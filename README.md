@@ -1,14 +1,10 @@
-<p align="center">
-  <img src="docs/icon.png" width="96" alt="">
-</p>
-
-<h1 align="center">taurus.</h1>
+<h1 align="center">Taurus.</h1>
 
 <p align="center">Open-Sourced fork of chroma.pw with built-in Spotify Premium. </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/iOS-000000?style=for-the-badge&logo=ios&logoColor=white" alt="iOS">
-  <img src="https://img.shields.io/badge/Spotify-9.1.78-1ED760?style=for-the-badge&logo=spotify&logoColor=white" alt="Spotify 9.1.78">
+  <img src="https://img.shields.io/badge/Spotify-9.1.90-1ED760?style=for-the-badge&logo=spotify&logoColor=white" alt="Spotify 9.1.78">
   <img src="https://img.shields.io/badge/Objective--C-3A95E3?style=for-the-badge&logo=apple&logoColor=white" alt="Objective-C">
   <img src="https://img.shields.io/badge/GitHub_Actions-2671E5?style=for-the-badge&logo=githubactions&logoColor=white" alt="GitHub Actions">
 </p>
@@ -19,16 +15,9 @@
   <a href="#install-it">Install it</a>
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/now-playing.webp" width="16%" alt="Full screen player with lyrics">
-  <img src="docs/screenshots/album.webp" width="16%" alt="Album">
-  <img src="docs/screenshots/playlist.webp" width="16%" alt="Playlist">
-  <img src="docs/screenshots/queue.webp" width="16%" alt="Queue">
-  <img src="docs/screenshots/live-activity.webp" width="16%" alt="Live Activity on the lock screen">
-  <img src="docs/screenshots/home.webp" width="16%" alt="Home">
-</p>
 
-## Taurus: the free, open-sourced liquid glass spotify tweak - made my me. <3
+
+## Taurus: the free, open-sourced liquid glass spotify tweak 
 
 A no-jailbreak Theos tweak that rebuilds Spotify for iOS in Liquid Glass, injected into your own
 decrypted IPA and signed with your own certificate.
@@ -55,7 +44,7 @@ Add the release source to [SideStore or Feather](https://raw.githubusercontent.c
 
 ## Build it
 
-Bring a decrypted **Spotify 9.1.78** IPA; you get an unsigned
+Bring a decrypted **Spotify 9.1.78 or 9.1.90** IPA; you get an unsigned
 `Taurus-<mod version>.ipa` to sign with SideStore, Feather or any certificate signer. Each
 [release](https://github.com/samj-exe/taurus/releases) also carries the tweak's `.deb`.
 
