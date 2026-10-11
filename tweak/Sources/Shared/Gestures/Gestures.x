@@ -7,9 +7,15 @@
 #import "Core/SGCore.h"
 #import "Gestures.h"
 #import "Headers/SPTNowPlayingPlaybackController.h"
+#import "Headers/SPTPlayer.h"
+#import "Shared/Player/PlayerState.h"
 
 static __weak SPTNowPlayingPlaybackControllerImplementation *sg_player;
 static void (^sg_observer)(SGGestureAction action);
+
+// The now playing screen's model for liking, captured below: the only object Spotify gives that
+// knows how to put the song into Liked Songs. Absent until that screen has been built once.
+static __weak id sg_auxModel;
 
 void SGGestureSetObserver(void (^observer)(SGGestureAction action)) {
     sg_observer = [observer copy];
@@ -17,7 +23,32 @@ void SGGestureSetObserver(void (^observer)(SGGestureAction action)) {
 
 #pragma mark - what a cell does
 
-static void perform(SGGestureAction action) {
+// The two sides of Like that Spotify's model answers to; the model is not part of any header the mod
+// carries, so it is called through these. The track is asked whether it can be liked at all.
+@protocol SGAuxActions <NSObject>
+- (void)addToCollection;
+- (BOOL)isInCollection;
+- (BOOL)disallowAddingToCollection;
+@end
+
+@protocol SGCollectableTrack <NSObject>
+@property (nonatomic, readonly) BOOL isPodcast;
+@property (nonatomic, readonly) BOOL isAudiobook;
+@end
+
+static void like(void) {
+    id<SGAuxActions> model = sg_auxModel;
+    if (![model respondsToSelector:@selector(addToCollection)]) return;
+    SPTPlayerTrack *track = SGPlayerState().track;
+    if (!track) return;
+    if ([track respondsToSelector:@selector(isPodcast)] && [(id<SGCollectableTrack>)track isPodcast]) return;
+    if ([track respondsToSelector:@selector(isAudiobook)] && [(id<SGCollectableTrack>)track isAudiobook]) return;
+    if ([model isInCollection]) return;
+    if ([model disallowAddingToCollection]) return;
+    [model addToCollection];
+}
+
+void SGPerformGestureAction(SGGestureAction action) {
     SPTNowPlayingPlaybackControllerImplementation *player = sg_player;
     if (!player) return;
     if (action != SGGestureNothing && sg_observer) sg_observer(action);
@@ -47,6 +78,9 @@ static void perform(SGGestureAction action) {
         case SGGestureRepeat:
             [player toggleRepeatMode];
             break;
+        case SGGestureLike:
+            like();
+            break;
     }
 }
 
@@ -71,7 +105,7 @@ static void perform(SGGestureAction action) {
     NSInteger cell = SGGestureCellAt(point, visible.size);
     NSArray<NSNumber *> *zones = SGGestureZones();
     if (cell < 0 || cell >= (NSInteger)zones.count) return;
-    perform((SGGestureAction)zones[(NSUInteger)cell].integerValue);
+    SGPerformGestureAction((SGGestureAction)zones[(NSUInteger)cell].integerValue);
 }
 
 @end
@@ -128,6 +162,16 @@ void SGGestureAttach(UIView *host) {
     id controller = %orig;
     sg_player = controller;
     return controller;
+}
+%end
+
+// The now playing screen's own model is built with the screen; held weak so its going away is not
+// kept alive, and so the Like action simply does nothing while there is none.
+%hook SPTNowPlayingAuxiliaryActionsModel
+- (id)initWithCollectionPlatform:(id)collectionPlatform testManager:(id)testManager statefulPlayer:(id)statefulPlayer yourEpisodesSaveManager:(id)saveManager curationPlatform:(id)curationPlatform smartShuffleHandler:(id)shuffleHandler playingTrackProvider:(id)provider {
+    id model = %orig;
+    sg_auxModel = model;
+    return model;
 }
 %end
 

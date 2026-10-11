@@ -22,6 +22,9 @@
 @property (nonatomic, copy) void (^changed)(BOOL on);   // after the switch is stored; the page reloads
 @property (nonatomic, strong) UIColor *color;   // title, subtitle and symbol, for a warning row
 @property (nonatomic, copy) NSString *symbol;
+// A leading icon of its own in place of `symbol`, tinted `color` (or white): SGDiscordIcon for the
+// row that links to the server.
+@property (nonatomic, strong) UIImage *image;
 // A switch row that changes the whole app draws SGGlowSwitch instead of a UISwitch.
 @property (nonatomic) BOOL glows;
 // An ⓘ button beside the row's switch, whose tap reads this out under the row's title.

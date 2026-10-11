@@ -14,6 +14,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMotionUsageDescription</key>
+	<string>Move your head with AirPods in to like a song or change track.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_spotify-ln-check._tcp</string>

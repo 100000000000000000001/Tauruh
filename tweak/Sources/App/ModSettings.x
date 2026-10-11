@@ -1,9 +1,9 @@
-// Settings: a Mod Settings row at the end of Spotify's settings list opens the mod's own page: the
+// Settings: a Taurus Settings row at the end of Spotify's settings list opens the mod's own page: the
 // Appearance card with Redesigned UI, Karaoke in the redesign (Sing, Redesigned/Lyrics/SingSettings.m), then a
 // page per part of Spotify, each holding what that part offers in the stored look (App/Pages.m: Navbar,
 // Player, Lyrics, Home & Library for the native look, Albums for the redesign), Audio effects
-// (Shared/AudioEffects, in either look and applying straight away), Premium, ads & privacy, Labs,
-// All flags, a searchable list of every flag with an override per flag, and Mod, the
+// (Shared/AudioEffects, in either look and applying straight away), Misc (this page's own banners),
+// Premium, ads & privacy, Labs, All flags, a searchable list of every flag with an override per flag, and Mod, the
 // build, its updates and links. The same row leads the side drawer's list (trees/test6.txt), above
 // Your plan, so the page is a tap from Home, and holding Home on the tab bar opens it too. The tweaks read the switches when they run, so a change
 // shows after Spotify restarts; the tab editor on the Navbar page applies as soon as the bar lays
@@ -17,6 +17,7 @@
 #import "Settings/SGPage.h"
 #import "Settings/SGPageStyle.h"
 #import "Settings/SGModPage.h"
+#import "Settings/SGGlowSwitch.h"
 #import "Native/Home/Home.h"
 #import "Shared/AdBlock/AdBlock.h"
 #import "Redesigned/Album/Album.h"
@@ -31,8 +32,42 @@
 static const CGFloat kRowHeight = 56;
 static char kRowKey, kInsetKey;
 
+// The Misc page's switch that hides the Discord banner row in modSettingsPage below.
+#define SGKeyHideDiscordBanner @"spotifyglass.hide.discordBanner"
+
 static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^page)(void)) {
     return SGWithSymbol(SGPageRow(title, page), symbol);
+}
+
+// How long the wordmark takes to carry its spectrum all the way round, matching the glow switch's turn.
+static const double kRainbowSpinSeconds = 4;
+
+// The wordmark, drawn as a horizontal rainbow wearing the same colours as the SGGlowSwitch rim: a pattern
+// image the full spectrum wide, cut to the text itself so the label keeps the font and metrics Spotify
+// gives it. The ramp starts and ends on the same pink, so two cycles butted together have no seam, and the
+// second cycle is drawn on so `phase` can slide the ramp off one edge and back in the other.
+static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) {
+    width = MAX(1, width);
+    height = MAX(1, height);
+    NSArray<UIColor *> *stops = SGGlowRainbowColors();
+    NSUInteger count = stops.count;
+    if (count < 2) return UIColor.whiteColor;
+    NSMutableArray *colors = [NSMutableArray arrayWithCapacity:count];
+    for (UIColor *stop in stops) [colors addObject:(id)stop.CGColor];
+    CGFloat *locations = malloc(sizeof(CGFloat) * count);
+    for (NSUInteger i = 0; i < count; i++) locations[i] = (CGFloat)i / (CGFloat)(count - 1);
+    CGFloat offset = (CGFloat)phase * width;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(width, height)];
+    UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+        CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+        CGGradientRef gradient = CGGradientCreateWithColors(space, (__bridge CFArrayRef)colors, locations);
+        CGContextDrawLinearGradient(context.CGContext, gradient, CGPointMake(-offset, 0), CGPointMake(width - offset, 0), 0);
+        CGContextDrawLinearGradient(context.CGContext, gradient, CGPointMake(width - offset, 0), CGPointMake(2 * width - offset, 0), 0);
+        CGGradientRelease(gradient);
+        CGColorSpaceRelease(space);
+    }];
+    free(locations);
+    return [UIColor colorWithPatternImage:image];
 }
 
 @interface SGTaurusSettingsPage : SGModPage
@@ -43,10 +78,13 @@ static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^
     UIView *_masthead;
     UILabel *_mastheadTitle, *_mastheadByline, *_compactTitle;
     BOOL _compactTitleVisible;
+    CADisplayLink *_rainbowLink;
+    CFTimeInterval _rainbowLast;
+    double _rainbowPhase;
 }
 
 - (instancetype)initWithSections:(NSArray<SGModSection *> *)sections {
-    return [super initWithTitle:@"taurus" intro:nil sections:sections footer:nil];
+    return [super initWithTitle:@"Taurus" intro:nil sections:sections footer:nil];
 }
 
 - (void)viewDidLoad {
@@ -55,12 +93,13 @@ static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^
     _masthead.backgroundColor = SGPageBackground();
     _masthead.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     _mastheadTitle = [UILabel new];
-    _mastheadTitle.text = @"taurus";
+    _mastheadTitle.text = @"Taurus";
     _mastheadTitle.font = [UIFont systemFontOfSize:36 weight:UIFontWeightBold];
-    _mastheadTitle.textColor = UIColor.whiteColor;
     _mastheadTitle.textAlignment = NSTextAlignmentRight;
+    [_mastheadTitle sizeToFit];
+    _mastheadTitle.textColor = SGRainbowTextColor(_mastheadTitle.bounds.size.width, _mastheadTitle.bounds.size.height, 0);
     _mastheadByline = [UILabel new];
-    _mastheadByline.text = @"by samj.";
+    _mastheadByline.text = @"by Samj & Natasha";
     _mastheadByline.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
     _mastheadByline.textColor = [UIColor colorWithWhite:1 alpha:0.72];
     _mastheadByline.textAlignment = NSTextAlignmentRight;
@@ -69,14 +108,61 @@ static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^
     self.tableView.tableHeaderView = _masthead;
 
     _compactTitle = [UILabel new];
-    _compactTitle.text = @"taurus";
+    _compactTitle.text = @"Taurus";
     _compactTitle.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
-    _compactTitle.textColor = UIColor.whiteColor;
     [_compactTitle sizeToFit];
+    _compactTitle.textColor = SGRainbowTextColor(_compactTitle.bounds.size.width, _compactTitle.bounds.size.height, 0);
     _compactTitle.alpha = 0;
     _compactTitle.isAccessibilityElement = YES;
     _compactTitle.accessibilityElementsHidden = YES;
     self.navigationItem.titleView = _compactTitle;
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self startRainbow];
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    [self stopRainbow];
+}
+
+// The wordmark cycles while the page is on screen, one tick of the display link carrying the hue a little
+// further round, and rests when it is not: the pattern image is cut to the label, so it is remade each frame.
+- (void)startRainbow {
+    if (_rainbowLink) return;
+    _rainbowLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(rainbowTick:)];
+    _rainbowLink.preferredFrameRateRange = CAFrameRateRangeMake(24, 30, 30);
+    [_rainbowLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
+}
+
+- (void)stopRainbow {
+    [_rainbowLink invalidate];
+    _rainbowLink = nil;
+    _rainbowLast = 0;
+}
+
+- (void)rainbowTick:(CADisplayLink *)link {
+    CFTimeInterval step = _rainbowLast > 0 ? MIN(link.timestamp - _rainbowLast, 0.1) : 0;
+    _rainbowLast = link.timestamp;
+    _rainbowPhase += step / kRainbowSpinSeconds;
+    _rainbowPhase -= floor(_rainbowPhase);
+    [self applyRainbow];
+}
+
+// Only the label on screen is redrawn: the compact title once the masthead has scrolled away, the masthead
+// while it has not.
+- (void)applyRainbow {
+    CGSize compact = _compactTitle.bounds.size;
+    if (_compactTitleVisible) {
+        if (compact.width >= 1)
+            _compactTitle.textColor = SGRainbowTextColor(compact.width, compact.height, _rainbowPhase);
+        return;
+    }
+    CGSize title = _mastheadTitle.bounds.size;
+    if (title.width >= 1)
+        _mastheadTitle.textColor = SGRainbowTextColor(title.width, title.height, _rainbowPhase);
 }
 
 - (void)viewDidLayoutSubviews {
@@ -87,9 +173,9 @@ static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^
         _masthead.frame = CGRectMake(0, 0, width, 132);
         if (sizeChanged || self.tableView.tableHeaderView != _masthead) self.tableView.tableHeaderView = _masthead;
         _masthead.backgroundColor = UIColor.blackColor;
-        _mastheadTitle.textColor = UIColor.whiteColor;
         _mastheadByline.textColor = UIColor.whiteColor;
-        _mastheadTitle.frame = CGRectMake(16, 24, MAX(0, width - 32), 48);
+        CGSize title = _mastheadTitle.bounds.size;
+        _mastheadTitle.frame = CGRectMake(MAX(16, width - 16 - title.width), 24 + (48 - title.height) / 2, title.width, title.height);
         _mastheadByline.frame = CGRectMake(16, 72, MAX(0, width - 32), 24);
     }
     [self updateCompactTitleForScrollView:self.tableView];
@@ -115,6 +201,18 @@ static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^
 
 @end
 
+// Misc: the two banners the mod puts on its own page, each with a switch here to put it away. Its own
+// page so the Settings list stays a list of parts, the way every other part's options sit one tap in.
+static UIViewController *miscSettingsPage(void) {
+    SGModRow *hideSigning = SGHideRow(@"Hide the lock screen alert", @"Hide the notice that this build cannot be opened from the lock screen", SGKeyHideSigningWarning);
+    SGModRow *hideDiscord = SGHideRow(@"Hide the Discord banner", @"Hide the row here that advertises the Discord server", SGKeyHideDiscordBanner);
+    SGModSection *banners = SGSection(nil, @[
+        SGWithSymbol(hideSigning, @"lock.slash"),
+        SGWithSymbol(hideDiscord, @"bubble.left.and.bubble.right"),
+    ]);
+    return [[SGModPage alloc] initWithTitle:@"Misc" intro:SGRestartNote sections:@[banners] footer:nil];
+}
+
 static UIViewController *modSettingsPage(void) {
     // Opening the page is the only thing that asks; the cache keeps it to once every six hours.
     SGCheckForUpdate();
@@ -122,6 +220,7 @@ static UIViewController *modSettingsPage(void) {
     // A build the lock screen cannot open leads the page, above the tweaks: it is the one thing here
     // that no switch can put right, and it is worth reading before anything else.
     SGModRow *signing = SGSigningWarningRow();
+    if (signing) signing.visible = ^BOOL { return !SGFlag(SGKeyHideSigningWarning, NO); };
     NSMutableArray<SGModRow *> *topRows = [NSMutableArray array];
     SGModRow *update = SGActionRow(@"Taurus update available", @"Tap to view the latest release", ^{
         NSString *url = SGUpdateNewestRelease().url;
@@ -132,6 +231,13 @@ static UIViewController *modSettingsPage(void) {
     update.visible = ^BOOL { return SGUpdateVersion() != nil; };
     update.refreshOn = SGUpdateCheckedNotification;
     [topRows addObject:update];
+    // Above the signing banner, in its shape: the server is the one place to ask about a build, so it
+    // reads before the warning about one.
+    SGModRow *discord = SGLinkRow(@"Join the Discord", @"Release pings, help and previews", SGDiscordURL);
+    discord.image = SGDiscordIcon();
+    discord.color = SGDiscordColor();
+    discord.visible = ^BOOL { return !SGFlag(SGKeyHideDiscordBanner, NO); };
+    [topRows addObject:discord];
     if (signing) [topRows addObject:signing];
     [sections addObject:SGSection(nil, topRows)];
     SGModRow *mod = pageRow(@"Mod", @"info.circle", ^UIViewController *{ return SGAboutPage(); });
@@ -154,6 +260,7 @@ static UIViewController *modSettingsPage(void) {
     }
     if (SGRedesignedUIStored()) [parts addObject:pageRow(@"Albums", @"square.stack", ^UIViewController *{ return SGRAlbumSettingsPage(); })];
     else [parts addObject:pageRow(@"Home & Library", @"house", ^UIViewController *{ return SGHomeSettingsPage(); })];
+    [parts addObject:pageRow(@"Misc", @"ellipsis.circle", ^UIViewController *{ return miscSettingsPage(); })];
     [sections addObject:SGAppearanceSection()];
     // Sing's microphone is the redesigned player's, so Karaoke is the redesign's; its row follows a download.
     if (SGRedesignedUIStored()) {
@@ -194,7 +301,7 @@ static UIViewController *modSettingsPage(void) {
     if (!(self = [super initWithFrame:frame])) return nil;
     _icon = SGSymbolView(@"slider.horizontal.3", 20, UIImageSymbolWeightRegular, 24);
     _title = [UILabel new];
-    _title.text = @"Mod Settings";
+    _title.text = @"Taurus Settings";
     _title.textColor = UIColor.whiteColor;
     _chevron = SGSymbolView(@"chevron.right", 11, UIImageSymbolWeightSemibold, 12);
     for (UIView *v in @[_icon, _title, _chevron]) [self addSubview:v];

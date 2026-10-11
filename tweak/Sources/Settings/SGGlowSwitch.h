@@ -12,3 +12,7 @@
 @property (nonatomic, getter=isOn) BOOL on;
 - (void)setOn:(BOOL)on animated:(BOOL)animated;
 @end
+
+// The rainbow the switch circles its rim with: the stops in order, first and last the same pink so the
+// turn has no seam. Shared so the Taurus wordmark wears the same one.
+NSArray<UIColor *> *SGGlowRainbowColors(void);

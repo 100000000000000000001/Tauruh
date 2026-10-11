@@ -16,6 +16,8 @@ void SGAdoptFonts(UIView *list, UIView *exclude);
 UIImageView *SGSymbolView(NSString *name, CGFloat size, UIImageSymbolWeight weight, CGFloat box);
 // A symbol on a rounded grey square, the leading icon of a row that opens a page.
 UIImage *SGTileImage(NSString *symbol);
+// The Discord mark as a template image, for a row's leading slot (Settings/SGDiscordIcon.m).
+UIImage *SGDiscordIcon(void);
 // A grey note in a wrapper view, for a table header or footer; SGFitNote sizes it to its text.
 UIView *SGNote(NSString *text);
 void SGFitNote(UITableView *table, UIView *wrapper, CGFloat top, CGFloat bottom);
@@ -32,5 +34,6 @@ UITableViewCell *SGDequeueCell(UITableView *table, NSString *identifier);
 
 void SGOpenURL(NSString *url);
 extern NSString *const SGRepoURL;
+extern NSString *const SGDiscordURL;
 // The controller on top of the key window, through whatever is presented over it.
 UIViewController *SGTopController(void);

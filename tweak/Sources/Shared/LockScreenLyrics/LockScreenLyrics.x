@@ -165,7 +165,9 @@ static BOOL playingBy(NSDictionary *info) {
     double elapsed = elapsedAt(info, now, now);
     NSString *line = lineFor(info, elapsed);
     sg_shownLine = line;
-    %orig(line ? withLine(info, line, elapsed) : info);
+    // Like the update's own rewrite: the line replaces the artist when there is one, and the clock is
+    // written either way. Spotify's dictionary keeps every other key.
+    %orig(line ? withLine(info, line, elapsed) : withElapsed(info, elapsed));
 }
 
 - (NSDictionary *)nowPlayingInfo {
@@ -181,6 +183,10 @@ static BOOL playingBy(NSDictionary *info) {
     if (!SGFlag(SGKeyLockScreenLyrics, YES)) return;
     sg_lock = [NSObject new];
     %init;
+    // A change of account can change what is playing under the same info; take another look at once.
+    [NSNotificationCenter.defaultCenter addObserverForName:@"pw.spoti.account.changed" object:nil
+                                                     queue:NSOperationQueue.mainQueue
+                                                usingBlock:^(NSNotification *note) { tick(); }];
     // The timer waits for Spotify to report a playing track; nothing before that has a line to show.
     SGLog(@"lock screen lyrics: on");
 }

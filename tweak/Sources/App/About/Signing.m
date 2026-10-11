@@ -89,6 +89,7 @@ SGModRow *SGSigningWarningRow(void) {
 // but a build that is simply left broken does not nag on every launch. The row stays either way.
 void SGCheckSigningOnce(void) {
     if (SGSigningOpensFromLockScreen()) return;
+    if (SGFlag(SGKeyHideSigningWarning, NO)) return;
     NSString *appID = SGSigningAppIdentifier();
     NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
     SGLog(@"signing: installed as %@ but signed under %@; the now playing card cannot open this build",

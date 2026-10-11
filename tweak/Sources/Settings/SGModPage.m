@@ -628,9 +628,16 @@ static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
     UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
     if (row.color) content.secondaryTextProperties.color = row.color;
     BOOL tile = row.symbol && !row.color;
-    if (tile) content.image = SGTileImage(row.symbol);
+    if (row.image) {
+        content.image = [row.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        content.imageProperties.tintColor = row.color ?: UIColor.whiteColor;
+        content.imageToTextPadding = 14;
+    } else if (tile) {
+        content.image = SGTileImage(row.symbol);
+    }
     cell.contentConfiguration = content;
-    cell.separatorInset = UIEdgeInsetsMake(0, row.symbol ? (tile ? 58 : 48) : 16, 0, 0);
+    BOOL leading = row.symbol || row.image;
+    cell.separatorInset = UIEdgeInsetsMake(0, leading ? (tile ? 58 : 48) : 16, 0, 0);
     showProgress(cell, row, NO);
 
     if (row.key) {

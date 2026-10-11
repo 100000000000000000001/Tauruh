@@ -20,6 +20,9 @@ static const CGFloat kFontSize = 30, kMargin = 24, kLineGap = 24, kRowTighten = 
 static const CGFloat kDimAlpha = 0.3, kFillEdge = 22, kLift = 2.5, kDimScale = 0.97;
 static const CGFloat kAnchor = 0.28;   // where the sung line rests, as a share of the height
 static const CGFloat kEdgeFade = 0.1;  // the lines fade out over this share at the top and bottom
+// The small preview under the player's cover: the room the page's lines have in it and the gap under
+// the sung one, which the room leaves only a peek of the next line through.
+static const CGFloat kCompactMargin = 24, kCompactGap = 6;
 static const CGFloat kBlurPerLine = 1.4, kMaxBlur = 6;
 // The (oh, aye) hanging under a line: smaller, a little dimmer, and just clear of it.
 static const CGFloat kBackingScale = 0.62, kBackingAlpha = 0.8, kBackingGap = 4;
@@ -1080,6 +1083,7 @@ typedef struct {
     // The room the lines have (lineInsets), and the fade's edges on their way to it from _bandFrom.
     UIEdgeInsets _band, _bandFrom;
     CFTimeInterval _bandSince, _bandFor;
+    BOOL _compact;   // the small preview under the player's cover: no credit, no extras, no scrolling
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -1124,6 +1128,28 @@ typedef struct {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(scheduleLink) name:UIApplicationDidBecomeActiveNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(scheduleLink) name:UIApplicationWillResignActiveNotification object:nil];
     return self;
+}
+
+// The small preview under the player's cover: one line, the one being sung, without the credit, the
+// pronunciation and translation button or their meanings, with nothing to scroll and no touches, so a
+// tap on the preview is still Spotify's to take. The font follows the room the player gives it.
+- (void)useCompactFontSize:(CGFloat)size {
+    if (!_compact) {
+        _compact = YES;
+        _crediting = NO;
+        _margin = kCompactMargin;
+        _lineGap = kCompactGap;
+        _blurPerLine = 0;
+        _maxBlur = 0;
+        _scroll.scrollEnabled = NO;
+        _scroll.alwaysBounceVertical = NO;
+        self.userInteractionEnabled = NO;
+        for (UIGestureRecognizer *gesture in self.gestureRecognizers) gesture.enabled = NO;
+    }
+    if (fabs(size - _fontSize) < 0.5) return;
+    _fontSize = size;
+    _font = [UIFont systemFontOfSize:_fontSize weight:UIFontWeightBold];
+    if (_lines && _tops) [self restyle];
 }
 
 - (void)dealloc {
@@ -1172,6 +1198,7 @@ typedef struct {
 
 // Genius is asked once the song's lines are in; lines that change under it are matched again.
 - (void)askMeanings {
+    if (_compact) return;   // the preview shows the line alone; nothing there explains a word
     _meanings = nil;
     NSUInteger asked = ++_meaningsAsked;
     NSArray<SGKaraokeLine *> *lines = _lines;
@@ -1402,6 +1429,9 @@ typedef struct {
 
 // What a line shows besides its words: what the song has, of what the lyrics menu has switched on.
 - (SGRKaraokeStyle *)styleNow {
+    if (_compact) {   // the preview sets the line alone, however the words are switched for the page
+        return [[SGRKaraokeStyle alloc] initWithSize:_fontSize order:SGRLyricsTextOrder() pronunciation:NO translation:NO];
+    }
     return [[SGRKaraokeStyle alloc] initWithSize:_fontSize order:SGRLyricsTextOrder()
                                    pronunciation:_hasSpoken && SGFlag(SGRKeyLyricsPronunciation, NO)
                                      translation:_hasTranslation && SGFlag(SGRKeyLyricsTranslation, NO)];
@@ -1447,6 +1477,10 @@ typedef struct {
 // The button shows only for a song with a pronunciation or a translation to show, and its menu only
 // what the song has: a switch for each, reading what tapping it will do.
 - (void)offerExtras {
+    if (_compact) {   // the preview has no room for the button, and nothing to open
+        _extras.hidden = YES;
+        return;
+    }
     BOOL offered = _lines && (_hasSpoken || _hasTranslation);
     if (!offered) {
         _extras.hidden = YES;
@@ -1696,7 +1730,7 @@ typedef struct {
 - (void)tick {
     NSString *track = SGKaraokePlayingTrack();
     if (!(track == _track || [track isEqualToString:_track])) {
-        SGLog(@"karaoke: page shows track %@, lyrics %@", track, SGKaraokeLinesForTrack(track) ? @"captured" : @"not captured yet");
+        if (!_compact) SGLog(@"karaoke: page shows track %@, lyrics %@", track, SGKaraokeLinesForTrack(track) ? @"captured" : @"not captured yet");
         _track = track;
         _lines = nil;
         _builtWidth = 0;
@@ -1707,18 +1741,20 @@ typedef struct {
     // Plain text is shown while Spotify is asked whether it has the song timed; its answer replaces it.
     NSArray<SGKaraokeLine *> *kept = _plain && _lines && track ? SGKaraokeLinesForTrack(track) : nil;
     if (kept && kept != _lines) {
-        SGLog(@"karaoke: timed lines of %@ came in over the plain text", track);
+        if (!_compact) SGLog(@"karaoke: timed lines of %@ came in over the plain text", track);
         _lines = nil;
         _builtWidth = 0;
         [self creditTo:nil];
         [self dropLineViews];
     }
     if (!_lines && track && (_lines = SGKaraokeLinesForTrack(track))) {
-        SGLog(@"karaoke: showing %lu lines of %@", (unsigned long)_lines.count, track);
+        if (!_compact) SGLog(@"karaoke: showing %lu lines of %@", (unsigned long)_lines.count, track);
         [self timeLines];
         [self setNeedsLayout];
     }
-    [self setShowing:_tops != nil];
+    // The preview has no clock of its own for words: with nothing timed there is no line to sweep, and
+    // Spotify's own reading is left in its place.
+    [self setShowing:_tops != nil && !(_compact && _plain)];
     // The source is settled a moment after the lines are, so it is asked for until it answers.
     if (_crediting && _lines && !_credit.text.length) [self creditTo:SGLyricsCreditFor(track)];
     if (!_tops) return;

@@ -16,7 +16,12 @@ typedef NS_ENUM(NSInteger, SGGestureAction) {
     SGGesturePreviousTrack,
     SGGestureShuffle,
     SGGestureRepeat,
+    SGGestureLike,   // the current song into Liked Songs, through the now playing screen's model
 };
+
+// Runs one of the actions above against the player, exactly as a double tap on a zone does; the
+// haptics observer hears it too. Main thread. Used by the double tap and by the AirPods gestures.
+void SGPerformGestureAction(SGGestureAction action);
 
 NSArray<NSString *> *SGGestureActionNames(void);
 NSArray<NSString *> *SGGestureSplitNames(void);

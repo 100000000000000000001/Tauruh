@@ -4,6 +4,7 @@
 #import "Pages.h"
 #import "Shared/ArtistBlock/ArtistBlock.h"
 #import "Shared/Gestures/Gestures.h"
+#import "Shared/HeadGestures/HeadGestures.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/LyricsMeanings/Meanings.h"
 #import "Shared/Player/PlayerSettings.h"
@@ -91,10 +92,13 @@ UIViewController *SGPlayerSettingsPage(void) {
     blocked.value = ^NSString *{
         return SGFlag(SGKeyArtistBlock, NO) ? @(SGBlockedArtists().count).stringValue : @"Off";
     };
+    SGModRow *head = SGPageRow(@"AirPods gestures", ^UIViewController *{ return SGHeadGesturesSettingsPage(); });
+    head.value = ^NSString *{ return SGHeadGestureStatus(); };
     BOOL native = !SGRedesignedUIStored();
 
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObject:SGSection(nil, @[
         SGWithSymbol(SGPageRow(@"Gestures", ^UIViewController *{ return SGGesturesSettingsPage(); }), @"hand.tap"),
+        SGWithSymbol(head, @"airpods"),
         SGWithSymbol(blocked, @"person.crop.circle.badge.xmark"),
     ])];
     NSMutableArray<SGModRow *> *pages = [NSMutableArray array];

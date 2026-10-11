@@ -228,6 +228,7 @@ static void gesturePerformed(SGGestureAction action) {
         case SGGesturePreviousTrack: SGPlayFeedback(SGFeedbackSkip); break;
         case SGGestureShuffle:
         case SGGestureRepeat: SGPlayFeedback(SGFeedbackToggle); break;
+        case SGGestureLike: SGPlayFeedback(SGFeedbackAdd); break;
     }
 }
 

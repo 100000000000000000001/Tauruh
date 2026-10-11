@@ -720,6 +720,9 @@ static void pass(SGRPlayerMenuTakeover *t) {
         [UIView animateWithDuration:0.2 animations:^{ t.catcher.alpha = 1; }];
         [t.card growFrom:anchorInCard(t)];
     } else if (changed) {
+        // The rows just replaced have never been laid out: frame them at the size they are about to have,
+        // or the animation below walks them, from nothing at the card's corner, to where they belong.
+        [t.card layoutIfNeeded];
         SGRAnimate(SGRMotionLayout, ^{
             placeCard(t, container);
             [t.card layoutIfNeeded];

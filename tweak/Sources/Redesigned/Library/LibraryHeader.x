@@ -1,7 +1,9 @@
 // Library redesign: the header of Your Library and of a folder inside it, the way Home and Search have theirs
-// (Redesigned/Home/HomeHeader.x, Redesigned/Search/SearchPage.x). A large title at the leading edge, the avatar
-// that opens the side drawer at the trailing edge, and the scrim Spotify lays behind the header gone, the soft
-// scroll edge (Kit/SGREdgeEffect.x) being what keeps the header clear of the list scrolling under it.
+// (Redesigned/Home/HomeHeader.x, Redesigned/Search/SearchPage.x), with the avatar that opens the side drawer and
+// the buttons at the trailing edge. The root draws no title of its own -- "Your Library" ran over the avatar in
+// the leading corner, so it is not drawn at all and the header carries no text; a folder still draws its own
+// name. The scrim Spotify lays behind the header is gone, the soft scroll edge (Kit/SGREdgeEffect.x) being what
+// keeps the header clear of the list scrolling under it.
 //
 // The filter chips under the row stay Spotify's, untouched. They were taken out when the redesign was first
 // built and the header closed up by the 49pt they left, and sorting a library turned out to be something the
@@ -177,8 +179,8 @@ static BOOL isFace(UIView *view) {
     return faceClass && [view isKindOfClass:faceClass];
 }
 
-// The root header's controls at its trailing edge, the avatar last, and the title before them. Answers what it
-// placed in the order it reads, nothing while the header has no control laid out.
+// The root header's controls at its trailing edge, the avatar last and no title at all. Answers what it placed
+// in the order it reads, nothing while the header has no control laid out.
 static NSArray<UIView *> *placeRoot(UIView *header) {
     UIView *spotifyTitle = SGRFindByIdentifier(header, @"YourLibraryHeader.title", &kHeaderTitleKey);
     vanish(spotifyTitle);
@@ -193,9 +195,9 @@ static NSArray<UIView *> *placeRoot(UIView *header) {
     if (face) [trailing addObject:face];
     if (!trailing.count) return trailing;
 
-    CGFloat leading = placeTrailing(header, trailing);
-    CGRect row = SGFrameIn(trailing.firstObject, header);
-    layoutTitle(header, spotifyTitle, SGRSideMargin, leading, CGRectGetMidY(row));
+    // No title on the root: "Your Library" ran over the avatar in the leading corner, so the header carries
+    // only the controls at its trailing edge.
+    placeTrailing(header, trailing);
     for (UIView *control in trailing) watchRow(control.superview, header, placeRoot);
     return trailing;
 }

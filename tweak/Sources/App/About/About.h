@@ -24,6 +24,8 @@ BOOL SGSigningOpensFromLockScreen(void);     // YES when unreadable, so a build 
 SGModRow *SGSigningWarningRow(void);          // nil while the signature is sound
 void SGCheckSigningOnce(void);
 void SGShowSigningFixIfPending(void);   // the sheet the tour held back, if any
+// The Misc switch (App/ModSettings.x) hides both the settings banner and the once-per-signature alert.
+#define SGKeyHideSigningWarning @"spotifyglass.hide.signingWarning"
 
 // Backup.m: the settings out to a JSON file through the share sheet, and back in from one, replacing
 // what is set and restarting.

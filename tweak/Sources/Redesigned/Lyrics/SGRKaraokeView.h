@@ -18,6 +18,12 @@
 @property (nonatomic, readonly) UIEdgeInsets lineInsets;
 // duration 0 moves everything at once.
 - (void)setLineInsets:(UIEdgeInsets)insets duration:(NSTimeInterval)duration;
+// The one-line preview under the player's cover (Redesigned/Player/PlayerArtwork.x): the lines are set
+// at `size`, without the credit, the pronunciation and translation button or their meanings, with
+// nothing to scroll and no touches, so a tap on the preview stays Spotify's. The view takes the whole
+// of its host and dims the rest of it as ever, which is how Spotify's own line under it is hidden. Set
+// before it has lines, and again as the room it has changes.
+- (void)useCompactFontSize:(CGFloat)size;
 // Asked as a tap lands on the lines, before it seeks or opens what a line means; NO leaves the tap to
 // whoever else watches the touch. Nil takes every tap.
 @property (nonatomic, copy) BOOL (^takesTap)(void);
