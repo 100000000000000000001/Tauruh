@@ -22,7 +22,7 @@
 A no-jailbreak Theos tweak that rebuilds Spotify for iOS in Liquid Glass, injected into your own
 decrypted IPA and signed with your own certificate.
 
-Built and tested on **Spotify 9.1.78** — use that version's IPA. The mod hooks Spotify's own classes,
+Built and tested on **Spotify 9.1.90** — use that version's IPA. The mod hooks Spotify's own classes,
 which change between releases, so another version may build and then break.
 
 | | |
