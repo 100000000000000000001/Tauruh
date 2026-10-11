@@ -1,6 +1,8 @@
 #include "SGSingTimeline.h"
 #include "SGSingDSP.h"
+#include "Shared/AudioEffects/SGDSPEffects.h"
 #include <math.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -13,7 +15,23 @@ struct SGSingTimeline {
     SGAudioStamp origin;
     SGSingTimelineState state;
     SGSingMixer mixer;
+    SGDSPReverb *room;
+    float roomLeft[kSGDSPEffectMaxFrames], roomRight[kSGDSPEffectMaxFrames];
+    atomic_uint angleBits, distanceBits, roomBits, widthBits;
+    atomic_bool spatial;
 };
+
+static uint32_t floatBits(float value) {
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof bits);
+    return bits;
+}
+
+static float floatFromBits(uint32_t bits) {
+    float value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
 
 SGSingTimeline *SGSingTimelineCreate(uint32_t capacity, uint32_t reserve) {
     if (!capacity || capacity > SGSingTimelineFrames || !reserve || reserve > capacity) return NULL;
@@ -22,11 +40,20 @@ SGSingTimeline *SGSingTimelineCreate(uint32_t capacity, uint32_t reserve) {
     t->dry = calloc((size_t)capacity * 2, sizeof(float));
     t->vocals = calloc((size_t)capacity * 2, sizeof(float));
     if (!t->dry || !t->vocals) { SGSingTimelineDestroy(t); return NULL; }
+    t->room = SGDSPReverbCreate(SGSingSampleRate, 2, 100);
+    atomic_store(&t->distanceBits, floatBits(1.5f));
+    atomic_store(&t->roomBits, floatBits(0.25f));
+    atomic_store(&t->widthBits, floatBits(1.1f));
     t->capacity = capacity; t->reserve = reserve;
     return t;
 }
 void SGSingTimelineDestroy(SGSingTimeline *t) {
-    if (t) { free(t->dry); free(t->vocals); free(t); }
+    if (t) {
+        SGDSPReverbFree(t->room);
+        free(t->dry);
+        free(t->vocals);
+        free(t);
+    }
 }
 void SGSingTimelineBegin(SGSingTimeline *t, SGAudioStamp origin, float level) {
     t->origin = origin;
@@ -39,6 +66,16 @@ void SGSingTimelineBegin(SGSingTimeline *t, SGAudioStamp origin, float level) {
 void SGSingTimelineSetLevel(SGSingTimeline *t, float level) {
     t->level = SGSingClampLevel(level);
     if (t->state == SGSingTimelineActive) SGSingMixerSetLevel(&t->mixer, level);
+}
+void SGSingTimelineSetVoiceAngle(SGSingTimeline *t, float radians) {
+    if (t) atomic_store(&t->angleBits, floatBits(isfinite(radians) ? radians : 0));
+}
+void SGSingTimelineSetSpatial(SGSingTimeline *t, bool on, float distance, float room, float width) {
+    if (!t) return;
+    atomic_store(&t->distanceBits, floatBits(distance));
+    atomic_store(&t->roomBits, floatBits(room));
+    atomic_store(&t->widthBits, floatBits(width));
+    atomic_store(&t->spatial, on);
 }
 void SGSingTimelineBypass(SGSingTimeline *t) {
     if (t->state == SGSingTimelineIdle || t->state == SGSingTimelineDraining) return;
@@ -131,20 +168,46 @@ uint32_t SGSingTimelineRead(SGSingTimeline *t, float *out, uint32_t frames) {
     }
     uint64_t queued = SGSingTimelineQueued(t);
     if (frames > queued) frames = (uint32_t)queued;
-    for (uint32_t i = 0; i < frames; i++, t->consumed++) {
-        size_t at = (t->consumed % t->capacity) * 2;
-        float dry[2] = {t->dry[at], t->dry[at+1]}, result[2];
-        if (t->consumed < t->processed) {
-            SGSingMixerProcess(&t->mixer, dry, t->vocals + at, result, 1);
-        } else {
-            // Bypass completes before the last aligned vocal runs out. Never extrapolate a
-            // missing stem from its last sample: that would add a DC offset to the original.
-            result[0] = dry[0]; result[1] = dry[1];
-            // A short last vocal packet can exhaust coverage inside a large render quantum.
-            // Keep the mixer's next recovery ramp anchored to the dry gain actually emitted.
-            if (t->mixer.gain != 1 || t->mixer.remaining) SGSingMixerInit(&t->mixer, SGSingSampleRate, 1);
+    SGSingMixerSetVoiceAngle(&t->mixer, floatFromBits(atomic_load(&t->angleBits)));
+    SGSingMixerSetSpatial(&t->mixer, atomic_load(&t->spatial),
+                          floatFromBits(atomic_load(&t->distanceBits)),
+                          floatFromBits(atomic_load(&t->roomBits)),
+                          floatFromBits(atomic_load(&t->widthBits)));
+    for (uint32_t base = 0; base < frames;) {
+        uint32_t count = frames - base;
+        if (count > kSGDSPEffectMaxFrames) count = kSGDSPEffectMaxFrames;
+        for (uint32_t i = 0; i < count; i++, t->consumed++) {
+            size_t at = (t->consumed % t->capacity) * 2;
+            float dry[2] = {t->dry[at], t->dry[at + 1]}, result[2];
+            if (t->consumed < t->processed) {
+                SGSingMixerProcess(&t->mixer, dry, t->vocals + at, result, 1);
+                t->roomLeft[i] = t->mixer.roomSend;
+            } else {
+                // Bypass completes before the last aligned vocal runs out. Never extrapolate a
+                // missing stem from its last sample: that would add a DC offset to the original.
+                result[0] = dry[0]; result[1] = dry[1];
+                t->mixer.roomSend = 0;
+                t->roomLeft[i] = 0;
+                // A short last vocal packet can exhaust coverage inside a large render quantum.
+                // Keep the mixer's next recovery ramp anchored to the dry gain actually emitted.
+                if (t->mixer.gain != 1 || t->mixer.remaining) {
+                    t->mixer.gain = t->mixer.targetGain = 1;
+                    t->mixer.step = 0;
+                    t->mixer.remaining = 0;
+                }
+            }
+            t->roomRight[i] = t->roomLeft[i];
+            out[(base + i) * 2] = result[0];
+            out[(base + i) * 2 + 1] = result[1];
         }
-        out[i*2] = result[0]; out[i*2+1] = result[1];
+        if (t->room) {
+            SGDSPReverbRun(t->room, t->roomLeft, t->roomRight, count);
+            for (uint32_t i = 0; i < count; i++) {
+                out[(base + i) * 2] = fmaxf(-1, fminf(1, out[(base + i) * 2] + t->roomLeft[i]));
+                out[(base + i) * 2 + 1] = fmaxf(-1, fminf(1, out[(base + i) * 2 + 1] + t->roomRight[i]));
+            }
+        }
+        base += count;
     }
     if (t->state == SGSingTimelineDraining && t->consumed == t->captured) t->state = SGSingTimelineIdle;
     return frames;

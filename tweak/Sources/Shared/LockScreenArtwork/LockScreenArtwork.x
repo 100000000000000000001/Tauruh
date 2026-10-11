@@ -256,14 +256,10 @@ static SGArtworkWatcher *sg_watcher;
 %end
 
 %ctor {
-    if (!SGAnimatedArtworkAvailable()) {
-        SGLog(@"lock artwork: off, animated artwork needs iOS 26");
+    if (SGAnimatedArtworkAvailable()) {
+        SGLog(@"lock artwork: handled by full-screen artwork settings");
         return;
     }
-    sg_lock = [NSObject new];
-    sg_watcher = [SGArtworkWatcher new];
-    SGAddPlayerStateObserver(sg_watcher);
-    %init;
-    SGRequireClasses(@[@"MPNowPlayingInfoCenter"]);
-    SGLog(@"lock artwork: on");
+    SGLog(@"lock artwork: off, animated artwork needs iOS 26");
+    return;
 }

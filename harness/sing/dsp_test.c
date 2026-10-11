@@ -89,7 +89,19 @@ static void mixing(void) {
     SGSingMixerSetLevel(&m, NAN);
     assert(m.targetGain == 1);
 }
+static void spatial(void) {
+    enum { frames = 4410 };
+    float original[frames * 2], vocals[frames * 2], output[frames * 2];
+    for (unsigned i = 0; i < frames * 2; i++) original[i] = vocals[i] = 0.25f;
+    SGSingMixer mixer;
+    SGSingMixerInit(&mixer, 44100, 1);
+    SGSingMixerSetSpatial(&mixer, true, 1.5f, 1, 1);
+    SGSingMixerSetVoiceAngle(&mixer, 1.57079632679f);
+    SGSingMixerProcess(&mixer, original, vocals, output, frames);
+    assert(output[(frames - 1) * 2 + 1] > output[(frames - 1) * 2]);
+    assert(mixer.roomSend > 0);
+}
 int main(void) {
-    rings(); mixing();
-    puts("sing: wraparound, full/empty, 100000 concurrent packets, ramps and limiter passed");
+    rings(); mixing(); spatial();
+    puts("sing: queues, ramps, limiter, spatial placement and room send passed");
 }

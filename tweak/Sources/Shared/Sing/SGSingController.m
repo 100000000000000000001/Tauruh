@@ -7,6 +7,8 @@
 #import "Shared/Audio/SGAudioPipeline.h"
 #import "Shared/Player/PlayerState.h"
 #import "Shared/Player/SpeedPitch.h"
+#import "Shared/HeadGestures/HeadGestures.h"
+#import "SGSingSpatial.h"
 #import <AVFoundation/AVFoundation.h>
 #import <MediaPlayer/MediaPlayer.h>
 
@@ -65,9 +67,37 @@ static double downstreamLatency(void) {
 @property (nonatomic) CFTimeInterval lastClockPublication;
 - (void)workerStatus:(int32_t)status session:(SGSingSession *)session;
 - (void)reconcile;
+- (void)updateSpatial;
+- (void)applySpatial;
+- (void)setSpatialAngle:(double)angle;
 - (void)stop:(BOOL)discard unload:(BOOL)unload;
 @end
 static SGSingController *sg_controller;
+static SGSpatialFront sg_spatialFront;
+static BOOL sg_spatialListening;
+
+static double storedSpatialNumber(NSString *key, double fallback, double minimum, double maximum) {
+    id value = [NSUserDefaults.standardUserDefaults objectForKey:key];
+    double number = [value isKindOfClass:NSNumber.class] ? [value doubleValue] : fallback;
+    return isfinite(number) ? fmin(maximum, fmax(minimum, number)) : fallback;
+}
+
+static BOOL spatialAudioOnRoute(void) {
+    for (AVAudioSessionPortDescription *port in AVAudioSession.sharedInstance.currentRoute.outputs) {
+        if ([port respondsToSelector:@selector(spatialAudioEnabled)] && port.spatialAudioEnabled) return YES;
+    }
+    return NO;
+}
+
+static void spatialMotion(CMDeviceMotion *motion) {
+    if (!motion) {
+        sg_spatialFront.hasFront = false;
+        dispatch_async(dispatch_get_main_queue(), ^{ [sg_controller setSpatialAngle:0]; });
+        return;
+    }
+    double angle = SGSpatialVoiceAngle(&sg_spatialFront, motion.attitude.yaw, motion.timestamp, SGSingSpatialFront());
+    dispatch_async(dispatch_get_main_queue(), ^{ [sg_controller setSpatialAngle:angle]; });
+}
 
 uint64_t SGSingTrackIdentifier(id uri) {
     const char *text = SGURIString(uri).UTF8String;
@@ -297,6 +327,7 @@ static void workerStatus(void *context, int32_t status) {
     }
 }
 - (void)reconcile {
+    [self updateSpatial];
     SGSingSession *session = _session;
     if (session) {
         SPTPlayerState *state = SGPlayerState();
@@ -337,7 +368,36 @@ static void workerStatus(void *context, int32_t status) {
     if (!_session && _wanted && !_waitingForCommand && !_blockedTrack) [self start];
     if (!_session && !_waitingForCommand && !_retired.count &&
         (!_wanted || _blockedTrack || [self restriction])) { [_timer invalidate]; _timer = nil; }
+    [self updateSpatial];
 }
+
+- (void)applySpatial {
+    SGSingStream *current = stream(_session);
+    if (!current) return;
+    SGSingStreamSetSpatial(current, SGSingSpatial(), SGSingSpatialDistance(),
+                           SGSingSpatialRoom() / 100, SGSingSpatialWidth() / 100);
+}
+
+- (void)setSpatialAngle:(double)angle {
+    SGSingStreamSetVoiceAngle(stream(_session), isfinite(angle) ? (float)angle : 0);
+}
+
+- (void)updateSpatial {
+    [self applySpatial];
+    SPTPlayerState *player = SGPlayerState();
+    BOOL wanted = SGSingSpatial() && _wanted && _session && player.isPlaying && !player.isPaused && !_interrupted;
+    BOOL listen = wanted && !spatialAudioOnRoute();
+    if (listen == sg_spatialListening) return;
+    sg_spatialListening = listen;
+    SGLog(@"Sing spatial voice %@", listen ? @"follows the head" : wanted ? @"stands down for system spatial audio" : @"is ahead");
+    if (listen) {
+        SGHeadMotionListen(@"sing", ^(CMDeviceMotion *motion) { spatialMotion(motion); });
+    } else {
+        SGHeadMotionListen(@"sing", nil);
+        [self setSpatialAngle:0];
+    }
+}
+
 - (void)playerStateDidChange:(SPTPlayerState *)state {
     NSString *track = trackOf(state);
     if (_blockedTrack && ![_blockedTrack isEqualToString:track]) _blockedTrack = nil;
@@ -420,6 +480,7 @@ static void workerStatus(void *context, int32_t status) {
     if (configured) { [self updateAvailability]; return; }
     _wanted = NO; _blockedTrack = nil; _waitingForCommand = NO;
     [self stop:NO unload:YES];
+    [self updateSpatial];
     [self publish:SGSingUnavailable explanation:nil];
 }
 // A seek or a skip replaces the running generation; Sing prepares the new position once it lands.
@@ -475,6 +536,52 @@ void SGSingSetEnabled(BOOL enabled) {
     }
     [sg_controller reconcile];
 }
+#if SG_DRIVER
+void SGDriverSingSetEnabled(BOOL enabled) { SGSingSetEnabled(enabled); }
+#endif
+
+BOOL SGSingSpatialAvailable(void) {
+    return SGSingSupported() && SGHeadGesturesAvailable();
+}
+
+BOOL SGSingSpatial(void) {
+    return SGFlag(SGKeySingSpatial, NO);
+}
+
+void SGSetSingSpatial(BOOL on) {
+    on = on && SGSingSpatialAvailable();
+    [NSUserDefaults.standardUserDefaults setBool:on forKey:SGKeySingSpatial];
+    if (on) SGHeadMotionAskPermission();
+    [sg_controller updateSpatial];
+    [NSNotificationCenter.defaultCenter postNotificationName:SGSingDidChangeNotification object:nil];
+}
+
+double SGSingSpatialDistance(void) {
+    return storedSpatialNumber(SGKeySingSpatialDistance, 1.5, 1, 6.5);
+}
+
+double SGSingSpatialRoom(void) {
+    return storedSpatialNumber(SGKeySingSpatialRoom, 25, 0, 100);
+}
+
+double SGSingSpatialFront(void) {
+    return storedSpatialNumber(SGKeySingSpatialFront, 5, 5, 60);
+}
+
+double SGSingSpatialWidth(void) {
+    return storedSpatialNumber(SGKeySingSpatialWidth, 110, 0, 200);
+}
+
+void SGSetSingSpatialSound(double meters, double roomPercent, double frontSeconds, double widthPercent) {
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    [defaults setDouble:fmin(6.5, fmax(1, meters)) forKey:SGKeySingSpatialDistance];
+    [defaults setDouble:fmin(100, fmax(0, roomPercent)) forKey:SGKeySingSpatialRoom];
+    [defaults setDouble:fmin(60, fmax(5, frontSeconds)) forKey:SGKeySingSpatialFront];
+    [defaults setDouble:fmin(200, fmax(0, widthPercent)) forKey:SGKeySingSpatialWidth];
+    [sg_controller applySpatial];
+    [NSNotificationCenter.defaultCenter postNotificationName:SGSingDidChangeNotification object:nil];
+}
+
 void SGSingPlaybackWillChange(void) { SGSingAudioInvalidate(); }
 void SGSingPlaybackDidChange(void) {
     dispatch_async(dispatch_get_main_queue(), ^{

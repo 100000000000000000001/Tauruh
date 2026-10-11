@@ -53,6 +53,7 @@ static id readKey(id object, NSString *key) {
 
 %hook SPTEncorePopUpPresenter
 - (void)presentPopUp:(id)popUp {
+    SGAdBlockSawOne(@"Popups");
     id model = readKey(popUp, @"model") ?: popUp;
     NSString *title = readKey(model, @"title") ?: readKey(model, @"dialogTitle");
     NSString *body = readKey(model, @"descriptionText") ?: readKey(model, @"body") ?: readKey(model, @"subtitle");
@@ -66,7 +67,7 @@ static id readKey(id object, NSString *key) {
 %end
 
 %ctor {
-    if (!SGFlag(SGKeyHideUpsells, YES)) return;
+    if (!SGHidden(SGKeyHideUpsells)) return;
     %init;
     SGRequireClasses(@[@"SPTEncorePopUpDialogModel", @"SPTEncorePopUpDialog", @"SPTEncorePopUpPresenter"]);
 }

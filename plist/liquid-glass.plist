@@ -8,6 +8,8 @@
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
+	<key>MusicHapticsSupported</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -20,5 +22,7 @@
 		<string>_spotify-connect._tcp</string>
 		<string>_googlecast._tcp</string>
 	</array>
+	<key>NSMotionUsageDescription</key>
+	<string>Head gestures and Spatial Audio use motion to respond to how you move.</string>
 </dict>
 </plist>

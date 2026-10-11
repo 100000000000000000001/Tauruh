@@ -12,9 +12,11 @@
 #import "LyricsText.h"
 #import "MeaningSheet.h"
 #import "Shared/LyricsSources/LyricsSources.h"
+#import "Shared/LyricsTranslation/LyricsTranslation.h"
 #import "Shared/Player/PlayerEvents.h"
 #import "Shared/Haptics/Haptics.h"
 #import "Redesigned/Kit/SGRTokens.h"
+#import <NaturalLanguage/NaturalLanguage.h>
 
 static const CGFloat kFontSize = 30, kMargin = 24, kLineGap = 24, kRowTighten = 2;
 static const CGFloat kDimAlpha = 0.3, kFillEdge = 22, kLift = 2.5, kDimScale = 0.97;
@@ -52,6 +54,9 @@ enum { kMostSung = 6 };
 // end of the last line sung before it to the start of the next, or from the top of the song to the
 // first line. BiniLyrics' web player, which copies Apple Music's, draws them from seven seconds.
 static const NSInteger kBreakMinMs = 7000;
+
+typedef void (^SGRTranslated)(NSArray<NSString *> *translations, NSString *error);
+typedef void (^SGRTranslator)(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *language, SGRTranslated progress, SGRTranslated done);
 // The dots' size and the room between them, as shares of the font, which is Apple Music's proportion.
 static const CGFloat kDotShare = 0.5, kDotGapShare = 0.27;
 // Their timeline, Apple Music's as that player reads it off: in over 0.4 s, breathing between 85 % and
@@ -1031,6 +1036,10 @@ typedef struct {
 } SGRKaraokeBreak;
 
 @interface SGRKaraokeView () <UIScrollViewDelegate>
+- (void)translateWith:(SGRTranslator)translator;
+- (void)translationsChanged;
+- (BOOL)anyUntranslated:(NSArray<SGKaraokeLine *> *)lines;
+- (void)takeTranslations:(NSArray<NSString *> *)translations into:(NSArray<SGKaraokeLine *> *)lines;
 @end
 
 @implementation SGRKaraokeView {
@@ -1063,6 +1072,8 @@ typedef struct {
     CFTimeInterval _stillSince;   // when the position stopped moving, 0 while it moves
     SGRKaraokeStyle *_style;   // how the lines were laid out
     BOOL _hasSpoken, _hasTranslation;   // whether the song has any line with either
+    BOOL _untranslated, _foreign;
+    NSArray<SGKaraokeLine *> *_translating;
     UIButton *_extras;
     CGFloat _builtWidth;
     BOOL _showing;
@@ -1119,6 +1130,7 @@ typedef struct {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionEndedNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(restyle) name:SGRLyricsTextDidChangeNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(translationsChanged) name:SGLyricsTranslationsDidChangeNotification object:nil];
     // A locked phone leaves the card in its window, so the link has to be put down by the app going
     // away rather than by the view going: see scheduleLink.
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(scheduleLink) name:UIApplicationDidBecomeActiveNotification object:nil];
@@ -1351,6 +1363,46 @@ typedef struct {
     _dots = nil;
 }
 
+static BOOL lineHasWords(SGKaraokeLine *line) {
+    for (SGKaraokeWord *word in line.words) {
+        if ([word.text rangeOfCharacterFromSet:NSCharacterSet.letterCharacterSet].location != NSNotFound) return YES;
+    }
+    return NO;
+}
+
+static NSArray<NSString *> *textsOf(NSArray<SGKaraokeLine *> *lines) {
+    NSMutableArray<NSString *> *texts = [NSMutableArray arrayWithCapacity:lines.count];
+    for (SGKaraokeLine *line in lines) {
+        [texts addObject:lineHasWords(line) && !line.translation.length ? SGKaraokeLineText(line) ?: @"" : @""];
+    }
+    return texts;
+}
+
+static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language) {
+    NSString *target = [[language componentsSeparatedByCharactersInSet:
+                         [NSCharacterSet characterSetWithCharactersInString:@"-_"]] firstObject].lowercaseString;
+    NSMutableSet<NSString *> *seen = [NSMutableSet set];
+    NSUInteger distinct = 0, sure = 0, foreign = 0;
+    NLLanguageRecognizer *recognizer = [NLLanguageRecognizer new];
+    for (SGKaraokeLine *line in lines) {
+        if (!lineHasWords(line)) continue;
+        NSString *text = SGKaraokeLineText(line).lowercaseString;
+        if (!text.length || [seen containsObject:text]) continue;
+        [seen addObject:text];
+        distinct++;
+        [recognizer reset];
+        [recognizer processString:text];
+        NSDictionary<NLLanguage, NSNumber *> *hypotheses = [recognizer languageHypothesesWithMaximum:1];
+        NLLanguage detected = hypotheses.allKeys.firstObject;
+        if (!detected || hypotheses[detected].doubleValue < 0.8) continue;
+        sure++;
+        NSString *code = [[detected componentsSeparatedByCharactersInSet:
+                           [NSCharacterSet characterSetWithCharactersInString:@"-_"]] firstObject].lowercaseString;
+        if (![code isEqualToString:target]) foreign++;
+    }
+    return sure == 0 || foreign * 5 >= MAX(distinct, 5);
+}
+
 // When each line is sung and where the breaks are, worked out once per song for the frames to read.
 - (void)timeLines {
     free(_spans);
@@ -1359,7 +1411,9 @@ typedef struct {
     _spans = calloc(count + 1, sizeof(SGRKaraokeSpan));
     _breaks = calloc(count + 1, sizeof(SGRKaraokeBreak));
     _breakCount = 0;
-    _hasSpoken = _hasTranslation = NO;
+    _hasSpoken = _hasTranslation = _untranslated = NO;
+    if (_track) SGLyricsSyncSavedTranslation(_track, SGLyricsGeminiLanguage(), _lines);
+    _foreign = lyricsAreForeign(_lines, SGLyricsGeminiLanguage());
     _plain = SGKaraokeLinesTiming(_lines) == SGKaraokeTimingNone;
     NSInteger sungTo = 0;   // the top of the song counts as where the singing before the first line ends
     for (NSUInteger i = 0; i < count; i++) {
@@ -1369,6 +1423,7 @@ typedef struct {
         sungTo = MAX(sungTo, _spans[i].end);
         _hasSpoken = _hasSpoken || line.pronunciation || line.backing.pronunciation;
         _hasTranslation = _hasTranslation || line.translation.length;
+        _untranslated = _untranslated || (!line.translation.length && lineHasWords(line));
     }
     [self offerExtras];
     [self askMeanings];
@@ -1447,7 +1502,13 @@ typedef struct {
 // The button shows only for a song with a pronunciation or a translation to show, and its menu only
 // what the song has: a switch for each, reading what tapping it will do.
 - (void)offerExtras {
-    BOOL offered = _lines && (_hasSpoken || _hasTranslation);
+    NSString *language = SGLyricsGeminiLanguage();
+    BOOL gemini = SGGeminiKeySet();
+    BOOL onDevice = SGOnDeviceTranslation.translationAvailable;
+    BOOL intelligence = [SGOnDeviceTranslation appleIntelligenceAvailable:language];
+    BOOL translatable = (_foreign || SGFlag(SGKeyLyricsTranslateEverySong, NO)) &&
+                        _untranslated && (gemini || onDevice || intelligence);
+    BOOL offered = _lines && (_hasSpoken || _hasTranslation || translatable);
     if (!offered) {
         _extras.hidden = YES;
         return;
@@ -1474,6 +1535,13 @@ typedef struct {
         _extras.accessibilityLabel = @"Pronunciation and translation";
         [self addSubview:_extras];
     }
+    BOOL translating = _translating == _lines;
+    UIButtonConfiguration *buttonConfig = _extras.configuration;
+    if (buttonConfig.showsActivityIndicator != translating) {
+        buttonConfig.showsActivityIndicator = translating;
+        _extras.configuration = buttonConfig;
+        _extras.accessibilityValue = translating ? @"Translating" : nil;
+    }
     NSMutableArray<UIMenuElement *> *items = [NSMutableArray array];
     if (_hasSpoken) {
         BOOL on = SGFlag(SGRKeyLyricsPronunciation, NO);
@@ -1487,9 +1555,93 @@ typedef struct {
                                              image:[UIImage systemImageNamed:@"character.bubble"] identifier:nil
                                            handler:^(UIAction *action) { SGRSetLyricsTextShown(SGRLyricsTextTranslation, !on); }]];
     }
+    if (translatable && !translating) {
+        __weak SGRKaraokeView *weakSelf = self;
+        void (^offer)(NSString *, NSString *, NSString *, SGRTranslator) =
+        ^(NSString *title, NSString *glyph, NSString *subtitle, SGRTranslator translator) {
+            UIAction *action = [UIAction actionWithTitle:title image:[UIImage systemImageNamed:glyph] identifier:nil
+                                                 handler:^(UIAction *selected) { [weakSelf translateWith:translator]; }];
+            action.subtitle = subtitle;
+            [items addObject:action];
+        };
+        if (onDevice) {
+            offer(@"Translate on iPhone", @"translate", @"Apple's Translate, on this iPhone",
+                  ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated progress, SGRTranslated done) {
+                [SGOnDeviceTranslation translate:textsOf(lines) to:to done:done];
+            });
+        }
+        if (intelligence) {
+            offer(@"Translate with Apple Intelligence", @"apple.intelligence", @"On this iPhone",
+                  ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated progress, SGRTranslated done) {
+                [SGOnDeviceTranslation translateWithAppleIntelligence:textsOf(lines) to:to song:SGLyricsSongName(track)
+                    progress:^(NSArray<NSString *> *soFar) { progress(soFar, nil); } done:done];
+            });
+        }
+        if (gemini) {
+            offer(@"Translate with Gemini", @"sparkles", @"Sends the lyrics to Google",
+                  ^(NSArray<SGKaraokeLine *> *lines, NSString *track, NSString *to, SGRTranslated progress, SGRTranslated done) {
+                SGLyricsTranslateWithGemini(track, lines, to, done);
+            });
+        }
+    }
     _extras.menu = [UIMenu menuWithChildren:items];
     _extras.hidden = NO;
     [self setNeedsLayout];
+}
+
+- (void)translateWith:(SGRTranslator)translator {
+    NSArray<SGKaraokeLine *> *lines = _lines;
+    NSString *track = _track;
+    if (!lines.count || _translating == lines) return;
+    _translating = lines;
+    [self offerExtras];
+    NSString *language = SGLyricsGeminiLanguage();
+    translator(lines, track, language, ^(NSArray<NSString *> *soFar, NSString *error) {
+        [self takeTranslations:soFar into:lines];
+        SGLyricsSaveTranslation(track, language, lines);
+    }, ^(NSArray<NSString *> *translations, NSString *error) {
+        if (self->_translating == lines) self->_translating = nil;
+        if (translations) {
+            [self takeTranslations:translations into:lines];
+            SGLyricsSaveTranslation(track, language, lines);
+            if (lines == self->_lines) self->_untranslated = [self anyUntranslated:lines];
+        }
+        [self offerExtras];
+        if (error) {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:translations ? @"Partly translated" : @"No translation"
+                                                                           message:error preferredStyle:UIAlertControllerStyleAlert];
+            alert.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+            [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
+            [SGTopController() presentViewController:alert animated:YES completion:nil];
+        }
+    });
+}
+
+- (BOOL)anyUntranslated:(NSArray<SGKaraokeLine *> *)lines {
+    for (SGKaraokeLine *line in lines) if (!line.translation.length && lineHasWords(line)) return YES;
+    return NO;
+}
+
+- (void)translationsChanged {
+    if (!_lines) return;
+    [self timeLines];
+    [self restyle];
+}
+
+- (void)takeTranslations:(NSArray<NSString *> *)translations into:(NSArray<SGKaraokeLine *> *)lines {
+    __block BOOL took = NO;
+    [lines enumerateObjectsUsingBlock:^(SGKaraokeLine *line, NSUInteger index, BOOL *stop) {
+        if (index < translations.count && translations[index].length && !line.translation.length) {
+            line.translation = translations[index];
+            line.translationMade = YES;
+            took = YES;
+        }
+    }];
+    if (!took || lines != _lines) return;
+    _hasTranslation = YES;
+    [self offerExtras];
+    if (SGFlag(SGRKeyLyricsTranslation, NO)) [self restyle];
+    else SGRSetLyricsTextShown(SGRLyricsTextTranslation, YES);
 }
 
 // Where a line starts on the page, for the stack as it is arranged now: an open break holds the room
@@ -1699,6 +1851,8 @@ typedef struct {
         SGLog(@"karaoke: page shows track %@, lyrics %@", track, SGKaraokeLinesForTrack(track) ? @"captured" : @"not captured yet");
         _track = track;
         _lines = nil;
+        _translating = nil;
+        _untranslated = _foreign = NO;
         _builtWidth = 0;
         [self creditTo:nil];
         [self dropLineViews];

@@ -19,6 +19,8 @@ void SGSingTimelineDestroy(SGSingTimeline *timeline); // both endpoints stopped
 // Begin also invalidates all retained audio. The caller must change generation before a seek.
 void SGSingTimelineBegin(SGSingTimeline *timeline, SGAudioStamp origin, float vocalLevel);
 void SGSingTimelineSetLevel(SGSingTimeline *timeline, float level);
+void SGSingTimelineSetVoiceAngle(SGSingTimeline *timeline, float radians);
+void SGSingTimelineSetSpatial(SGSingTimeline *timeline, bool on, float distance, float room, float width);
 void SGSingTimelineBypass(SGSingTimeline *timeline);
 SGSingTimelineState SGSingTimelineGetState(const SGSingTimeline *timeline);
 uint32_t SGSingTimelineWritable(const SGSingTimeline *timeline);

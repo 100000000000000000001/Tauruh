@@ -6,6 +6,11 @@
 #import "Shared/Gestures/Gestures.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/LyricsMeanings/Meanings.h"
+#import "Shared/LyricsTranslation/LyricsTranslation.h"
+#import "Shared/Fonts/Fonts.h"
+#import "Shared/HeadGestures/HeadGestures.h"
+#import "Shared/ListeningStats/ListeningStats.h"
+#import "Shared/Lossless/SGLossless.h"
 #import "Shared/Player/PlayerSettings.h"
 #import "Native/Appearance/Appearance.h"
 #import "Native/Navbar/Navbar.h"
@@ -14,6 +19,7 @@
 #import "Shared/Haptics/Haptics.h"
 #import "Shared/LiveActivity/LiveActivity.h"
 #import "Redesigned/Lyrics/LyricsText.h"
+#import "Redesigned/Home/Home.h"
 #import "Redesigned/Navbar/Navbar.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Redesigned/Player/Player.h"
@@ -63,7 +69,13 @@ SGModSection *SGAppearanceSection(void) {
         offerRestart(on);
     };
     NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:SGWithSymbol(redesign, @"sparkles")];
-    [rows addObjectsFromArray:SGRedesignedUIStored() ? SGRAppearanceRows() : SGNativeAppearanceRows()];
+    if (SGRedesignedUIStored()) {
+        [rows addObjectsFromArray:SGRAppearanceRows()];
+        [rows addObject:SGRHomeTopPicksRow()];
+    } else {
+        [rows addObjectsFromArray:SGNativeAppearanceRows()];
+    }
+    [rows addObjectsFromArray:SGAppFontRows()];
     return SGNotedSection(@"Appearance", rows, @"Changes apply after you restart Spotify.");
 }
 
@@ -80,7 +92,9 @@ UIViewController *SGLyricsSettingsPage(void) {
     if (redesigned) {
         SGModRow *landscape = SGSwitchRow(@"Landscape lyrics", @"Show lyrics beside the player controls", SGRKeyLandscapeLyrics);
         landscape.changed = ^(BOOL on) { SGRPlayerLyricsOrientationChanged(); };
-        [sections addObject:SGSection(@"Display", @[landscape, SGLyricsWordTimingRow(), SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow()])];
+        [sections addObject:SGSection(@"Display", @[landscape, SGLyricsWordTimingRow(), SGRLyricsRomanisedRow(),
+            SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow()])];
+        [sections addObject:SGSection(@"Translation", @[SGTranslateEverySongRow(), SGGeminiKeyRow(), SGSavedTranslationsRow()])];
     }
     [sections addObject:SGSection(nil, more)];
     return [[SGModPage alloc] initWithTitle:@"Lyrics" intro:SGRestartNote sections:sections footer:nil];
@@ -106,9 +120,10 @@ UIViewController *SGPlayerSettingsPage(void) {
     }
     [pages addObject:SGWithSymbol(SGPageRow(@"Lock screen widget", ^UIViewController *{ return SGLockScreenWidgetPage(); }), @"lock")];
     [sections addObject:SGSection(nil, pages)];
+    [sections addObject:SGNotedSection(@"Lossless", @[
+        SGOptionRow(@"Lossless files", @"Play matching FLAC or ALAC files instead of Spotify's stream", SGKeyLossless),
+    ], @"Put matching files in Files › Spotify › Lossless. Applies after you restart Spotify.")];
+    if (!native) return SGRPlayerSettingsPage(sections);
     if (native) [sections addObjectsFromArray:SGNativePlayerScreenSections()];
-    // Vibrations hook Spotify's own controls and its audio, so they answer under either look.
-    [sections addObjectsFromArray:SGVibrationsSections()];
-
     return [[SGModPage alloc] initWithTitle:@"Player" intro:SGRestartNote sections:sections footer:nil];
 }

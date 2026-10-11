@@ -2,6 +2,7 @@
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "PlayerSettings.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/LockScreenArtwork/LockScreenArtwork.h"
 
 UIViewController *SGLockScreenWidgetPage(void) {
@@ -9,6 +10,6 @@ UIViewController *SGLockScreenWidgetPage(void) {
         SGSection(@"Controls", @[
             SGFlagRow(@"Like and dislike buttons", @"ios-feature-lockscreen.like_dislike_enabled"),
         ]),
-        SGSection(@"Artwork", SGAnimatedArtworkRows()),
+        SGSection(@"Full-screen artwork", SGLockScreenMotionRows()),
     ] footer:nil];
 }

@@ -131,13 +131,26 @@ static NSData *pageBody(SGLyricsResult *chain, NSData *colours) {
     NSMutableArray<SGPBField *> *lyrics = [NSMutableArray array];
     if (chain.synced) [lyrics addObject:SGPBVarint(1, 1)];
     NSArray<NSNumber *> *starts = chain.starts;
-    [chain.texts enumerateObjectsUsingBlock:^(NSString *text, NSUInteger i, BOOL *stop) {
-        NSInteger start = i < starts.count ? [starts[i] integerValue] : 0;
-        NSData *line = SGPBSerialize(@[SGPBVarint(1, (uint64_t)MAX(start, 0)),
+    NSInteger (^startOf)(NSUInteger) = ^NSInteger(NSUInteger i) { return i < starts.count ? MAX([starts[i] integerValue], 0) : 0; };
+    // Spotify's page takes its lines in time order, and a source can list one out of it (a chorus written
+    // once with its repeats after it): they go in by their starts, lines starting together as they came.
+    NSMutableArray<NSNumber *> *order = [NSMutableArray arrayWithCapacity:chain.texts.count];
+    for (NSUInteger i = 0; i < chain.texts.count; i++) [order addObject:@(i)];
+    if (chain.synced) {
+        [order sortWithOptions:NSSortStable usingComparator:^NSComparisonResult(NSNumber *a, NSNumber *b) {
+            NSInteger x = startOf(a.unsignedIntegerValue), y = startOf(b.unsignedIntegerValue);
+            return x < y ? NSOrderedAscending : x > y ? NSOrderedDescending : NSOrderedSame;
+        }];
+    }
+    for (NSNumber *index in order) {
+        NSString *text = chain.texts[index.unsignedIntegerValue];
+        NSData *line = SGPBSerialize(@[SGPBVarint(1, (uint64_t)startOf(index.unsignedIntegerValue)),
                                        SGPBString(2, [text isKindOfClass:NSString.class] ? text : @"")]);
         [lyrics addObject:SGPBBytes(2, line)];
-    }];
-    [lyrics addObject:SGPBString(5, chain.provider.length ? chain.provider : kUnnamedProvider)];
+    }
+    // The footer names whoever's text this is, which the terms of some sources ask for (SpicyLyrics.m).
+    NSString *provider = chain.pageProvider ?: chain.provider;
+    [lyrics addObject:SGPBString(5, provider.length ? provider : kUnnamedProvider)];
     return SGPBSerialize(@[SGPBBytes(1, SGPBSerialize(lyrics)), SGPBBytes(2, colours ?: defaultColours())]);
 }
 
@@ -395,7 +408,7 @@ static void answerHeld(id delegate, NSURLSession *session, NSURLSessionDataTask 
     }
     if (ended || cancelled) {
         SGLog(@"lyrics: the request for %@ ended before the sources answered, nothing delivered", state.track);
-        // URLSession holds the end of a cancelled task back until it has a disposition.
+        // URLSession holds the end of a canceled task back until it has a disposition.
         if (cancelled) handler(NSURLSessionResponseCancel);
         return;
     }
@@ -463,7 +476,7 @@ static void finishDonor(id delegate, NSURLSession *session, NSURLSessionDataTask
         forward(error);
         return;
     }
-    // The donor's colours are the track's own only when they were worked out from its artwork.
+    // The donor's colors are the track's own only when they were worked out from its artwork.
     NSData *page = decide(state.track, chain, nil, YES, state.artwork ? coloursIn(body) : nil);
     if (!page) {
         SGLog(@"lyrics: no source has lyrics for %@ any more, its request fails", state.track);
@@ -594,7 +607,7 @@ static void completed(id delegate, NSURLSession *session, NSURLSessionTask *task
     SGLyricsMigrateLegacyKeys();
     if (!SGLyricsEnabled()) return;
     %init(SGLyricsReplies);
-    BOOL everyTrack = SGFlag(SGKeyLyricsAllTracks, YES);
+    BOOL everyTrack = SGFlag(SGKeyLyricsAllTracks, NO);
     if (everyTrack) {
         // The generator gives a class that only inherits the method an override of its own, which would
         // put a second hook in front of NSURLSession's.

@@ -25,6 +25,8 @@
 #import "Shared/Flags/Flags.h"
 #import "Shared/AudioEffects/AudioEffectsPage.h"
 #import "Shared/LiveActivity/LiveActivity.h"
+#import "Shared/HeadGestures/HeadGestures.h"
+#import "Shared/ListeningStats/ListeningStats.h"
 #import "App/About/About.h"
 #import "Pages.h"
 
@@ -146,12 +148,17 @@ static UIViewController *modSettingsPage(void) {
         pageRow(@"Player", @"play.circle", ^UIViewController *{ return SGPlayerSettingsPage(); }),
         pageRow(@"Lyrics", @"quote.bubble", ^UIViewController *{ return SGLyricsSettingsPage(); }),
         audioEffects,
+        pageRow(@"Vibrations", @"iphone.radiowaves.left.and.right", ^UIViewController *{ return SGVibrationsSettingsPage(); }),
     ]];
     if (@available(iOS 17.0, *)) {
         SGModRow *liveActivity = pageRow(@"Live Activity", @"platter.filled.top.iphone", ^UIViewController *{ return SGLiveActivitySettingsPage(); });
         liveActivity.value = ^NSString *{ return SGLiveActivitySummary(); };
         [parts addObject:liveActivity];
     }
+    [parts addObjectsFromArray:@[
+        pageRow(@"AirPods gestures", @"airpods.pro", ^UIViewController *{ return SGHeadGesturesSettingsPage(); }),
+        pageRow(@"Listening stats", @"chart.bar", ^UIViewController *{ return SGListeningStatsPage(); }),
+    ]];
     if (SGRedesignedUIStored()) [parts addObject:pageRow(@"Albums", @"square.stack", ^UIViewController *{ return SGRAlbumSettingsPage(); })];
     else [parts addObject:pageRow(@"Home & Library", @"house", ^UIViewController *{ return SGHomeSettingsPage(); })];
     [sections addObject:SGAppearanceSection()];

@@ -1,431 +1,484 @@
-// Spicy Lyrics, the source behind the Spicetify extension of the same name (spicylyrics.org). Like
-// Musixmatch it is asked by Spotify's own track id rather than by name, so it never answers with a
-// live cut of the song by mistake; unlike Musixmatch, what it has is Apple Music's syllable timing,
-// down to the backing vocals and the two sides of a duet.
+// Spicy Lyrics, through its Developer Platform (developers.spicylyrics.org) on the user's own key.
+// One request by Spotify's track id answers with the best sync there is: a community one made by
+// hand, else Apple Music's or Spotify's. Syllable syncs time every syllable and carry duets and
+// backing vocals. The key lives in the Keychain, not in the settings, so a settings export never
+// carries it; without one the source answers nothing.
 //
-// Its Developer Platform API returns the best sync from its catalogue and names the provider it
-// chose. The user supplies a publishable client key; it is kept in Keychain, never in preferences.
+// The API's terms ask for the provider to be named wherever its lyrics show, and for a community
+// sync's maker and uploader to be credited and linked with it: the credit is marked required, so it
+// shows under the lyrics whether Show source is on or not, and a tap on it opens their pages.
+//
+// An app ships its key to every user, so it takes a publishable key (sl_pk_) with the No origin header
+// entry allowed, as the API's docs ask; a secret key is for a server. Answers and misses are kept per
+// track for the session, a rate limit is waited out, and a refused key is not tried again for a while.
+#import <Security/Security.h>
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
 #import "LyricsSources.h"
-#import "Shared/Lyrics/Lyrics.h"
-#import <Security/Security.h>
 
-static NSString *const kAPI = @"https://api.spicylyrics.org/v1/lyrics";
-static NSString *const kKeychainService = @"pw.spoti.spotifyglass.spicylyrics";
-static NSString *const kKeychainAccount = @"publishable-client-key";
+static NSString *const kAPI = @"https://api.spicylyrics.org/v1/lyrics/";
+static NSString *const kDashboard = @"https://developers.spicylyrics.org/dashboard";
+#ifndef SG_VERSION
+#define SG_VERSION "dev"
+#endif
+static NSString *const kAgent = @"Taurus/" SG_VERSION " (Spotify for iOS lyrics, by track id)";
+// A reply for this many tracks is kept; a rate limit is waited out for at most an hour, 60 s when the
+// reply does not say; a refused key is tried again after ten minutes.
+static const NSUInteger kKeptTracks = 100;
+static const NSTimeInterval kMostWait = 3600, kDefaultWait = 60, kRefusedWait = 600;
+static NSString *const kService = @"Taurus.SpicyLyrics", *const kAccount = @"api-key";
+NSString *const SGSpicyLyricsKey = @"spicylyrics";
 
-NSString *SGSpicyLyricsAPIKey(void) {
-    NSDictionary *query = @{
-        (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
-        (__bridge id)kSecAttrService: kKeychainService,
-        (__bridge id)kSecAttrAccount: kKeychainAccount,
-        (__bridge id)kSecReturnData: @YES,
-        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne,
-    };
-    CFTypeRef result = NULL;
-    if (SecItemCopyMatching((__bridge CFDictionaryRef)query, &result) != errSecSuccess || !result) return nil;
-    NSData *data = CFBridgingRelease(result);
-    NSString *key = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-    return [key hasPrefix:@"sl_pk_"] ? key : nil;
+#pragma mark - the key
+
+static NSDictionary *keyQuery(void) {
+    return @{(__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+             (__bridge id)kSecAttrService: kService, (__bridge id)kSecAttrAccount: kAccount};
 }
 
-static BOOL storeSpicyLyricsAPIKey(NSString *key) {
-    NSDictionary *query = @{
-        (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
-        (__bridge id)kSecAttrService: kKeychainService,
-        (__bridge id)kSecAttrAccount: kKeychainAccount,
-    };
-    SecItemDelete((__bridge CFDictionaryRef)query);
-    if (!key.length) return YES;
-    NSMutableDictionary *item = [query mutableCopy];
+static NSString *storedKey(void) {
+    NSMutableDictionary *query = [keyQuery() mutableCopy];
+    query[(__bridge id)kSecReturnData] = @YES;
+    query[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
+    CFTypeRef data = NULL;
+    if (SecItemCopyMatching((__bridge CFDictionaryRef)query, &data) != errSecSuccess || !data) return nil;
+    NSString *key = [[NSString alloc] initWithData:(__bridge_transfer NSData *)data encoding:NSUTF8StringEncoding];
+    return key.length ? key : nil;
+}
+
+static void storeKey(NSString *key) {
+    SecItemDelete((__bridge CFDictionaryRef)keyQuery());
+    if (!key.length) return;
+    NSMutableDictionary *item = [keyQuery() mutableCopy];
     item[(__bridge id)kSecValueData] = [key dataUsingEncoding:NSUTF8StringEncoding];
     item[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
-    return SecItemAdd((__bridge CFDictionaryRef)item, NULL) == errSecSuccess;
+    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)item, NULL);
+    if (status != errSecSuccess) SGLog(@"spicy lyrics: the key could not be kept (%d)", (int)status);
 }
 
-static void spicyKeyNotice(NSString *title, NSString *message) {
-    UIAlertController *notice = [UIAlertController alertControllerWithTitle:title message:message preferredStyle:UIAlertControllerStyleAlert];
-    [notice addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleCancel handler:nil]];
-    [SGTopController() presentViewController:notice animated:YES completion:nil];
+BOOL SGSpicyLyricsKeySet(void) {
+    return storedKey() != nil;
 }
 
-SGModRow *SGSpicyLyricsAPIKeyRow(void) {
-    return SGStatActionRow(@"Spicy Lyrics API key", @"Use a publishable sl_pk_ key; enable native no-Origin access", ^NSString *{
-        return SGSpicyLyricsAPIKey().length ? @"Set" : @"Not set";
-    }, ^{
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Spicy Lyrics API key"
-            message:@"Create a publishable client key in the Spicy Lyrics Developer Platform and enable its native-client no-Origin access. Do not use a secret sl_sk_ key in a distributed app."
-            preferredStyle:UIAlertControllerStyleAlert];
-        [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
-            field.placeholder = @"sl_pk_…";
-            field.secureTextEntry = YES;
-            field.text = SGSpicyLyricsAPIKey();
-            field.autocorrectionType = UITextAutocorrectionTypeNo;
-            field.autocapitalizationType = UITextAutocapitalizationTypeNone;
-        }];
-        [alert addAction:[UIAlertAction actionWithTitle:@"Remove key" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
-            storeSpicyLyricsAPIKey(nil);
-        }]];
-        [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-        [alert addAction:[UIAlertAction actionWithTitle:@"Save" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
-            NSString *key = [alert.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
-            if (![key hasPrefix:@"sl_pk_"] || key.length <= 6) {
-                spicyKeyNotice(@"Invalid client key", @"Enter a publishable Spicy Lyrics key beginning with sl_pk_.");
-                return;
-            }
-            if (!storeSpicyLyricsAPIKey(key)) spicyKeyNotice(@"Could not save key", @"Keychain rejected the Spicy Lyrics key.");
-        }]];
-        [SGTopController() presentViewController:alert animated:YES completion:nil];
-    });
+#pragma mark - the response
+
+static NSInteger ms(id seconds) {
+    return [seconds respondsToSelector:@selector(doubleValue)] ? (NSInteger)llround([seconds doubleValue] * 1000) : 0;
 }
 
-#pragma mark - the packed shape
-
-// Legacy packed replies use [values, stream]: every distinct string, number, boolean and null in the document, and
-// a stream of integers rebuilding it. A number at or above zero is an index into the values; below
-// zero it opens a structure. Straight from the extension's own packer, which is the only writer of
-// this shape there is.
-typedef NS_ENUM(NSInteger, SGSpicyOp) {
-    SGSpicyOpObject = -1,        // key count, that many key indexes, then that many values
-    SGSpicyOpArray = -2,         // item count, then that many values
-    SGSpicyOpRows = -3,          // item count, key count, the keys once, then the rows' values
-    SGSpicyOpEmptyArray = -4,
-    SGSpicyOpOneItemArray = -5,  // the one value
-    SGSpicyOpEmptyObject = -6,
-};
-
-// Deep enough for any lyrics document and shallow enough that a malformed reply cannot run the
-// stack out: the shape below nests six levels, not sixty.
-static const NSUInteger kMaxDepth = 64;
-
-@interface SGSpicyReader : NSObject {
-@public
-    NSArray *values, *stream;
-    NSUInteger cursor;
-    BOOL bad;   // the reply did not hold together; whatever has been read of it is thrown away
-}
-@end
-
-@implementation SGSpicyReader
-@end
-
-static NSInteger nextNumber(SGSpicyReader *reader) {
-    if (reader->cursor >= reader->stream.count) {
-        reader->bad = YES;
-        return 0;
-    }
-    id number = reader->stream[reader->cursor++];
-    if (![number isKindOfClass:NSNumber.class]) {
-        reader->bad = YES;
-        return 0;
-    }
-    return [number integerValue];
+static NSString *stringIn(NSDictionary *object, NSString *name) {
+    id value = [object isKindOfClass:NSDictionary.class] ? object[name] : nil;
+    return [value isKindOfClass:NSString.class] && [value length] ? value : nil;
 }
 
-static id valueAt(SGSpicyReader *reader, NSInteger index) {
-    if (index < 0 || (NSUInteger)index >= reader->values.count) {
-        reader->bad = YES;
-        return nil;
-    }
-    return reader->values[index];
+static NSArray *arrayIn(NSDictionary *object, NSString *name) {
+    id value = [object isKindOfClass:NSDictionary.class] ? object[name] : nil;
+    return [value isKindOfClass:NSArray.class] ? value : @[];
 }
 
-static NSString *nextKey(SGSpicyReader *reader) {
-    id key = valueAt(reader, nextNumber(reader));
-    if (![key isKindOfClass:NSString.class]) {
-        reader->bad = YES;
-        return nil;
-    }
-    return key;
-}
-
-static id decode(SGSpicyReader *reader, NSUInteger depth) {
-    if (reader->bad || depth > kMaxDepth) {
-        reader->bad = YES;
-        return nil;
-    }
-    NSInteger op = nextNumber(reader);
-    if (reader->bad) return nil;
-    if (op >= 0) return valueAt(reader, op);
-    // A count is read before anything is built with it, so a reply claiming a million keys cannot
-    // have a million slots reserved for it before the stream is found to be shorter than that.
-    NSInteger count = op == SGSpicyOpObject || op == SGSpicyOpArray || op == SGSpicyOpRows ? nextNumber(reader) : 0;
-    if (reader->bad || count < 0 || (NSUInteger)count > reader->stream.count) {
-        reader->bad = YES;
-        return nil;
-    }
-    switch (op) {
-        case SGSpicyOpObject: {
-            NSMutableArray<NSString *> *keys = [NSMutableArray arrayWithCapacity:count];
-            for (NSInteger i = 0; i < count; i++) {
-                NSString *key = nextKey(reader);
-                if (reader->bad) return nil;
-                [keys addObject:key];
-            }
-            NSMutableDictionary *object = [NSMutableDictionary dictionaryWithCapacity:count];
-            for (NSInteger i = 0; i < count; i++) {
-                id value = decode(reader, depth + 1);
-                if (reader->bad) return nil;
-                object[keys[i]] = value;
-            }
-            return object;
-        }
-        case SGSpicyOpArray: {
-            NSMutableArray *items = [NSMutableArray arrayWithCapacity:count];
-            for (NSInteger i = 0; i < count; i++) {
-                id item = decode(reader, depth + 1);
-                if (reader->bad) return nil;
-                [items addObject:item];
-            }
-            return items;
-        }
-        // A run of objects sharing their keys — every line of a song — with the keys written once.
-        case SGSpicyOpRows: {
-            NSInteger keyCount = nextNumber(reader);
-            if (reader->bad || keyCount < 0 || (NSUInteger)keyCount > reader->stream.count) {
-                reader->bad = YES;
-                return nil;
-            }
-            NSMutableArray<NSString *> *keys = [NSMutableArray arrayWithCapacity:keyCount];
-            for (NSInteger i = 0; i < keyCount; i++) {
-                NSString *key = nextKey(reader);
-                if (reader->bad) return nil;
-                [keys addObject:key];
-            }
-            NSMutableArray *rows = [NSMutableArray arrayWithCapacity:count];
-            for (NSInteger i = 0; i < count; i++) {
-                NSMutableDictionary *row = [NSMutableDictionary dictionaryWithCapacity:keyCount];
-                for (NSInteger k = 0; k < keyCount; k++) {
-                    id value = decode(reader, depth + 1);
-                    if (reader->bad) return nil;
-                    row[keys[k]] = value;
-                }
-                [rows addObject:row];
-            }
-            return rows;
-        }
-        case SGSpicyOpEmptyArray: return @[];
-        case SGSpicyOpOneItemArray: {
-            id only = decode(reader, depth + 1);
-            return reader->bad ? nil : @[only];
-        }
-        case SGSpicyOpEmptyObject: return @{};
-    }
-    reader->bad = YES;
-    return nil;
-}
-
-static id unpack(id packed) {
-    // Should the server ever answer a caller of ours with the document itself, it is already what
-    // the rest of this file wants.
-    if ([packed isKindOfClass:NSDictionary.class]) return packed;
-    if (![packed isKindOfClass:NSArray.class] || [packed count] != 2) return nil;
-    id values = packed[0], stream = packed[1];
-    if (![values isKindOfClass:NSArray.class] || ![stream isKindOfClass:NSArray.class]) return nil;
-    SGSpicyReader *reader = [SGSpicyReader new];
-    reader->values = values;
-    reader->stream = stream;
-    id document = decode(reader, 0);
-    // Anything left in the stream means it was not the document it claimed to be.
-    if (reader->bad || reader->cursor != reader->stream.count) {
-        SGLog(@"spicy: the packed reply did not hold together, %lu of %lu read",
-              (unsigned long)reader->cursor, (unsigned long)reader->stream.count);
-        return nil;
-    }
-    return document;
-}
-
-#pragma mark - the document as lines
-
-// The API times in seconds, the mod in milliseconds.
-static NSInteger msIn(id seconds) {
-    return [seconds isKindOfClass:NSNumber.class] ? (NSInteger)llround([seconds doubleValue] * 1000.0) : 0;
-}
-
-static NSDictionary *dictionaryIn(id value) {
-    return [value isKindOfClass:NSDictionary.class] ? value : nil;
-}
-
-static NSArray *arrayIn(id value) {
-    return [value isKindOfClass:NSArray.class] ? value : nil;
-}
-
-// One voice's syllables as words. A syllable is a piece of a word — the API marks the ones that run
-// into the next with IsPartOfWord, which is the same thing the mod calls a word being joined to the
-// one before it, read from the other end.
-static NSArray<SGKaraokeWord *> *wordsFrom(NSArray *syllables) {
+// A Lead or Background: its syllables as words, read from `field` (Text, or TransliteratedText for
+// how they sound). IsPartOfWord says a syllable runs on into the next one, so the next is laid flush
+// against it. The line is timed by the part's own start and end where it has them.
+static SGKaraokeLine *syllableLine(NSDictionary *part, NSString *field) {
     NSMutableArray<SGKaraokeWord *> *words = [NSMutableArray array];
-    BOOL joinToPrevious = NO;
-    for (id raw in syllables ?: @[]) {
-        NSDictionary *syllable = dictionaryIn(raw);
-        if (!syllable) continue;
-        BOOL runsOn = [syllable[@"IsPartOfWord"] boolValue];
-        id text = syllable[@"Text"];
-        NSString *said = [text isKindOfClass:NSString.class]
-            ? [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet] : nil;
-        if (said.length) {
-            SGKaraokeWord *word = [SGKaraokeWord new];
-            word.text = said;
-            word.start = msIn(syllable[@"StartTime"]);
-            word.end = msIn(syllable[@"EndTime"]);
-            word.joined = joinToPrevious && words.count > 0;
-            [words addObject:word];
-        }
-        joinToPrevious = runsOn;
+    BOOL runsOn = NO;
+    for (NSDictionary *syllable in arrayIn(part, @"Syllables")) {
+        NSString *text = [stringIn(syllable, field) stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        if (!text.length) continue;
+        SGKaraokeWord *word = [SGKaraokeWord new];
+        word.text = text;
+        word.start = ms(syllable[@"StartTime"]);
+        word.end = MAX(ms(syllable[@"EndTime"]), word.start);
+        word.joined = words.count && runsOn;
+        [words addObject:word];
+        runsOn = [syllable[@"IsPartOfWord"] boolValue];
     }
-    return words;
-}
-
-static SGKaraokeLine *lineFrom(NSArray<SGKaraokeWord *> *words, id start, id end) {
     if (!words.count) return nil;
     SGKaraokeLine *line = [SGKaraokeLine new];
     line.words = words;
-    // The line's own times where it has them; the words it is made of where it does not.
-    line.start = start ? msIn(start) : words.firstObject.start;
-    line.end = end ? msIn(end) : words.lastObject.end;
+    line.start = part[@"StartTime"] ? ms(part[@"StartTime"]) : words.firstObject.start;
+    line.end = MAX(part[@"EndTime"] ? ms(part[@"EndTime"]) : words.lastObject.end, line.start);
     return line;
 }
 
-// Content: [ { Type: "Vocal", OppositeAligned, Lead: { StartTime, EndTime, Syllables }, Background } ]
-static NSArray<SGKaraokeLine *> *linesFromSyllables(NSArray *content) {
+// How the part sounds: its syllables' own spellings, timed with them, else the part's spelling
+// estimated across the line.
+static SGKaraokeLine *spokenLine(NSDictionary *part, NSString *spelt, SGKaraokeLine *line) {
+    return SGLyricsPronunciation(syllableLine(part, @"TransliteratedText").words, spelt, line);
+}
+
+// The translation of the line and its backing, unless it reads the same as them. The API does not say
+// what language a TranslatedText is in, so it is taken only while the Lyrics page asks for any. With a
+// language chosen, the line is left without one for Musixmatch or Gemini to fill in that language, as an
+// Apple Music translation in another language is left out (SGTTML.m).
+static NSString *translationOf(NSString *translation, SGKaraokeLine *line) {
+    if (!translation.length || SGLyricsTranslationLanguage()) return nil;
+    NSString *said = SGKaraokeLineText(line);
+    if (line.backing) said = [said stringByAppendingFormat:@" %@", SGKaraokeLineText(line.backing)];
+    return [SGLyricsBareText(translation) isEqualToString:SGLyricsBareText(said)] ? nil : translation;
+}
+
+static NSArray<SGKaraokeLine *> *syllableLines(NSArray *content) {
     NSMutableArray<SGKaraokeLine *> *lines = [NSMutableArray array];
-    for (id raw in content ?: @[]) {
-        NSDictionary *vocal = dictionaryIn(raw);
-        NSDictionary *lead = dictionaryIn(vocal[@"Lead"]);
-        if (!lead) continue;
-        SGKaraokeLine *line = lineFrom(wordsFrom(arrayIn(lead[@"Syllables"])), lead[@"StartTime"], lead[@"EndTime"]);
+    for (NSDictionary *item in content) {
+        if (![item isKindOfClass:NSDictionary.class]) continue;
+        NSDictionary *lead = item[@"Lead"];
+        SGKaraokeLine *line = syllableLine(lead, @"Text");
         if (!line) continue;
-        // The (oh, aye) sung under the line. The API keeps it in groups, one per run of it; the page
-        // has one backing line under each line, so the runs read on as one.
-        NSMutableArray<SGKaraokeWord *> *backing = [NSMutableArray array];
-        for (id rawGroup in arrayIn(vocal[@"Background"]) ?: @[]) {
-            NSDictionary *group = dictionaryIn(rawGroup);
-            if (group) [backing addObjectsFromArray:wordsFrom(arrayIn(group[@"Syllables"]))];
+        line.align = [item[@"OppositeAligned"] boolValue] ? SGKaraokeAlignTrailing : SGKaraokeAlignLeading;
+        // A line can have several background phrases; the view has one backing line, so they share it,
+        // and their translations join the lead's.
+        NSMutableArray *backing = [NSMutableArray array];
+        NSMutableArray<NSString *> *spelt = [NSMutableArray array], *translated = [NSMutableArray array];
+        if (stringIn(lead, @"TranslatedText")) [translated addObject:stringIn(lead, @"TranslatedText")];
+        for (NSDictionary *group in arrayIn(item, @"Background")) {
+            [backing addObjectsFromArray:arrayIn(group, @"Syllables")];
+            if (stringIn(group, @"TransliteratedText")) [spelt addObject:stringIn(group, @"TransliteratedText")];
+            if (stringIn(group, @"TranslatedText")) [translated addObject:stringIn(group, @"TranslatedText")];
         }
-        line.backing = lineFrom(backing, nil, nil);
-        // The far side of a duet. The API says outright which lines belong to the second voice, so
-        // unlike TTML there are no voices here to work an alignment out from.
-        if ([vocal[@"OppositeAligned"] boolValue] || [lead[@"OppositeAligned"] boolValue]) {
-            line.align = SGKaraokeAlignTrailing;
-        }
+        NSDictionary *background = @{@"Syllables": backing};
+        line.backing = syllableLine(background, @"Text");
+        line.backing.align = line.align;
+        line.pronunciation = spokenLine(lead, stringIn(lead, @"TransliteratedText"), line);
+        if (line.backing) line.backing.pronunciation = spokenLine(background, [spelt componentsJoinedByString:@" "], line.backing);
+        line.translation = translationOf([translated componentsJoinedByString:@" "], line);
         [lines addObject:line];
     }
     return lines.count ? lines : nil;
 }
 
-// Content: [ { Type: "Vocal", Text, StartTime, EndTime } ] — timed by the line, the words inside it
-// left to the mod's own estimate, as Spotify's own lines and LRCLIB's are.
-static NSArray<SGKaraokeLine *> *linesFromLines(NSArray *content) {
+static BOOL isBreak(NSString *text) {
+    NSString *trimmed = [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    return !trimmed.length || [trimmed isEqualToString:@"♪"];
+}
+
+// Starts only; the words inside are estimated. A line that ends well before the next begins gets an
+// empty line at its end, so the estimate does not stretch it over the pause.
+static NSArray<SGKaraokeLine *> *lineLines(NSArray *content) {
+    NSMutableArray<NSDictionary *> *kept = [NSMutableArray array];
+    for (NSDictionary *item in content) {
+        if (!isBreak(stringIn(item, @"Text"))) [kept addObject:item];
+    }
     NSMutableArray<NSNumber *> *starts = [NSMutableArray array];
     NSMutableArray<NSString *> *texts = [NSMutableArray array];
-    for (id raw in content ?: @[]) {
-        NSDictionary *vocal = dictionaryIn(raw);
-        id text = vocal[@"Text"];
-        if (![text isKindOfClass:NSString.class]) continue;
-        [starts addObject:@(msIn(vocal[@"StartTime"]))];
-        [texts addObject:text];
+    for (NSUInteger i = 0; i < kept.count; i++) {
+        [starts addObject:@(ms(kept[i][@"StartTime"]))];
+        [texts addObject:kept[i][@"Text"]];
+        NSInteger end = ms(kept[i][@"EndTime"]);
+        if (end > 0 && i + 1 < kept.count && ms(kept[i + 1][@"StartTime"]) > end) {
+            [starts addObject:@(end)];
+            [texts addObject:@""];
+        }
     }
-    return SGKaraokeEstimatedLines(starts, texts);
+    NSArray<SGKaraokeLine *> *lines = SGKaraokeEstimatedLines(starts, texts);
+    // Breaks were left out of kept, so the lines and kept pair up one to one.
+    for (NSUInteger i = 0; i < lines.count && i < kept.count; i++) {
+        if ([kept[i][@"OppositeAligned"] boolValue]) lines[i].align = SGKaraokeAlignTrailing;
+        lines[i].pronunciation = SGLyricsPronunciation(nil, stringIn(kept[i], @"TransliteratedText"), lines[i]);
+        lines[i].translation = translationOf(stringIn(kept[i], @"TranslatedText"), lines[i]);
+    }
+    return lines;
 }
 
-// What the server actually sent, named rather than quoted: the field names and counts, never the
-// words. For telling a document that has no timing from one whose timing we failed to read.
-static NSString *shapeOf(NSDictionary *document) {
-    NSMutableString *shape = [NSMutableString stringWithFormat:@"Type=%@ keys=[%@]",
-                              document[@"Type"], [document.allKeys componentsJoinedByString:@" "]];
-    NSArray *content = arrayIn(document[@"Content"]);
-    if (content) [shape appendFormat:@" Content=%lu", (unsigned long)content.count];
-    NSDictionary *first = dictionaryIn(content.firstObject);
-    if (first) [shape appendFormat:@" Content[0]=[%@]", [first.allKeys componentsJoinedByString:@" "]];
-    NSDictionary *lead = dictionaryIn(first[@"Lead"]);
-    if (lead) [shape appendFormat:@" Lead=[%@] syllables=%lu", [lead.allKeys componentsJoinedByString:@" "],
-               (unsigned long)arrayIn(lead[@"Syllables"]).count];
-    NSDictionary *syllable = dictionaryIn(arrayIn(lead[@"Syllables"]).firstObject);
-    if (syllable) [shape appendFormat:@" Syllable[0]=[%@]", [syllable.allKeys componentsJoinedByString:@" "]];
-    NSArray *staticLines = arrayIn(document[@"Lines"]);
-    if (staticLines) [shape appendFormat:@" Lines=%lu", (unsigned long)staticLines.count];
-    // Whose words these are, where the document says so: a static reply is text Spicy is passing on
-    // from somewhere else, and its name tells us why it came without timing.
-    if (document[@"source"]) [shape appendFormat:@" source=%@", document[@"source"]];
-    NSDictionary *staticLine = dictionaryIn(staticLines.firstObject);
-    if (staticLine) [shape appendFormat:@" Lines[0]=[%@]", [staticLine.allKeys componentsJoinedByString:@" "]];
-    return shape;
+// The lines, each with its translation, and the text for Spotify's page: an empty row between two
+// lines is a ♪ there, as a stanza break.
+static NSArray<SGKaraokeLine *> *staticLines(NSArray *rows, NSArray<NSString *> **pageTexts) {
+    NSMutableArray<NSString *> *texts = [NSMutableArray array], *page = [NSMutableArray array];
+    NSMutableArray<NSDictionary *> *kept = [NSMutableArray array];
+    for (NSDictionary *row in rows) {
+        NSString *text = stringIn(row, @"Text");
+        if (isBreak(text)) {
+            if (page.count && ![page.lastObject isEqualToString:@"♪"]) [page addObject:@"♪"];
+            continue;
+        }
+        [texts addObject:text];
+        [page addObject:text];
+        [kept addObject:row];
+    }
+    if ([page.lastObject isEqualToString:@"♪"]) [page removeLastObject];
+    *pageTexts = page;
+    NSArray<SGKaraokeLine *> *lines = SGKaraokeStaticLines(texts);
+    for (NSUInteger i = 0; i < lines.count && i < kept.count; i++) lines[i].translation = translationOf(stringIn(kept[i], @"TranslatedText"), lines[i]);
+    return lines;
 }
 
-#pragma mark - the source
+// What the credit reads, and the pages it links to. A community sync names the people who made it,
+// each linked where the API gives an address; a catalog's is named as the provider it is, reached
+// through Spicy Lyrics.
+static NSString *creditFor(NSDictionary *body, NSArray<SGLyricsLink *> **links) {
+    *links = nil;
+    NSString *source = stringIn(body, @"source");
+    if ([source isEqualToString:@"apple_music"]) return @"Apple Music via Spicy Lyrics";
+    if ([source isEqualToString:@"spotify"]) return @"Spotify via Spicy Lyrics";
+    if (![source isEqualToString:@"spicy_lyrics"]) return @"Spicy Lyrics, source unknown";
+    NSDictionary *people = [body[@"UploadAttribution"] isKindOfClass:NSDictionary.class] ? body[@"UploadAttribution"] : nil;
+    NSDictionary *makerInfo = people[@"Maker"], *uploaderInfo = people[@"Uploader"];
+    NSString *maker = stringIn(makerInfo, @"username"), *uploader = stringIn(uploaderInfo, @"username");
+    NSMutableArray<SGLyricsLink *> *found = [NSMutableArray array];
+    for (NSArray *person in @[@[@"Uploader", uploaderInfo ?: @{}], @[@"Maker", makerInfo ?: @{}]]) {
+        NSString *name = stringIn(person[1], @"username");
+        NSURL *url = [NSURL URLWithString:stringIn(person[1], @"url") ?: @""];
+        NSString *scheme = url.scheme.lowercaseString;
+        if (!name || !url.host.length || !([scheme isEqualToString:@"https"] || [scheme isEqualToString:@"http"])) continue;
+        if ([[found valueForKey:@"url"] containsObject:url]) continue;   // one person both made and uploaded it
+        SGLyricsLink *link = [SGLyricsLink new];
+        link.title = [NSString stringWithFormat:@"%@: %@", person[0], name];
+        link.url = url;
+        [found addObject:link];
+    }
+    *links = found.count ? found : nil;
+    if (maker && uploader && ![maker isEqualToString:uploader]) {
+        return [NSString stringWithFormat:@"Spicy Lyrics, synced by %@, uploaded by %@", maker, uploader];
+    }
+    if (maker ?: uploader) return [NSString stringWithFormat:@"Spicy Lyrics, synced by %@", maker ?: uploader];
+    return @"Spicy Lyrics";
+}
 
-// Uses the official Developer Platform API and a user-supplied publishable key. Secret keys never
-// ship in this client; the API's native-client no-Origin option must be enabled for the key.
-SGLyricsAsk SGSpicyLyricsAsk = ^(SGLyricsQuery *query, void (^done)(SGLyricsResult *result)) {
-    NSString *key = SGSpicyLyricsAPIKey();
-    if (!query.trackID.length || !key.length) {
-        SGLog(@"spicy: no request for %@%@", query.trackID, key.length ? @"" : @", client key not configured");
+SGLyricsResult *SGSpicyLyricsResult(id root) {
+    NSDictionary *body = [root isKindOfClass:NSDictionary.class] ? root[@"Body"] : nil;
+    if (![body isKindOfClass:NSDictionary.class]) return nil;
+    NSString *type = stringIn(body, @"Type");
+    NSArray<NSString *> *pageTexts = nil;
+    NSArray<SGKaraokeLine *> *lines = [type isEqualToString:@"Syllable"] ? syllableLines(arrayIn(body, @"Content"))
+        : [type isEqualToString:@"Line"] ? lineLines(arrayIn(body, @"Content"))
+        : [type isEqualToString:@"Static"] ? staticLines(arrayIn(body, @"Lines"), &pageTexts)
+        : nil;
+    if (!lines.count) return nil;
+    SGLyricsResult *result = [SGLyricsResult new];
+    NSArray<SGLyricsLink *> *links;
+    result.provider = creditFor(body, &links);
+    result.creditLinks = links;
+    result.creditRequired = YES;
+    result.karaokeLines = lines;
+    result.wordTimed = SGKaraokeLinesTiming(lines) == SGKaraokeTimingWords;
+    result.synced = SGKaraokeLinesTiming(lines) != SGKaraokeTimingNone;
+    NSArray<NSNumber *> *starts;
+    NSArray<NSString *> *texts;
+    if (result.synced) {
+        SGLyricsPageLines(lines, &starts, &texts);
+    } else {
+        NSMutableArray<NSNumber *> *zeros = [NSMutableArray array];
+        NSMutableArray<NSString *> *plain = [NSMutableArray array];
+        for (SGKaraokeLine *line in lines) {
+            [zeros addObject:@0];
+            [plain addObject:SGKaraokeLineText(line)];
+        }
+        starts = zeros;
+        texts = pageTexts ?: plain;
+        if (pageTexts) {
+            [zeros removeAllObjects];
+            for (NSUInteger i = 0; i < pageTexts.count; i++) [zeros addObject:@0];
+        }
+    }
+    result.starts = starts;
+    result.texts = texts;
+    return result;
+}
+
+#pragma mark - asking
+
+// Main queue only, as the walk asks and the reply calls back there.
+static NSMutableDictionary<NSString *, id> *sg_answers;   // a result, or NSNull for "none"
+static NSTimeInterval sg_waitUntil;   // a rate limit's end, by the system's uptime
+static NSString *sg_refused;          // the error code of the last 401 or 403, "" when it gave none
+static NSTimeInterval sg_refusedUntil;
+
+static NSTimeInterval uptime(void) {
+    return NSProcessInfo.processInfo.systemUptime;
+}
+
+// Spotify's 22 character base62 id, the only thing the API takes.
+static BOOL isTrackID(NSString *trackID) {
+    if (trackID.length != 22) return NO;
+    NSCharacterSet *base62 = [NSCharacterSet characterSetWithCharactersInString:
+        @"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"];
+    return [trackID rangeOfCharacterFromSet:base62.invertedSet].location == NSNotFound;
+}
+
+// A header's wait in seconds: a number of seconds, a Unix time (a RateLimit-Reset some servers send),
+// or an HTTP date; 0 when it says none.
+static NSTimeInterval secondsIn(NSString *value, NSDate *now) {
+    value = [value stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+    if (!value.length) return 0;
+    if ([value rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"0123456789."].invertedSet].location == NSNotFound) {
+        double seconds = value.doubleValue;
+        return seconds > 1e9 ? seconds - now.timeIntervalSince1970 : seconds;
+    }
+    NSDateFormatter *format = [NSDateFormatter new];
+    format.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    format.timeZone = [NSTimeZone timeZoneForSecondsFromGMT:0];
+    format.dateFormat = @"EEE, dd MMM yyyy HH:mm:ss zzz";
+    NSDate *date = [format dateFromString:value];
+    return date ? [date timeIntervalSinceDate:now] : 0;
+}
+
+// How long to leave the API alone after this reply: a 429 or 503 for its Retry-After, else its
+// RateLimit-Reset, else a minute; any reply with no requests left until its RateLimit-Reset. Never more
+// than an hour.
+NSTimeInterval SGSpicyLyricsWait(NSHTTPURLResponse *reply, NSDate *now);
+NSTimeInterval SGSpicyLyricsWait(NSHTTPURLResponse *reply, NSDate *now) {
+    NSString *reset = [reply valueForHTTPHeaderField:@"RateLimit-Reset"];
+    NSTimeInterval wait = 0;
+    if (reply.statusCode == 429 || reply.statusCode == 503) {
+        wait = secondsIn([reply valueForHTTPHeaderField:@"Retry-After"], now);
+        if (wait <= 0) wait = secondsIn(reset, now);
+        if (wait <= 0) wait = kDefaultWait;
+    } else {
+        NSString *left = [[reply valueForHTTPHeaderField:@"RateLimit-Remaining"] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+        if ([left isEqualToString:@"0"]) wait = secondsIn(reset, now);
+    }
+    return MIN(MAX(wait, 0), kMostWait);
+}
+
+// What a refusal's error code means, short enough for the source's row.
+static NSString *refusalReason(NSString *code) {
+    if ([code isEqualToString:@"origin_not_allowed"] || [code isEqualToString:@"origins_not_configured"]) return @"Key rejected: allow No origin header";
+    if ([code isEqualToString:@"application_paused"]) return @"Key rejected: paused";
+    if ([code isEqualToString:@"key_revoked"]) return @"Key rejected: revoked";
+    if ([code isEqualToString:@"key_not_found"] || [code isEqualToString:@"key_malformed"] || [code isEqualToString:@"malformed_authorization"]) return @"Key rejected: not found";
+    for (NSString *word in @[@"suspended", @"disabled", @"deleted"]) {
+        if ([code containsString:word]) return @"Key rejected: disabled";
+    }
+    return @"Key rejected";
+}
+
+NSString *SGSpicyLyricsStatus(void) {
+    if (!SGSpicyLyricsKeySet()) return @"Needs a key";
+    return sg_refused ? refusalReason(sg_refused) : nil;
+}
+
+static NSString *errorCodeIn(id root) {
+    NSDictionary *body = [root isKindOfClass:NSDictionary.class] ? root[@"Body"] : nil;
+    return stringIn(body, @"error") ?: stringIn(root, @"error");
+}
+
+static void keepAnswer(NSString *trackID, id answer) {
+    if (!sg_answers) sg_answers = [NSMutableDictionary dictionary];
+    if (sg_answers.count >= kKeptTracks) [sg_answers removeAllObjects];
+    sg_answers[trackID] = answer;
+}
+
+// The ask with the key passed in, which harness/spicy-lyrics/ drives without a Keychain.
+void SGSpicyLyricsAskWith(NSString *key, SGLyricsQuery *query, void (^done)(SGLyricsResult *result));
+void SGSpicyLyricsAskWith(NSString *key, SGLyricsQuery *query, void (^done)(SGLyricsResult *result)) {
+    NSString *trackID = query.trackID;
+    if (!key.length || !isTrackID(trackID)) {
         done(nil);
         return;
     }
-    NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%@/%@", kAPI, query.trackID]];
-    NSDictionary *headers = @{@"Authorization": [@"Bearer " stringByAppendingString:key], @"Accept": @"application/json"};
-    SGLyricsGetJSON(url, headers, ^(id root) {
-        NSDictionary *envelope = dictionaryIn(root);
-        NSInteger status = [envelope[@"Status"] integerValue];
-        if (status && status != 200) {
-            SGLog(@"spicy: %@ API status %ld", query.trackID, (long)status);
+    id kept = sg_answers[trackID];
+    if (kept) {
+        done(kept == NSNull.null ? nil : kept);
+        return;
+    }
+    NSTimeInterval now = uptime();
+    if (sg_refused && now < sg_refusedUntil) {
+        done(nil);
+        return;
+    }
+    if (now < sg_waitUntil) {
+        // Lost rather than "no lyrics", so the walk is not kept and asks again once the wait is over.
+        SGLog(@"spicy lyrics: %@ skipped, rate limited for %.0fs more", trackID, sg_waitUntil - now);
+        SGLyricsNoteReply(nil, [NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorCannotConnectToHost userInfo:nil]);
+        done(nil);
+        return;
+    }
+    NSURL *url = [NSURL URLWithString:[kAPI stringByAppendingString:trackID]];
+    NSDictionary *headers = @{@"Authorization": [@"Bearer " stringByAppendingString:key], @"Accept": @"application/json", @"User-Agent": kAgent};
+    SGLyricsGetJSONReply(url, headers, ^(id root, NSHTTPURLResponse *reply) {
+        NSInteger status = reply.statusCode;
+        NSTimeInterval wait = SGSpicyLyricsWait(reply, NSDate.date);
+        if (wait > 0) {
+            sg_waitUntil = uptime() + wait;
+            SGLog(@"spicy lyrics: rate limited (%ld), leaving it alone for %.0fs", (long)status, wait);
+        }
+        if (status == 401 || status == 403) {
+            sg_refused = errorCodeIn(root) ?: @"";
+            sg_refusedUntil = uptime() + kRefusedWait;
+            SGLog(@"spicy lyrics: the key was refused (%ld, %@), not asking for %.0fs", (long)status, sg_refused, kRefusedWait);
             done(nil);
             return;
         }
-        NSDictionary *document = dictionaryIn(unpack(envelope[@"Body"] ?: envelope));
-        if (!document) {
-            SGLog(@"spicy: %@ returned no document", query.trackID);
-            done(nil);
-            return;
-        }
-        SGLog(@"spicy: %@ came back as %@", query.trackID, shapeOf(document));
-        NSString *type = [document[@"Type"] isKindOfClass:NSString.class] ? document[@"Type"] : nil;
-        NSArray *content = arrayIn(document[@"Content"]);
-        BOOL wordTimed = [type isEqualToString:@"Syllable"];
-        NSArray<SGKaraokeLine *> *lines = wordTimed ? linesFromSyllables(content)
-            : [type isEqualToString:@"Line"] ? linesFromLines(content) : nil;
-        SGLyricsResult *result = [SGLyricsResult new];
-        if (lines) {
-            result.synced = YES;
-            result.wordTimed = wordTimed;
-            result.karaokeLines = lines;
-            NSArray<NSNumber *> *starts;
-            NSArray<NSString *> *texts;
-            SGLyricsPageLines(lines, &starts, &texts);
-            result.starts = starts;
-            result.texts = texts;
-        } else if ([type isEqualToString:@"Static"]) {
-            // The words with nothing to time them by: the page shows them, and a source under this
-            // one in the order can still time them.
-            NSMutableArray<NSNumber *> *starts = [NSMutableArray array];
-            NSMutableArray<NSString *> *texts = [NSMutableArray array];
-            for (id raw in arrayIn(document[@"Lines"]) ?: @[]) {
-                id text = dictionaryIn(raw)[@"Text"];
-                if (![text isKindOfClass:NSString.class]) continue;
-                [starts addObject:@0];
-                [texts addObject:[text length] ? text : @"♪"];
-            }
-            result.starts = starts;
-            result.texts = texts;
-            result.karaokeLines = SGKaraokeStaticLines(texts);
-        }
-        NSString *source = [document[@"source"] isKindOfClass:NSString.class] ? document[@"source"] : nil;
-        NSDictionary<NSString *, NSString *> *sourceNames = @{
-            @"spicy_lyrics": @"Spicy Lyrics",
-            @"apple_music": @"Apple Music",
-            @"spotify": @"Spotify",
-        };
-        result.provider = sourceNames[source] ?: @"Spicy Lyrics";
-        if (!result.texts.count) {
-            SGLog(@"spicy: %@ came back as %@ with nothing the page could show", query.trackID, type ?: @"no shape at all");
-            done(nil);
-            return;
-        }
-        SGLog(@"spicy: %@ has %lu %@ lines", query.trackID, (unsigned long)result.texts.count,
-              result.wordTimed ? @"word timed" : result.synced ? @"line timed" : @"untimed");
+        if (status == 200 || status == 404) sg_refused = nil;
+        SGLyricsResult *result = status == 200 ? SGSpicyLyricsResult(root) : nil;
+        if (status == 200 || status == 404 || status == 400) keepAnswer(trackID, result ?: NSNull.null);
+        SGLog(@"spicy lyrics: %@ %@", trackID, result
+              ? [NSString stringWithFormat:@"has %lu %@ lines, credited to %@", (unsigned long)result.karaokeLines.count,
+                 result.wordTimed ? @"word timed" : result.synced ? @"line timed" : @"untimed", result.provider]
+              : [NSString stringWithFormat:@"has nothing (%ld)", (long)status]);
         done(result);
     });
+}
+
+SGLyricsAsk SGSpicyLyricsAsk = ^(SGLyricsQuery *query, void (^done)(SGLyricsResult *result)) {
+    SGSpicyLyricsAskWith(storedKey(), query, done);
 };
+
+#pragma mark - the row
+
+// What is wrong with a pasted key, nil when it looks like a publishable one: sl_pk_, then printable
+// ASCII, 12 characters at the least.
+NSString *SGSpicyLyricsKeyProblem(NSString *key);
+NSString *SGSpicyLyricsKeyProblem(NSString *key) {
+    if ([key hasPrefix:@"sl_sk_"]) return @"That is a secret key, which belongs on a server, not in an app.";
+    NSCharacterSet *printable = [NSCharacterSet characterSetWithRange:NSMakeRange(0x21, 0x7E - 0x21 + 1)];
+    if (![key hasPrefix:@"sl_pk_"] || key.length < 12 || [key rangeOfCharacterFromSet:printable.invertedSet].location != NSNotFound) {
+        return @"That is not a publishable key.";
+    }
+    return nil;
+}
+
+// A key saved puts the source at the top of the order, since it was set to be used; a key removed
+// takes it out, as it can answer nothing without one. Either way a refusal of the old key is forgotten.
+static void setKey(NSString *key) {
+    storeKey(key);
+    sg_refused = nil;
+    sg_refusedUntil = 0;
+    NSMutableArray<NSString *> *order = [SGLyricsOrder() mutableCopy];
+    [order removeObject:SGSpicyLyricsKey];
+    if (key.length) [order insertObject:SGSpicyLyricsKey atIndex:0];
+    SGLyricsSetOrder(order);
+}
+
+static void askForKey(NSString *problem) {
+    NSString *how = @"Sign up at Spicy Lyrics for Developers, create an application, turn on client access with "
+                    @"No origin header allowed, and paste its publishable key (sl_pk_). The key stays on this iPhone.";
+    NSString *refused = SGSpicyLyricsKeySet() ? SGSpicyLyricsStatus() : nil;
+    NSString *lead = problem ?: refused ? [refused stringByAppendingString:@"."] : nil;
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Spicy Lyrics Key"
+        message:lead ? [NSString stringWithFormat:@"%@\n\n%@", lead, how] : how
+        preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
+        field.placeholder = @"sl_pk_...";
+        field.keyboardType = UIKeyboardTypeASCIICapable;
+        field.autocorrectionType = UITextAutocorrectionTypeNo;
+        field.autocapitalizationType = UITextAutocapitalizationTypeNone;
+        field.spellCheckingType = UITextSpellCheckingTypeNo;
+    }];
+    UIAlertAction *save = [UIAlertAction actionWithTitle:@"Save" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        NSString *key = [alert.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        if (!key.length) return;
+        NSString *wrong = SGSpicyLyricsKeyProblem(key);
+        // Asked again, saying what was wrong, rather than kept and failing on every track.
+        if (wrong) dispatch_async(dispatch_get_main_queue(), ^{ askForKey(wrong); });
+        else setKey(key);
+    }];
+    [alert addAction:save];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Open Dashboard" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [UIApplication.sharedApplication openURL:[NSURL URLWithString:kDashboard] options:@{} completionHandler:nil];
+    }]];
+    if (SGSpicyLyricsKeySet()) {
+        [alert addAction:[UIAlertAction actionWithTitle:@"Remove" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+            setKey(nil);
+        }]];
+    }
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    alert.preferredAction = save;
+    [SGTopController() presentViewController:alert animated:YES completion:nil];
+}
+
+SGModRow *SGSpicyLyricsKeyRow(void) {
+    return SGStatActionRow(@"Spicy Lyrics key", @"Community word syncs, with your own key",
+                           ^NSString *{ return !SGSpicyLyricsKeySet() ? @"Off" : sg_refused ? @"Rejected" : @"Set"; }, ^{ askForKey(nil); });
+}

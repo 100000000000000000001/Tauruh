@@ -41,7 +41,9 @@ UIViewController *SGAdsSettingsPage(void) {
     NSMutableArray<SGModRow *> *counts = [NSMutableArray array];
     for (NSString *label in SGAdBlockLabels()) {
         [counts addObject:SGStatRow(label, ^NSString *{
-            return @(SGAdBlockCount(label)).stringValue;
+            NSUInteger checked = SGAdBlockChecked(label);
+            return checked == NSNotFound ? @(SGAdBlockCount(label)).stringValue
+                : [NSString stringWithFormat:@"%lu of %lu", (unsigned long)SGAdBlockCount(label), (unsigned long)checked];
         })];
     }
     [counts addObject:SGStatRow(@"Total", ^NSString *{
@@ -49,15 +51,14 @@ UIViewController *SGAdsSettingsPage(void) {
     })];
     [counts addObject:SGActionRow(@"Reset the counters", nil, ^{ SGResetAdBlock(); })];
 
-    SGModRow *fakePremium = SGSwitchRow(@"Spoof Premium", nil, SGKeyFakePremium);
+    SGModRow *fakePremium = SGOptionRow(@"Spoof Premium", nil, SGKeyFakePremium);
     fakePremium.warning = SGFakePremiumWarning;
 
-    NSMutableArray<SGModRow *> *ads = [NSMutableArray arrayWithArray:@[
-        SGWithSymbol(SGSwitchRow(@"Hide ads", nil, SGKeyHideAds), @"speaker.slash"),
-        SGWithSymbol(SGSwitchRow(@"Hide upsells", nil, SGKeyHideUpsells), @"hand.raised"),
-    ]];
-    if (!SGRedesignedUIStored())
-        [ads addObject:SGWithSymbol(SGSwitchRow(@"Hide the video carousel in Search", nil, SGKeyHideSearchVideos), @"play.rectangle.on.rectangle")];
+    // The redesign's Search keeps only its category cards, so the video carousel switch is the native look's.
+    NSMutableArray<SGModRow *> *ads = [NSMutableArray arrayWithObjects:
+        SGWithSymbol(SGOptionRow(@"Hide ads", nil, SGKeyHideAds), @"speaker.slash"),
+        SGWithSymbol(SGOptionRow(@"Hide upsells", nil, SGKeyHideUpsells), @"hand.raised"), nil];
+    if (!SGRedesignedUIStored()) [ads addObject:SGWithSymbol(SGOptionRow(@"Hide the video carousel in Search", nil, SGKeyHideSearchVideos), @"play.rectangle.on.rectangle")];
     [ads addObject:SGWithSymbol(SGPageRow(@"Ad and upsell flags", ^UIViewController *{ return adFlagsPage(); }), @"flag")];
 
     return [[SGModPage alloc] initWithTitle:@"Premium, ads & privacy" intro:SGRestartNote sections:@[
@@ -66,7 +67,8 @@ UIViewController *SGAdsSettingsPage(void) {
             SGWithSymbol(fakePremium, @"crown"),
         ], @"Free accounts only."),
         SGPrivacySection(),
-        SGSection(@"Ads blocked so far", counts),
+        SGNotedSection(@"Ads blocked so far", counts,
+                       @"\"3 of 214\" is 3 stopped of 214 checked. 0 of 0 means Spotify never asked, so that part does nothing on this version."),
         SGPrivacyCountersSection(),
     ] footer:nil];
 }

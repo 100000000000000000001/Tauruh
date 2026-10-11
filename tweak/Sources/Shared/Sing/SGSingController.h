@@ -28,6 +28,9 @@ float SGSingVocalLevel(void);
 float SGSingReducedLevel(void); // the last level below 100 %, which turning Sing on goes back to
 void SGSingSetVocalLevel(float level);
 void SGSingSetEnabled(BOOL enabled);
+#if SG_DRIVER
+void SGDriverSingSetEnabled(BOOL enabled);
+#endif
 // Before/after an explicit seek or skip. The first invalidates render output immediately.
 void SGSingPlaybackWillChange(void);
 void SGSingPlaybackDidChange(void);
@@ -35,3 +38,17 @@ void SGSingPlaybackDidSeek(double seconds);
 uint64_t SGSingTrackIdentifier(id uri);
 BOOL SGSingPosition(SPTPlayerState *state, double *position);
 double SGSingSourcePosition(SPTPlayerState *state); // the unmodified player getter, defined by hooks
+
+#define SGKeySingSpatial @"spotifyglass.sing.spatial"
+#define SGKeySingSpatialDistance @"spotifyglass.sing.spatial.distance"
+#define SGKeySingSpatialRoom @"spotifyglass.sing.spatial.room"
+#define SGKeySingSpatialFront @"spotifyglass.sing.spatial.front"
+#define SGKeySingSpatialWidth @"spotifyglass.sing.spatial.width"
+BOOL SGSingSpatialAvailable(void);
+BOOL SGSingSpatial(void);
+void SGSetSingSpatial(BOOL on);
+double SGSingSpatialDistance(void);
+double SGSingSpatialRoom(void);
+double SGSingSpatialFront(void);
+double SGSingSpatialWidth(void);
+void SGSetSingSpatialSound(double meters, double roomPercent, double frontSeconds, double widthPercent);

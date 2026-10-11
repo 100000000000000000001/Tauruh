@@ -66,6 +66,12 @@ void SGSingStreamSetLevel(SGSingStream *s, float level) {
     level = SGSingClampLevel(level);
     uint32_t bits; memcpy(&bits, &level, sizeof bits); atomic_store(&s->levelBits, bits);
 }
+void SGSingStreamSetVoiceAngle(SGSingStream *s, float radians) {
+    if (s) SGSingTimelineSetVoiceAngle(s->timeline, radians);
+}
+void SGSingStreamSetSpatial(SGSingStream *s, bool on, float distance, float room, float width) {
+    if (s) SGSingTimelineSetSpatial(s->timeline, on, distance, room, width);
+}
 SGSingTimelineState SGSingStreamState(const SGSingStream *s) { return atomic_load(&s->state); }
 uint64_t SGSingStreamPresented(const SGSingStream *s) { return atomic_load(&s->publishedPresented); }
 uint64_t SGSingStreamCaptured(const SGSingStream *s) { return atomic_load(&s->publishedCaptured); }

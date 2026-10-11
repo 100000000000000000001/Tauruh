@@ -18,11 +18,13 @@ subprocess.run([os.environ.get("CC", "clang"), "-x", "c", "-std=c11", "-Wall", "
                 "-Werror", "-pthread", "-fsanitize=" + sanitizer, "-g", "-I", str(src),
                 str(here / "timeline_test.c"), str(src / "Shared/Audio/SGAudioRingBuffer.m"),
                 str(src / "Shared/Sing/SGSingDSP.m"), str(src / "Shared/Sing/SGSingTimeline.m"),
+                str(here / "reverb_stub.c"),
                 "-o", str(out / "timeline-test")], check=True)
 subprocess.run([str(out / "timeline-test")], check=True)
 subprocess.run([os.environ.get("CC", "clang"), "-x", "c", "-std=c11", "-Wall", "-Wextra",
                 "-Werror", "-pthread", "-fsanitize=" + sanitizer, "-g", "-I", str(src),
                 str(here / "stream_test.c"), str(src / "Shared/Audio/SGAudioRingBuffer.m"),
                 str(src / "Shared/Sing/SGSingDSP.m"), str(src / "Shared/Sing/SGSingTimeline.m"),
-                str(src / "Shared/Sing/SGSingStream.m"), "-o", str(out / "stream-test")], check=True)
+                str(src / "Shared/Sing/SGSingStream.m"), str(here / "reverb_stub.c"),
+                "-o", str(out / "stream-test")], check=True)
 subprocess.run([str(out / "stream-test")], check=True)

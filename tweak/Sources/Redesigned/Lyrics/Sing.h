@@ -12,3 +12,4 @@ void SGRSingApplySwitch(void);
 // the main page says beside the chevron (Off, On, No model, the download's percentage).
 UIViewController *SGRKaraokeSettingsPage(void);
 NSString *SGRKaraokeSummary(void);
+UIViewController *SGSpatialVoiceSettingsPage(void);

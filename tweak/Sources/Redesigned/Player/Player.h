@@ -28,6 +28,19 @@
 #import <UIKit/UIKit.h>
 
 @class SGRArtworkField;
+@class SGModSection;
+
+// The field behind the player.
+#define SGRKeyPlayerBackground @"spotifyglass.redesign.player.background"
+typedef NS_ENUM(NSInteger, SGRPlayerBackgroundKind) {
+    SGRPlayerBackgroundStill,
+    SGRPlayerBackgroundColours,
+    SGRPlayerBackgroundFluid,
+    SGRPlayerBackgroundAnimated,
+    SGRPlayerBackgroundVisualiser,
+};
+SGRPlayerBackgroundKind SGRPlayerBackground(void);
+NSArray<NSString *> *SGRPlayerBackgroundNames(void);
 
 // The artwork's colours moving behind the player (on until switched off), or the blurred artwork held
 // still; the row is on the Now playing page (Redesigned/NowPlayingBar/NowPlayingBarSettings.m).
@@ -40,6 +53,7 @@ void SGRPlayerMenuWatchMoreButton(UIView *button);
 
 // The field behind the player, nil until the player has laid out once (PlayerField.x).
 SGRArtworkField *SGRPlayerField(void);
+void SGRPlayerHoldField(void);
 
 #pragma mark - the cover (PlayerArtwork.x)
 
@@ -54,6 +68,7 @@ CGRect SGRPlayerArtworkAreaIn(UIView *host);
 // Hides the cover on screen and its shadow, or shows them again, for a stand-in to fly in its place
 // (PlayerMorph.x).
 void SGRPlayerSetCoverHidden(BOOL hidden);
+CGFloat SGRPlayerCoverScale(void);
 
 #pragma mark - the lyrics in the player (PlayerLyrics.x)
 
@@ -71,7 +86,37 @@ void SGRPlayerToggleLyrics(void);
 // Called by PlayerLyrics.x whenever either of those two changed, so the footer's lyrics glyph follows
 // (PlayerFooter.x). It returns at once when nothing changed.
 void SGRPlayerLyricsChanged(void);
+#define SGRKeyLyricsAutoHide @"spotifyglass.redesign.lyrics.autoHide"
+
+// The system volume slider below the player controls.
+#define SGRKeyPlayerVolume @"spotifyglass.redesign.player.volume"
+BOOL SGRPlayerVolumeOn(void);
+BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat margin);
+
+// The cover's color may tint the player's controls.
+#define SGRKeyPlayerFollowsCover @"spotifyglass.redesign.player.followsCover"
+BOOL SGRPlayerFollowsCover(void);
+void SGRPlayerSetCoverAccent(UIColor *cover);
+void SGRPlayerPaintCover(UIView *stack);
+
+// Landscape lyrics take over the player when enabled.
+#define SGRKeyLyricsLandscape @"spotifyglass.redesign.lyrics.landscape"
+void SGRPlayerShowLandscape(BOOL show);
+
+void SGRPlayerMotionLyricsChanged(void);
+void SGRPlayerMotionFieldLaidOut(void);
+void SGRPlayerMotionCoverLaidOut(void);
+BOOL SGRPlayerMotionShowing(void);
+UIView *SGRPlayerMotionPreview(void (^arrived)(void));
+CGFloat SGRPlayerClipDim(CGFloat luminance, BOOL contrast, BOOL lyrics);
+
+BOOL SGRPlayerVisualiserShowing(void);
+void SGRPlayerVisualiserUpdate(void);
+UIView *SGRPlayerVisualiserPreview(void);
+void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind);
 
 // Alpha 0, no touches, hidden from accessibility, set again on every call: for Spotify's Swift views,
 // which SGRSuppress cannot keep (PlayerControls.x).
 void SGRPlayerVanish(UIView *view);
+
+UIViewController *SGRPlayerSettingsPage(NSArray<SGModSection *> *more);

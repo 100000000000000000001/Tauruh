@@ -72,6 +72,7 @@ static NSArray *filtered(NSArray *components) {
             [kept addObject:component];
             continue;
         }
+        SGAdBlockSawOne(@"Page components");
         if (isAd(component)) {
             SGAdBlockCountOne(@"Page components");
             SGLog(@"dropped page component %@", component[@"id"] ?: component[@"component"]);
@@ -112,8 +113,8 @@ static NSArray *filtered(NSArray *components) {
 %end
 
 %ctor {
-    ads = SGFlag(SGKeyHideAds, YES);
-    upsells = SGFlag(SGKeyHideUpsells, YES);
+    ads = SGHidden(SGKeyHideAds);
+    upsells = SGHidden(SGKeyHideUpsells);
     if (!ads && !upsells) return;
     %init;
     SGRequireClasses(@[@"HUBViewModelBuilderImplementation"]);
