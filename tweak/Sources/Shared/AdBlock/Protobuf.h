@@ -1,5 +1,3 @@
-// The protobuf wire format, just enough to walk into a message, change a few fields and write it
-// back with everything else untouched. Premium.m and Feeds.m read Spotify's responses through it.
 #import <Foundation/Foundation.h>
 
 // A field as it sits on the wire: a varint carries its value, everything else its raw payload.
@@ -17,6 +15,4 @@ SGPBField *SGPBVarint(uint32_t number, uint64_t value);
 SGPBField *SGPBBytes(uint32_t number, NSData *payload);
 SGPBField *SGPBString(uint32_t number, NSString *text);
 NSString *SGPBText(SGPBField *field);   // the payload read as UTF-8, nil for any other field
-// The message at `path` (field numbers, outermost first) handed to `edit`, whose result takes its
-// place; nil when a field of the path is missing, the bytes do not parse or `edit` returns nil.
 NSData *SGPBEdit(NSData *message, NSArray<NSNumber *> *path, NSData *(^edit)(NSData *inner));

@@ -83,14 +83,10 @@ bool SGSingTimelineVocals(SGSingTimeline *t, SGAudioStamp stamp, const float *pc
         stamp.frames > t->captured - stamp.sourceFrame ||
         (t->state != SGSingTimelinePreparing && t->state != SGSingTimelineActive && t->state != SGSingTimelineRecovering)) return false;
     if (stamp.sourceFrame != t->processed) {
-        // Cold preparation may skip an initial prefix already emitted as original audio.
-        // This exception cannot skip an audible/future hole or conceal a later missing hop.
         if (t->state != SGSingTimelinePreparing || t->processed != t->origin.sourceFrame ||
             stamp.sourceFrame < t->processed || stamp.sourceFrame > t->consumed) return false;
     }
     t->processed = stamp.sourceFrame + stamp.frames;
-    // Never write expired samples back into the circular buffer: their slots may now contain
-    // future audio. A packet straddling the audible cursor contributes only its live suffix.
     uint64_t expired = t->consumed > stamp.sourceFrame ? t->consumed - stamp.sourceFrame : 0;
     if (expired < stamp.frames) {
         stamp.sourceFrame += expired; stamp.frames -= (uint32_t)expired;
@@ -108,8 +104,6 @@ uint32_t SGSingTimelineRead(SGSingTimeline *t, float *out, uint32_t frames) {
             t->state = SGSingTimelineActive;
         }
     }
-    // An isolated late window gets a fresh recovery budget after sustained playback.
-    // Brief returns to Active must not give an overloaded worker unlimited dry/wet cycles.
     if (t->state == SGSingTimelineActive && t->recoveryStart != UINT64_MAX &&
         t->consumed - t->recoveredAt >= SGSingRecoveryLimitFrames) t->recoveryStart = UINT64_MAX;
     if (t->state == SGSingTimelineActive && SGSingTimelineReadyFrames(t) <= SGSingReserveFrames + (uint64_t)frames) {
@@ -122,8 +116,6 @@ uint32_t SGSingTimelineRead(SGSingTimeline *t, float *out, uint32_t frames) {
         if (t->consumed - t->recoveryStart >= SGSingRecoveryLimitFrames) {
             SGSingTimelineBypass(t);
         } else if (ready >= t->reserve && ready > SGSingReserveFrames + (uint64_t)frames) {
-            // Rebuild the same reserve required on first activation. Half a reserve let
-            // a single late result toggle Sing on/off every time the worker fell behind.
             SGSingMixerSetLevel(&t->mixer, t->level);
             t->state = SGSingTimelineActive;
             t->recoveredAt = t->consumed;
@@ -137,11 +129,7 @@ uint32_t SGSingTimelineRead(SGSingTimeline *t, float *out, uint32_t frames) {
         if (t->consumed < t->processed) {
             SGSingMixerProcess(&t->mixer, dry, t->vocals + at, result, 1);
         } else {
-            // Bypass completes before the last aligned vocal runs out. Never extrapolate a
-            // missing stem from its last sample: that would add a DC offset to the original.
             result[0] = dry[0]; result[1] = dry[1];
-            // A short last vocal packet can exhaust coverage inside a large render quantum.
-            // Keep the mixer's next recovery ramp anchored to the dry gain actually emitted.
             if (t->mixer.gain != 1 || t->mixer.remaining) SGSingMixerInit(&t->mixer, SGSingSampleRate, 1);
         }
         out[i*2] = result[0]; out[i*2+1] = result[1];

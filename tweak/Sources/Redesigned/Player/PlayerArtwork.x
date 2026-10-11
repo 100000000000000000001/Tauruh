@@ -1,16 +1,3 @@
-// Player redesign: the cover sits on the field with continuous corners and a soft shadow, and shrinks
-// back while playback is paused, the way the Music app's does; the lyric preview under it is the
-// page's own view at the size of Spotify's room, so the line sweeps word by word.
-//
-// Tree (trees/clean/player/01.txt:36-43): CoverArtCellImpl > ... > CoverArtTiltView 354x354 > an
-// ElementView the same size > ImageViewProxy > Encore.ImageView (clips) > UIImageView, with
-// Lyrics_NPVContainerKit.LyricsContainerView under the tilt view. The ElementView is what gets the
-// corners and the scale: the tilt view's own transform is left to the tilt Spotify gives it when the
-// cover is inspected. The image clips, so the shadow is a plate of the Kit's behind it.
-//
-// The scale is identity while the player opens or closes: the bar morphs into a 354pt stand-in
-// (NowPlaying_ECMKit.MaskView, 01.txt:86) and the cover under it has to match where it lands. Once
-// the transition is over a paused cover springs down.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Redesigned/Lyrics/SGRKaraokeView.h"
@@ -23,8 +10,6 @@ static const CGFloat kCoverMinWidth = 200;
 
 static char kPlateKey;
 static NSHashTable<UIView *> *sg_tilts;
-// The cover of each tilt view once found. A frame Spotify sets on a scaled view becomes its scaled
-// size, leaving bounds that no longer match the tilt view's, so the cover is not looked for by size again.
 static NSMapTable<UIView *, UIView *> *sg_covers;
 
 static CGFloat currentScale(void) {
@@ -66,8 +51,6 @@ static void scaleCover(UIView *tilt, CGFloat scale) {
 
 #pragma mark - where the cover is
 
-// The tilt view of the cover on screen: the queue is a cover per cell and the cells out of view are
-// kept hidden (player/02.txt:521), so the one showing is the one in a window with nothing hidden over it.
 static UIView *showingTilt(void) {
     for (UIView *tilt in sg_tilts) {
         if (!tilt.window) continue;
@@ -95,8 +78,6 @@ CGRect SGRPlayerCoverFrameIn(UIView *host) {
 CGRect SGRPlayerArtworkAreaIn(UIView *host) {
     UIView *tilt = showingTilt();
     if (!tilt || !host) return CGRectNull;
-    // The band is the first view over the cover as wide as the player: the cover sits inset inside it
-    // (01.txt:33-36, CoverArtCellImpl > UIView {0, 110, 402, 466.67} > UIView {24, 8, ...} > the tilt view).
     for (UIView *v = tilt.superview; v; v = v.superview) {
         if (v == host) break;
         if (v.bounds.size.width >= host.bounds.size.width - 1) return [host convertRect:v.bounds fromView:v];
@@ -162,12 +143,6 @@ static void scaleEveryCover(BOOL animated) {
 }
 %end
 
-// The lyric preview under the cover (Lyrics_NPVContainerKit.LyricsContainerView, 01.txt:35): Spotify's
-// one line is replaced with ours, the page's own view (Redesigned/Lyrics/SGRKaraokeView.h) at the size
-// of the room, so the line sweeps word by word under the artwork as it does on the full screen. The
-// view dims the rest of its host while it has lines, which is Spotify's own line; a song it cannot
-// time, or one with no lyrics at all, leaves it hidden and Spotify's line is back. A tap on the
-// preview still goes to Spotify, whose view remains the one under ours to receive it.
 static const void *kPreviewKey;
 static const CGFloat kPreviewMinWidth = 200;   // the player's room; a small one is another preview, not ours
 

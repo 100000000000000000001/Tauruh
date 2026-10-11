@@ -28,9 +28,6 @@ UIView *SGNote(NSString *text) {
     return wrapper;
 }
 
-// Header and footer views keep the height they are given, so size them to their text. Only the
-// size is compared: the table moves the footer's origin itself, and reassigning on that would
-// loop forever.
 void SGFitNote(UITableView *table, UIView *wrapper, CGFloat top, CGFloat bottom) {
     UILabel *label = wrapper.subviews.firstObject;
     CGFloat inset = table.layoutMargins.left;
@@ -56,8 +53,6 @@ static CGFloat barsHeight(UIView *view) {
     return window.bounds.size.height - top;
 }
 
-// The now playing bar and the tab bar float over the content, and the safe area does not cover
-// them, so the pages inset themselves by however much of the window the bars take.
 void SGInsetForBars(UITableView *table) {
     CGFloat bottom = MAX(0, barsHeight(table) - table.safeAreaInsets.bottom);
     if (table.contentInset.bottom == bottom) return;
@@ -67,9 +62,6 @@ void SGInsetForBars(UITableView *table) {
     table.verticalScrollIndicatorInsets = inset;
 }
 
-// The pages follow the running look's black and accent colour, read here by their keys so the page
-// framework depends on no layer: the native look's AMOLED switch and accent (Native/Appearance), or the
-// redesign's accent (Redesigned/Kit/SGRAccent.h), which is always black.
 static NSString *const kAmoledKey = @"spotifyglass.amoled";
 static NSString *const kAccentKey = @"spotifyglass.accent";
 static NSString *const kRedesignAccentKey = @"spotifyglass.redesign.accent";
@@ -107,8 +99,6 @@ UIImage *SGTileImage(NSString *symbol) {
 const CGFloat SGSectionHeaderHeight = 38;
 const CGFloat SGSectionGap = 20;
 
-// Every page below draws Spotify's own list row: a 13pt white title over an 11pt grey subtitle,
-// with an optional symbol in the leading slot.
 void SGFillCell(UITableViewCell *cell, NSString *title, NSString *subtitle, UIColor *color, NSString *symbolName) {
     UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];
     content.text = title;

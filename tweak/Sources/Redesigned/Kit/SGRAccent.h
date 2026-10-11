@@ -1,5 +1,3 @@
-// The redesign's accent colour in place of Spotify's green (SGRAccent.x), chosen apart from the native
-// look's and stored under its own key; unset is #37F200, negative keeps Spotify's own green.
 #import <UIKit/UIKit.h>
 
 #define SGRKeyAccent @"spotifyglass.redesign.accent"   // 0xRRGGBB

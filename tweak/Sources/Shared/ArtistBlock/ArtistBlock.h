@@ -1,5 +1,3 @@
-// Artist block: tracks by artists on the list are skipped as they come up (ArtistSkip.x). An artist
-// is kept by URI, with the name it had when it was blocked, so a rename or a namesake changes nothing.
 #import <UIKit/UIKit.h>
 
 #define SGKeyArtistBlock @"spotifyglass.artistBlock"

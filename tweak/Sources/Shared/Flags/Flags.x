@@ -1,8 +1,3 @@
-// Spotify reads every remote-config flag once at startup through the configuration provider,
-// keyed "component.property". The value handed back is Core/SGFlagForce.h's: what the redesign forces
-// (Redesigned/Kit/SGRedesign.h), which comes before an override so one left from Spotify's own screens
-// cannot pull a redesigned one apart, then an override from the Flags page, then what the ad blocking
-// and the lyrics sources force.
 #import "Core/SGCore.h"
 #import "Flags.h"
 

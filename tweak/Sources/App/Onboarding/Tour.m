@@ -41,8 +41,6 @@ static UIButton *glassButton(NSString *title) {
 
 #pragma mark - the choice
 
-// One of the two looks, as a glass card: symbol, name, a line on what it brings, and a check
-// when it is the one picked.
 @interface SGLookCard : UIControl
 - (instancetype)initWithSymbol:(NSString *)symbol title:(NSString *)title subtitle:(NSString *)subtitle;
 // A look this phone cannot run: the card stays on the page, greyed and untappable, and says why.
@@ -139,8 +137,6 @@ static UIButton *glassButton(NSString *title) {
 
 #pragma mark - the tour
 
-// One page, the one choice worth making now: the redesign or Spotify's own look. Everything else
-// waits in Mod Settings.
 @interface SGOnboardingController : UIViewController
 @end
 
@@ -205,8 +201,6 @@ static UIButton *glassButton(NSString *title) {
     BOOL redesign = glass && (SGFlag(SGKeyOnboardingSeen, NO) ? SGRedesignedUIStored() : YES);
     _redesigned.selected = redesign;
     _legacy.selected = !redesign;
-    // Liquid Glass is drawn by iOS 26 and by nothing before it, so on an older phone the card stays
-    // on the page to say so and the legacy look is the only one left.
     if (!glass) {
         [_redesigned makeUnavailable:[NSString stringWithFormat:@"Needs iOS 26. This phone runs iOS %@.", UIDevice.currentDevice.systemVersion]];
         _legacy.enabled = NO;

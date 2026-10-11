@@ -1,12 +1,3 @@
-// The chain: every source in the order the Lyrics page puts them in, asked one after another, the
-// first with timed lyrics answering for the track.
-//
-// Stopping at the first answer is what makes the lyrics card under the player appear at all. For a
-// track Spotify has no lyrics of its own for, the card is only offered when the answer to Spotify's
-// lyrics request arrives within about a second of the player building its list of cards; a walk that
-// went on through every source for word timing took three seconds and more, and the card never came.
-// So the order is the priority, as it reads on the Lyrics page: a source further down is only asked
-// when those above it had nothing timed, and then only for what they lacked.
 #import "Core/SGCore.h"
 #import "LyricsSources.h"
 #import "Shared/Lyrics/Lyrics.h"
@@ -16,8 +7,6 @@
 static const NSTimeInterval kTimeout = 6;
 static const NSUInteger kKeptTracks = 40;
 
-// What the switches were called while Musixmatch was the only source; read once, to carry an
-// existing install's settings over to the order.
 static NSString *const kLegacyMusixmatch = @"spotifyglass.musixmatchLyrics";
 static NSString *const kLegacyAllTracks = @"spotifyglass.musixmatchAllTracks";
 static NSString *const kLegacyNetEase = @"spotifyglass.neteaseWordTiming";
@@ -33,8 +22,6 @@ static NSString *const kLegacyNetEase = @"spotifyglass.neteaseWordTiming";
 
 #pragma mark - the requests the sources share
 
-// Every request any source has lost to the network or to a server too busy to answer, counted so a
-// walk can tell "no source has lyrics" from "a source could not say". Only the first is kept.
 static _Atomic NSUInteger sg_failures;
 
 BOOL SGLyricsReplyFailed(NSURLResponse *response, NSError *error) {
@@ -146,8 +133,6 @@ NSArray<SGLyricsProvider *> *SGLyricsAllProviders(void) {
             provider.key = key;
             provider.name = name;
             provider.detail = detail;
-            // A source that matches by Spotify's own track id has everything it needs from the
-            // start; the rest wait for the player to name the track before they can search.
             provider.needsName = ![@[@"musixmatch", @"spicylyrics"] containsObject:key];
             provider.ask = ask;
             return provider;
@@ -171,8 +156,6 @@ SGLyricsProvider *SGLyricsProviderFor(NSString *key) {
     return nil;
 }
 
-// An install from before the order existed keeps what it had: the sources it was using, in the only
-// order there was. Nothing is switched on for it that it had not already asked for.
 static NSArray<NSString *> *fromLegacyKeys(void) {
     if (!SGFlag(kLegacyMusixmatch, NO)) return @[];
     NSMutableArray<NSString *> *order = [NSMutableArray arrayWithObject:@"musixmatch"];
@@ -205,11 +188,6 @@ BOOL SGLyricsEnabled(void) {
 
 #pragma mark - what is known about the track
 
-// The player knows every track it has played by name, which is what every source but Musixmatch
-// searches by. The track is looked up by id rather than compared with the one playing now: a lyrics
-// request often lands a beat before the player moves on to its track, and comparing then left the
-// query nameless. A track the player has not reported starts with nothing, and the first source
-// that matches by id fills the rest in.
 static SGLyricsQuery *queryFor(NSString *trackID) {
     SGLyricsQuery *query = [SGLyricsQuery new];
     query.trackID = trackID;
@@ -239,8 +217,6 @@ static NSMutableDictionary<NSString *, id> *sg_kept;
 static NSMutableDictionary<NSString *, NSMutableArray *> *sg_waiting;
 static NSMutableSet<NSString *> *sg_missing;
 static NSMutableDictionary<NSString *, NSString *> *sg_credits;
-// Spotify's own has_lyrics per track, as its metadata said. The player's metadata is read many
-// times a second while a list scrolls, so a value already noted costs one lookup and no write.
 static NSMutableDictionary<NSString *, NSNumber *> *sg_spotifyHas;
 static const NSUInteger kNotedTracks = 200;
 
@@ -255,9 +231,6 @@ static void setUp(void) {
     });
 }
 
-// Whether the source's lines are better than what the walk already has: any lines beat none, and
-// finer timing beats coarser — words timed beat a line's start, which beats plain text. Read off the
-// lines themselves, which say how they were really timed, rather than off what the source claimed.
 static BOOL betterLines(SGLyricsResult *merged, SGLyricsResult *fresh) {
     if (!fresh.karaokeLines.count) return NO;
     return !merged.karaokeLines.count || SGKaraokeLinesTiming(fresh.karaokeLines) < SGKaraokeLinesTiming(merged.karaokeLines);
@@ -277,9 +250,6 @@ static BOOL betterTexts(SGLyricsResult *merged, SGLyricsResult *fresh) {
     return !merged.texts.count || (fresh.synced && !merged.synced);
 }
 
-// How long a lyrics request waits for the player to name its track before the walk starts without a
-// name. The request routinely lands a few hundred milliseconds before the player reports the track
-// it belongs to, and a walk started in that gap passes over every source that searches by name.
 static const NSTimeInterval kNameWait = 1.5, kNamePoll = 0.1;
 
 static BOOL named(SGLyricsQuery *query) {
@@ -301,11 +271,6 @@ static BOOL named(SGLyricsQuery *query) {
 @implementation SGLyricsWalk
 @end
 
-// A walk that ends with nothing is only an answer when every source got to search. One that passed a
-// source over for want of a name asked it nothing, and keeping that as "no lyrics" would stick to the
-// track: every later request would get the kept nil, and the lyrics card would be taken off the track
-// for the rest of the session. The same goes for a walk during which a request failed: a busy
-// server's 503 read as "no lyrics" hid a track's lyrics until Spotify was restarted.
 static void finish(SGLyricsWalk *walk) {
     SGLyricsQuery *query = walk.query;
     SGLyricsResult *merged = walk.merged;
@@ -342,8 +307,6 @@ static void step(SGLyricsWalk *walk) {
         return;
     }
     if (walk.index >= walk.order.count) {
-        // A source that matches by id named the track partway down: the ones passed over ask now,
-        // in the order they came in. Once, since they cannot be passed over again with a name.
         if (walk.passedOver.count && named(query)) {
             SGLog(@"lyrics: %@ named partway as \"%@\" by \"%@\", asking %@ after all", query.trackID,
                   query.title, query.artist, [walk.passedOver componentsJoinedByString:@", "]);
@@ -397,8 +360,6 @@ static void startWalk(NSString *trackID, SGLyricsQuery *query) {
     step(walk);
 }
 
-// Starts the walk as soon as the player has named the track, or once it has waited long enough
-// that it is not going to: a track opened for something other than what is playing is never named.
 static void whenNamed(NSString *trackID, NSTimeInterval waited) {
     SGLyricsQuery *query = queryFor(trackID);
     if (named(query) || waited >= kNameWait) {
@@ -465,11 +426,6 @@ void SGLyricsNoteSpotifyHas(NSString *trackID, BOOL has) {
 
 NSString *const SGLyricsOwnRequestKey = @"spotifyglass.ownRequest";
 
-// The cards under the player load together, and the list is shown without any card still loading
-// once this many milliseconds have passed (NowPlaying_ScrollImpl's scrollCardsAsyncLoadingTimeoutMs,
-// 2 s unless the server says otherwise, 1 s at the least). The lyrics card is one of them and waits
-// for the color-lyrics reply, which with a source of the mod's on comes after the chain has answered;
-// so the wait is set to the most the flag allows.
 id SGLyricsForcedFlag(NSString *key) {
     static BOOL on;
     static dispatch_once_t once;
@@ -521,8 +477,6 @@ void SGLyricsSetCredit(NSString *trackID, NSString *name) {
     }
 }
 
-// Once, at launch: the keys Musixmatch owned alone become an order, so the Lyrics page opens on what
-// the install was already doing rather than on nothing.
 void SGLyricsMigrateLegacyKeys(void) {
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
     if ([defaults objectForKey:SGKeyLyricsProviders]) return;

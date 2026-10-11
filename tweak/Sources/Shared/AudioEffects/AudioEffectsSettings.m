@@ -1,5 +1,3 @@
-// The audio effects' settings: what each key holds until set, its bounds, and the lists the page's choices
-// pick from, in the order the engine numbers them (SGDSPEffects.h).
 #import "Core/SGCore.h"
 #import "AudioEffects.h"
 #import "AudioEffectsApply.h"

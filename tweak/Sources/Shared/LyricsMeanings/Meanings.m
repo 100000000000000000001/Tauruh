@@ -27,8 +27,6 @@ SGModRow *SGLyricsMeaningsRow(void) {
 
 #pragma mark - text
 
-// Letters and digits only, lowercase, accents gone and apostrophes closed up, so "Don’t" and "dont"
-// read alike across sources.
 static NSString *folded(NSString *text) {
     static NSCharacterSet *kept;
     static dispatch_once_t once;
@@ -126,8 +124,6 @@ static NSString *stringIn(id value) {
     return [value isKindOfClass:NSString.class] ? value : nil;
 }
 
-// The hit whose title and artist both agree with the track's; a song only near it would explain
-// lines it does not have.
 static NSNumber *songIn(NSDictionary *response, NSString *title, NSString *artist) {
     NSString *wantTitle = folded(bareTitle(title));
     NSString *wantArtist = folded([artist componentsSeparatedByString:@", "].firstObject);
@@ -148,8 +144,6 @@ static NSNumber *songIn(NSDictionary *response, NSString *title, NSString *artis
     return nil;
 }
 
-// By the annotation, not the referent: a referent the artist spoke to is "verified" as a whole, the
-// editors' annotations under it too.
 static SGLyricsMeaningAuthor authorOf(NSDictionary *annotation) {
     NSString *state = stringIn(annotation[@"state"]);
     if ([annotation[@"verified"] boolValue] || [state isEqualToString:@"verified"]) return SGLyricsMeaningByArtist;
@@ -243,8 +237,6 @@ static void meaningsOf(NSString *trackID, void (^done)(NSArray<SGLyricsMeaning *
     });
 }
 
-// Each meaning goes to every line its fragment's first matchable line matches, so a chorus explained
-// once is explained wherever it is sung.
 static NSDictionary<NSNumber *, NSArray<SGLyricsMeaning *> *> *matched(NSArray<SGLyricsMeaning *> *meanings,
                                                                         NSArray<SGKaraokeLine *> *lines,
                                                                         SGLyricsMeaningsLevel level) {

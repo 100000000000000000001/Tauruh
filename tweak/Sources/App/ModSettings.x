@@ -1,18 +1,3 @@
-// Settings: a Taurus Settings row at the end of Spotify's settings list opens the mod's own page: the
-// Appearance card with Redesigned UI, Karaoke in the redesign (Sing, Redesigned/Lyrics/SingSettings.m), then a
-// page per part of Spotify, each holding what that part offers in the stored look (App/Pages.m: Navbar,
-// Player, Lyrics, Home & Library for the native look, Albums for the redesign), Audio effects
-// (Shared/AudioEffects, in either look and applying straight away), Misc (this page's own banners),
-// Premium, ads & privacy, Labs, All flags, a searchable list of every flag with an override per flag, and Mod, the
-// build, its updates and links. The same row leads the side drawer's list (trees/test6.txt), above
-// Your plan, so the page is a tap from Home, and holding Home on the tab bar opens it too. The tweaks read the switches when they run, so a change
-// shows after Spotify restarts; the tab editor on the Navbar page applies as soon as the bar lays
-// out again.
-//
-// Tree (trees/settings.txt): SettingsListViewController.view > SettingsListCollectionView of
-//   Element_List cells 402x56: 24pt icon at x 12, 13pt white title and 11pt grey subtitle at
-//   x 48, 12pt chevron on the right. A pushed page (trees/settings notifications opened.txt) is a
-//   UITableView bg #121212: header with an 11pt grey description at (16, 24), 53pt cells with the
 #import "Core/SGCore.h"
 #import "Settings/SGPage.h"
 #import "Settings/SGPageStyle.h"
@@ -42,10 +27,6 @@ static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^
 // How long the wordmark takes to carry its spectrum all the way round, matching the glow switch's turn.
 static const double kRainbowSpinSeconds = 4;
 
-// The wordmark, drawn as a horizontal rainbow wearing the same colours as the SGGlowSwitch rim: a pattern
-// image the full spectrum wide, cut to the text itself so the label keeps the font and metrics Spotify
-// gives it. The ramp starts and ends on the same pink, so two cycles butted together have no seam, and the
-// second cycle is drawn on so `phase` can slide the ramp off one edge and back in the other.
 static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) {
     width = MAX(1, width);
     height = MAX(1, height);
@@ -128,8 +109,6 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
     [self stopRainbow];
 }
 
-// The wordmark cycles while the page is on screen, one tick of the display link carrying the hue a little
-// further round, and rests when it is not: the pattern image is cut to the label, so it is remade each frame.
 - (void)startRainbow {
     if (_rainbowLink) return;
     _rainbowLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(rainbowTick:)];
@@ -151,8 +130,6 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
     [self applyRainbow];
 }
 
-// Only the label on screen is redrawn: the compact title once the masthead has scrolled away, the masthead
-// while it has not.
 - (void)applyRainbow {
     CGSize compact = _compactTitle.bounds.size;
     if (_compactTitleVisible) {
@@ -201,8 +178,6 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
 
 @end
 
-// Misc: the two banners the mod puts on its own page, each with a switch here to put it away. Its own
-// page so the Settings list stays a list of parts, the way every other part's options sit one tap in.
 static UIViewController *miscSettingsPage(void) {
     SGModRow *hideSigning = SGHideRow(@"Hide the lock screen alert", @"Hide the notice that this build cannot be opened from the lock screen", SGKeyHideSigningWarning);
     SGModRow *hideDiscord = SGHideRow(@"Hide the Discord banner", @"Hide the row here that advertises the Discord server", SGKeyHideDiscordBanner);
@@ -217,8 +192,6 @@ static UIViewController *modSettingsPage(void) {
     // Opening the page is the only thing that asks; the cache keeps it to once every six hours.
     SGCheckForUpdate();
     NSMutableArray<SGModSection *> *sections = [NSMutableArray array];
-    // A build the lock screen cannot open leads the page, above the tweaks: it is the one thing here
-    // that no switch can put right, and it is worth reading before anything else.
     SGModRow *signing = SGSigningWarningRow();
     if (signing) signing.visible = ^BOOL { return !SGFlag(SGKeyHideSigningWarning, NO); };
     NSMutableArray<SGModRow *> *topRows = [NSMutableArray array];
@@ -231,8 +204,6 @@ static UIViewController *modSettingsPage(void) {
     update.visible = ^BOOL { return SGUpdateVersion() != nil; };
     update.refreshOn = SGUpdateCheckedNotification;
     [topRows addObject:update];
-    // Above the signing banner, in its shape: the server is the one place to ask about a build, so it
-    // reads before the warning about one.
     SGModRow *discord = SGLinkRow(@"Join the Discord", @"Release pings, help and previews", SGDiscordURL);
     discord.image = SGDiscordIcon();
     discord.color = SGDiscordColor();
@@ -245,8 +216,6 @@ static UIViewController *modSettingsPage(void) {
     // The audio effects work on the sound, so both looks have them, with what they are doing beside the chevron.
     SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", ^UIViewController *{ return SGDSPSettingsPage(); });
     audioEffects.value = ^NSString *{ return SGDSPSummary(); };
-    // Home & Library holds only the native look's switches, and Albums only the redesign's; the Live
-    // Activity works under both, and only where ActivityKit's card does.
     NSMutableArray<SGModRow *> *parts = [NSMutableArray arrayWithArray:@[
         pageRow(@"Navbar", @"dock.rectangle", ^UIViewController *{ return SGNavbarPage(); }),
         pageRow(@"Player", @"play.circle", ^UIViewController *{ return SGPlayerSettingsPage(); }),
@@ -285,8 +254,6 @@ static UIViewController *modSettingsPage(void) {
 
 #pragma mark - row in the settings list and the side drawer
 
-// The last row of Spotify's settings list, chevron and all, or the first of the side drawer's,
-// drawn like the drawer's own rows: no chevron, icon and title 4pt further in.
 @interface SGModSettingsRow : UIControl
 @property (nonatomic) BOOL drawer;
 @end
@@ -333,8 +300,6 @@ static UINavigationController *navigationIn(UIViewController *page) {
     return nil;
 }
 
-// The drawer is presented over the app, so its row closes it first and pushes onto the stack it
-// was covering, the way the drawer's own rows open their pages.
 - (void)open {
     UIViewController *owner = nil;
     for (UIResponder *r = self; r && !owner; r = r.nextResponder) {
@@ -363,8 +328,6 @@ void SGOpenModSettings(UIView *source) {
     SGShowPage(nav.topViewController ?: SGTopController(), modSettingsPage());
 }
 
-// At the end of the settings list, or above the first row of the drawer's, with the inset for it
-// added again whenever Spotify resets the inset.
 static void placeRow(UICollectionView *list, SGModSettingsRow *row) {
     SGAdoptFonts(list, row);
     CGFloat bottom = list.contentSize.height;
@@ -380,14 +343,6 @@ static void placeRow(UICollectionView *list, SGModSettingsRow *row) {
     list.contentInset = inset;
 }
 
-// Media quality, Playback, Account and most of the rest of settings are the same controller class
-// as the list they were opened from, which is why the row turned up at the end of all of them.
-// What is on the navigation stack is not that controller though: every page in the app is wrapped
-// in a MusicAppPageHostingViewController (trees/settings notifications opened.txt), and Spotify
-// pushes a settings sub page as a page of its own, leaving the list it came from on the stack
-// underneath. So the settings list inside the lowest wrapper that holds one is the list the row
-// belongs at the end of, and a controller with no stack to be found on keeps the row rather than
-// losing it.
 static UIViewController *settingsListIn(UIViewController *page, Class kind) {
     if ([page isKindOfClass:kind]) return page;
     for (UIViewController *child in page.childViewControllers) {
@@ -412,8 +367,6 @@ static BOOL isSettingsRoot(UIViewController *list) {
     for (UIView *sub in ((UIViewController *)self).view.subviews) {
         if (![sub isKindOfClass:UICollectionView.class]) continue;
         SGModSettingsRow *row = objc_getAssociatedObject(sub, &kRowKey);
-        // A page that laid itself out before it was on the stack looked like the list for as long
-        // as that took; the row goes again as soon as it can be seen for what it is.
         if (!root) {
             [row removeFromSuperview];
             objc_setAssociatedObject(sub, &kRowKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -427,8 +380,6 @@ static BOOL isSettingsRoot(UIViewController *list) {
 }
 %end
 
-// The drawer's list (trees/test6.txt: SideDrawerListCollectionView under the profile header, Your
-// plan its first cell) is one of several collection views on the page, so it is found by name.
 static SGModSettingsRow *ensureDrawerRow(UICollectionView *list) {
     SGModSettingsRow *row = objc_getAssociatedObject(list, &kRowKey);
     if (!row) {

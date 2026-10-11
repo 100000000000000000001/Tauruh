@@ -1,8 +1,3 @@
-// What drives the native look's navbar: Spotify's tab bar composed on its layout passes (Navbar.x), and
-// holding Home opens Mod Settings.
-//
-// Tree (trees/home.txt): NavigationUI_TabBarImpl.TabBarView > TabBarCompactView > UIStackView of
-//   ElementContentView<TabBarItemElement>, each with an SPTEncoreIconView and an SPTEncoreLabel.
 #import "Core/SGCore.h"
 #import "Navbar.h"
 #import "Settings/SGPage.h"

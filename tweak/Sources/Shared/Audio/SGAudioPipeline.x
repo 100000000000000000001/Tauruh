@@ -21,9 +21,6 @@ static OSStatus (*originalStart)(AudioUnit);
 static OSStatus (*originalDispose)(AudioComponentInstance);
 static atomic_bool available;
 
-// Graph changes wait off the render thread. A render callback makes one attempt and never waits.
-// This protects the source/bus pair and prevents disposing a source during a pull. Setters can
-// invoke a property listener synchronously, hence the per-thread nesting count.
 enum { rendering = 1, changing = 2 };
 static atomic_uint gate;
 static pthread_mutex_t controlLock = PTHREAD_MUTEX_INITIALIZER;

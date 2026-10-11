@@ -1,9 +1,3 @@
-// Where the karaoke page gets its lines and its clock. The color-lyrics body is copied as it passes
-// the same URLSession delegates AdBlock/AdNetwork.x reads, untouched, and kept per track, since the
-// page may open long after the request finished. The clock is SPTEsperantoPlayer's state, asked for on
-// every frame: the player is caught the first time the app asks it, and its position runs on by itself.
-// With a source of the mod's on, the color-lyrics body is Shared/LyricsSources' to answer and it
-// hands the lines over.
 #import "Core/SGCore.h"
 #import "Shared/Sing/SGSingController.h"
 #import "Lyrics.h"
@@ -16,24 +10,16 @@ NSNotificationName const SGKaraokeLinesDidChangeNotification = @"spotifyglass.ka
 
 static const NSUInteger kKeptTracks = 40;
 static const NSUInteger kSeenTracks = 200;
-// A track whose request was lost may be asked for again after this long, twice as long after each loss
-// in a row up to the most: soon enough for the song still playing, not so soon that a busy server is pressed.
 static const NSTimeInterval kRetryPause = 10, kRetryPauseMost = 60;
 // What spclient needs from a request to answer it as the signed-in app.
 static NSString *const kSpclientHeaders[] = {@"authorization", @"client-token", @"app-platform", @"spotify-app-version", @"user-agent", @"accept-language"};
 
 static NSMutableDictionary<NSString *, NSArray<SGKaraokeLine *> *> *sg_lyrics;
 static NSMutableSet<NSString *> *sg_requested;
-// Of those, the ones with a request still out or waiting out its pause. A full cache spares their lines
-// and leaves them asked for, so no second request runs beside the first.
 static NSMutableSet<NSString *> *sg_asking;
 static NSMutableDictionary<NSString *, NSNumber *> *sg_losses;   // requests lost in a row, by track
 static NSDictionary<NSString *, NSString *> *sg_spclientHeaders;
 static __weak id sg_player;
-// Every track the player has reported, by id, so a source can name a track that is not the one
-// playing at the moment it is asked: a lyrics request routinely lands a beat before the player
-// moves on to its track. The last object seen is kept by pointer so the check on each call is free,
-// and its id behind it, since the player hands out a fresh object with every state it reports.
 static NSMutableDictionary<NSString *, SPTPlayerTrack *> *sg_seenTracks;
 static __weak SPTPlayerTrack *sg_lastSeen;
 static NSString *sg_lastSeenID;   // the player makes a new track object on every state it reports, so the id is what tells a change
@@ -76,8 +62,6 @@ static SPTPlayerTrack *upNextIn(SPTPlayerState *state) {
     return [next isKindOfClass:objc_getClass("SPTPlayerTrack")] ? next : nil;
 }
 
-// Main queue only. A full cache is emptied but for the track playing, the one up next and those still
-// being asked for; what goes can be asked for again.
 static void keep(NSString *track, NSArray<SGKaraokeLine *> *lines) {
     if (sg_lyrics.count >= kKeptTracks && !sg_lyrics[track]) {
         NSMutableSet<NSString *> *spared = [sg_asking mutableCopy];
@@ -126,8 +110,6 @@ NSArray<SGKaraokeLine *> *SGKaraokeLinesForTrack(NSString *trackID) {
     return trackID ? sg_lyrics[trackID] : nil;
 }
 
-// Main queue only. The track stays asked for through the pause, so the readers asking on every tick
-// send nothing until it is over.
 static void askAgainLater(NSString *trackID) {
     NSUInteger losses = sg_losses[trackID].unsignedIntegerValue;
     sg_losses[trackID] = @(losses + 1);
@@ -163,8 +145,6 @@ static void requestFromSpotify(NSString *trackID, BOOL retry) {
         SGLog(@"karaoke: fetched lyrics for %@: status %ld, %lu lines (%@), error %@", trackID,
               (long)status, (unsigned long)lines.count,
               SGKaraokeLinesTiming(lines) == SGKaraokeTimingNone ? @"untimed" : @"line timed", error);
-        // A refused authorization is lost too: the captured one may have expired, and Spotify's next
-        // spclient request brings a fresh one.
         BOOL lost = SGLyricsReplyFailed(response, error) || status == 401 || status == 403;
         dispatch_async(dispatch_get_main_queue(), ^{
             if (lost || (retry && !lines)) {
@@ -246,8 +226,6 @@ static NSString *idOf(SPTPlayerTrack *track) {
     return [text hasPrefix:@"spotify:track:"] ? [text substringFromIndex:@"spotify:track:".length] : nil;
 }
 
-// Tracks come in from the player and from every list that reads their metadata, so when the table
-// is full it is emptied, all but the track playing, whose name the next lyrics request needs.
 static void remember(SPTPlayerTrack *track, NSString *trackID) {
     @synchronized (sg_seenTracks) {
         if (sg_seenTracks.count >= kSeenTracks) {
@@ -271,10 +249,6 @@ void SGKaraokeRememberTrack(SPTPlayerTrack *track) {
     if (trackID) remember(track, trackID);
 }
 
-// With a source of the mod's on, the walk for a track starts the moment the player moves to it and,
-// for the track after it, while this one still plays: Spotify asks for a track's lyrics within a
-// beat of starting it and gives its card list about a second to load, so an answer that is already
-// in is what puts the card there. The track is named here, so no walk waits for a name.
 static void prefetch(SPTPlayerTrack *track, NSString *trackID, SPTPlayerState *state) {
     if (!sg_ownSources) return;
     SGLyricsPrefetch(trackID);
@@ -303,8 +277,6 @@ static void prefetch(SPTPlayerTrack *track, NSString *trackID, SPTPlayerState *s
 }
 %end
 
-// A new track is noticed where the player is asked for its state, and with nothing on screen nothing
-// may ask: the player's own report of the change asks it, so the walk starts at the skip.
 @interface SGKaraokeTrackWatcher : NSObject <SGPlayerStateObserver>
 @end
 
@@ -339,8 +311,6 @@ static SGKaraokeTrackWatcher *sg_trackWatcher;
 %end
 
 %ctor {
-    // The sources that search by name learn the name from the player, so the player is caught
-    // whenever one is on, not only for the redesign's lyrics and the lock screen.
     if (!SGRedesignedUI() && !SGFlag(SGKeyLockScreenLyrics, YES) && !SGLyricsEnabled()) return;
     sg_seenTracks = [NSMutableDictionary dictionary];
     sg_lyrics = [NSMutableDictionary dictionary];
@@ -351,8 +321,6 @@ static SGKaraokeTrackWatcher *sg_trackWatcher;
     %init;
     sg_trackWatcher = [SGKaraokeTrackWatcher new];
     SGAddPlayerStateObserver(sg_trackWatcher);
-    // Spotify's lyrics request can wait for the app to come back, and a walk that failed in the
-    // background was not kept, so it runs again now, ahead of that request.
     [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil
                                                      queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
         SPTPlayerState *state = playerState();

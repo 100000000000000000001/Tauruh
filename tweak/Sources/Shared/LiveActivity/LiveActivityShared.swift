@@ -1,5 +1,3 @@
-// Compiled into both the tweak and extension/LiveActivity: ActivityKit pairs the two sides by the
-// attributes' type name and App Intents by the intent's, so this must stay identical in both.
 import ActivityKit
 import AppIntents
 import Foundation

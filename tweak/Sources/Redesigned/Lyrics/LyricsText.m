@@ -1,5 +1,3 @@
-// What a line shows besides its words, as stored: the two switches of the lyrics menu and the order of
-// sizes of the Lyrics page (LyricsText.h). The page itself is LyricsTextSettings.m.
 #import "Core/SGCore.h"
 #import "LyricsText.h"
 

@@ -1,7 +1,3 @@
-// What the redesign's lyrics show of a line besides its words: the pronunciation and the translation a
-// source has for it (Shared/Lyrics/Lyrics.h), each switched on from the lyrics' own menu, and the order
-// of sizes the three are set in, from the Lyrics page. The switches apply at once, to every lyrics
-// view there is, and are kept for the next song and the next launch.
 #import <UIKit/UIKit.h>
 
 // A line's three texts. The order puts them largest first; the lyrics are always among them.

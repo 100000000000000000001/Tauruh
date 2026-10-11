@@ -1,5 +1,3 @@
-// The track's Canvas or its album's Apple Music cover as the lock screen's animated artwork. The key
-// is put on every dictionary that goes out, so the lock screen lyrics' rewrites carry it too.
 #import <MediaPlayer/MediaPlayer.h>
 #import "Core/SGCore.h"
 #import "LockScreenArtwork.h"
@@ -12,8 +10,6 @@
 
 static NSString *const kCanvazAddress = @"https://spclient.wg.spotify.com/canvaz-cache/v0/canvases";
 
-// Spotify sets the now playing info from several threads; what the hook reads is behind the lock and
-// everything else is main thread.
 static NSObject *sg_lock;
 static NSDictionary *sg_info;
 static CFAbsoluteTime sg_infoAt;
@@ -76,10 +72,6 @@ static NSString *artistOf(SPTPlayerTrack *track) {
     return names.count ? [names componentsJoinedByString:@", "] : nil;
 }
 
-// The last dictionary sent again so the system asks for the clip that has just landed, its position
-// run on to now. The artist comes off the player rather than out of the dictionary: the lock screen
-// lyrics may have put the line being sung there before this hook ever saw it, and a line sent back
-// as the track's own would stick until Spotify set the info itself again.
 static void resend(void) {
     NSDictionary *info;
     CFAbsoluteTime reportedAt;

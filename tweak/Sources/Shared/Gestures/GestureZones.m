@@ -34,8 +34,6 @@ double SGGestureStep(void) {
     return SGGestureStepChoices()[(NSUInteger)SGGestureStepChoice()].doubleValue;
 }
 
-// Seek out to the sides, play or pause in the middle; a grid of three rows repeats the columns, so
-// the split changes the cells to edit without changing what the player does until one is edited.
 static NSArray<NSNumber *> *defaultZones(NSInteger columns, NSInteger rows) {
     NSMutableArray<NSNumber *> *zones = [NSMutableArray array];
     for (NSInteger row = 0; row < rows; row++) {

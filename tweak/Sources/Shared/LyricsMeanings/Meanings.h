@@ -1,5 +1,3 @@
-// What the lines mean: Genius's annotations on the song, matched by their text to the lines the
-// lyrics view shows, whichever source those came from. Genius's own web endpoints, which take no key.
 #import <UIKit/UIKit.h>
 #import "Shared/Lyrics/Lyrics.h"
 
@@ -31,8 +29,5 @@ SGLyricsMeaningsLevel SGLyricsMeaningsShown(void);
 @class SGModRow;
 SGModRow *SGLyricsMeaningsRow(void);
 
-// The meanings of the lines by index into `lines`, on the main queue: empty when Genius has none for
-// the song or it could not be told apart, never called while the setting is off. Genius is asked once
-// per track; the matching is done again for each set of lines.
 void SGLyricsMeaningsFor(NSString *trackID, NSArray<SGKaraokeLine *> *lines,
                          void (^done)(NSDictionary<NSNumber *, NSArray<SGLyricsMeaning *> *> *byLine));

@@ -96,8 +96,6 @@ NSURLSessionTask *SGArtworkFetchAside(NSString *identifier, NSString *address, v
     return task;
 }
 
-// The size the clip is played at, its rotation applied, and the transform that puts its top left at
-// the origin.
 static CGSize shownSize(AVAssetTrack *track, CGAffineTransform *upright) {
     CGRect shown = CGRectApplyAffineTransform(CGRectMake(0, 0, track.naturalSize.width, track.naturalSize.height),
                                               track.preferredTransform);

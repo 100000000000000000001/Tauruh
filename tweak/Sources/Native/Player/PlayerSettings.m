@@ -1,5 +1,3 @@
-// The native player's settings: Spotify's own player screen and the parts of it to hide, and the queue
-// and devices flags. The Player page that holds them is App/Pages.m's.
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "NowPlaying.h"

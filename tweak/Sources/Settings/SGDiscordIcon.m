@@ -1,6 +1,3 @@
-// The Discord mark, the leading icon of the settings row that links to the server: the official glyph
-// (simple-icons, CC0) kept as the base64 PNG of a white template on clear and decoded once at first
-// use. It decodes as a template, so the row tints it whatever colour it is given (SGDiscordColor).
 #import "SGPageStyle.h"
 
 UIImage *SGDiscordIcon(void) {

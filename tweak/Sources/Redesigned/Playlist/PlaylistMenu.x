@@ -1,57 +1,17 @@
-// Playlist redesign: Sort and Mix on the playlist's ⋯ sheet, where the rest of Spotify's curation row
-// already is.
-//
-// Spotify puts seven pills over the first track -- Add, Mix, Notes, Video, Edit, Sort, Name & details
-// (own-playlist/01.txt:33) -- and the Music app has none of them: its playlist sorts from its own ⋯ menu.
-// So PlaylistRows.x closes the row up and these two rows stand in its place, because Sort and Mix are the
-// only two of the seven the ⋯ menu does not already offer.
-//
-// **Why these are rows of the mod's own and not rows of Spotify's menu.** The sheet is
-// ContextMenu_InternalImpl.ContextMenuViewController, a table whose rows come from Swift item factories
-// with no ObjC surface: nothing can be read out of them and nothing can be put between them. What can be
-// set is the table's header or footer view, which is how Speed and pitch has ridden on the player's menu
-// since it shipped (Shared/Player/SpeedPitchMenu.x). So the block goes in the header, above Spotify's own
-// rows, and is laid out by hand at the table's width.
-//
-// **And why not a menu of the redesign's own instead.** Building the sheet would mean owning its contents:
-// every row Spotify offers for a playlist, which varies by whose playlist it is, by market, by account and
-// by flag, each in the app's language and each doing something only Spotify's own code knows how to do.
-// None of that can be read off the item factories, so it would have to be a hard-coded list in one
-// language that goes stale the day Spotify adds a row -- the same trap the album's footer and the artist's
-// sections are written to avoid. Spotify keeps its rows; the mod adds to them.
-//
-// Which sheet is the playlist's: the ⋯ that opened it is the redesign's own pinned button
-// (Kit/SGRActionRow.h), so it records its page as it is tapped and a sheet that appears within
-// SGRPinnedMoreWindow of that belongs to it. Under the native look nothing pins a ⋯ and nothing here runs.
-//
-// What each row does is fire Spotify's own pill, so the action, the sheet Sort opens and the state Mix
-// keeps are all Spotify's; the words are read off the pills for the same reason. The pills sit in a list
-// cell closed up to nothing, which the page hands over as it lays out (SGRPlaylistTakeCuration) and which
-// is held from the page, so they are still there to fire once the list has scrolled past them.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Playlist.h"
 
 NSString *const SGRPlaylistCurationIdentifier = @"PlaylistCuration.Row.CurationActionsToolbar";
 
-// Mix says what it is in its identifier; Sort is an Encore.Button.Primary like Video, Edit and Name &
-// details, and its only word is the word in the app's language, so it is told apart by the glyph it draws
-// (SpotifyShared has `sort`, `sortDown`, `sortUp` and `arrowUpDown`, and Encore's icon knows its own name).
 static NSString *const kMixIdentifier = @"ListPlatform.ToolbarActions.MixButton";
 
-// The sheet's own measures and type: this draws on Spotify's sheet, not on a page of the redesign's, so it
-// takes the sheet's side margin and row height rather than the Kit's tokens, as Speed and pitch does.
 static const CGFloat kRowHeight = 56, kSideMargin = 16, kGlyphSide = 24, kGlyphGap = 16;
 
 static char kToolbarKey, kSortKey, kBlockKey, kDecidedKey;
 
 #pragma mark - Spotify's pills
 
-// The SPTEncoreIcon an Encore icon view was built with, which knows its own name. Encore keeps it in a
-// Swift ivar with no getter, as Redesigned/Navbar/TabBar.x found -- but not always the same one: the view
-// holds both `icon` and `experimentalIcon` (nm on SpotifyShared), and reading `icon` alone left the Sort
-// pill unrecognised on the phone while Mix, which is known by its identifier, came through
-// (device 2026-09-20). So every object ivar the view has is asked, and the first that knows a name answers.
 static NSString *glyphName(UIView *iconView) {
     unsigned int count = 0;
     Ivar *ivars = class_copyIvarList(iconView.class, &count);
@@ -88,8 +48,6 @@ static NSString *pillWord(UIView *pill) {
     return word ?: pill.accessibilityLabel;
 }
 
-// The two pills of the row, in the order they are to read on the sheet. Either may be missing: a playlist
-// of someone else's has no Mix, and a build without sorting has no Sort.
 static BOOL isSortGlyph(NSString *glyph) {
     NSString *name = glyph.lowercaseString;
     return [name containsString:@"sort"] || [name containsString:@"arrowupdown"] || [name containsString:@"filter"];
@@ -100,8 +58,6 @@ static void pillsIn(UIView *toolbar, UIView **sort, UIView **mix) {
     __block NSMutableArray<NSString *> *seen = [NSMutableArray array];
     SGForEachView(toolbar, ^(UIView *v) {
         NSString *identifier = v.accessibilityIdentifier;
-        // The pills, and only the pills: the toolbar itself carries an identifier too, and the first glyph
-        // under it is whichever pill comes first.
         if (!identifier.length || [identifier isEqualToString:SGRPlaylistCurationIdentifier]) return;
         if (!foundMix && [identifier containsString:kMixIdentifier]) {
             foundMix = v;
@@ -128,10 +84,6 @@ void SGRPlaylistTakeSort(UIView *page, UIView *button) {
     }
 }
 
-// The cell that carries the curation row, as it lays out. Held from the page rather than from the cell: the
-// list reuses the cell once it has scrolled past, and the sheet is opened from the top of a page one is
-// usually well down. Held strongly for the same reason -- the element view Spotify binds to the toolbar is
-// the toolbar's own, so it goes on answering wherever the cell it was in ends up.
 void SGRPlaylistTakeCuration(UIView *cell) {
     UIView *toolbar = SGRFindByIdentifier(cell, SGRPlaylistCurationIdentifier, &kToolbarKey);
     UIView *page = toolbar ? SGRPlaylistPageOf(cell) : nil;
@@ -149,8 +101,6 @@ void SGRPlaylistTakeCuration(UIView *cell) {
 
 #pragma mark - the block on the sheet
 
-// One row: a glyph, a word, and the whole width of the sheet to be tapped on. Spotify's own rows are drawn
-// by its table, so this only has to read as one of them.
 @interface SGRMenuRow : UIControl
 @property (nonatomic, weak) UIView *pill;
 @end
@@ -233,9 +183,6 @@ void SGRPlaylistTakeCuration(UIView *cell) {
     return self;
 }
 
-// The glyphs are the system's rather than Spotify's: Encore draws its own into a view of its own, and a
-// copy of one is a snapshot to keep right, where these two say the same thing on every build. The words
-// stay Spotify's, so the rows are in the app's language.
 - (void)showSort:(UIView *)sort mix:(UIView *)mix {
     _sort.pill = sort;
     _mix.pill = mix;
@@ -262,9 +209,6 @@ void SGRPlaylistTakeCuration(UIView *cell) {
     }
 }
 
-// Spotify's Sort opens a sheet of its own and its Mix changes the page under this one, so the menu closes
-// first and the pill is fired once it has: firing under an open sheet would put Spotify's next sheet behind
-// this one.
 - (void)sgr_rowTapped:(SGRMenuRow *)row {
     UIView *pill = row.pill;
     UIViewController *menu = self.menu;
@@ -296,12 +240,6 @@ static UITableView *tableIn(UIView *root, int depth) {
     return nil;
 }
 
-// The curation row of the page, held from the cell's own pass where there has been one, and looked for on
-// the page where there has not: the row is a cell closed up to nothing, and a collection view lays out
-// what it has to draw, so a page opened and left alone can reach the sheet before that cell has ever run
-// a pass. It was the only thing keeping Mix off the sheet, and the sheet only came right after the menu
-// had been opened and closed a few times (device 2026-09-20). The walk is the page's live views, which is
-// the cells on screen and no more, and it is done once per sheet.
 static UIView *curationIn(UIView *page) {
     UIView *found = SGRFindByIdentifier(page, SGRPlaylistCurationIdentifier, NULL);
     if (found) {
@@ -313,9 +251,6 @@ static UIView *curationIn(UIView *page) {
     return objc_getAssociatedObject(page, &kToolbarKey);
 }
 
-// The page this sheet belongs to, decided once and only from the ⋯ that opened it. What the page has to
-// show is decided pass by pass below, never here: a sheet turned down because the page was not ready yet
-// would stay turned down for as long as it was open.
 static UIView *pageFor(UIViewController *menu) {
     id decided = objc_getAssociatedObject(menu, &kDecidedKey);
     if (decided) return decided == NSNull.null ? nil : decided;
@@ -349,15 +284,10 @@ static void install(UIViewController *menu) {
         objc_setAssociatedObject(menu, &kBlockKey, block, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 
-    // Sort is Spotify's own header button where the page has one -- one identifier, in the header, never
-    // reused -- and the curation pill only where it has not, which is how it was found before the header's
-    // button was (device 2026-09-20: the pill's glyph did not answer and the row went missing).
     UIView *sort = nil, *mix = nil;
     pillsIn(objc_getAssociatedObject(page, &kToolbarKey), &sort, &mix);
     sort = objc_getAssociatedObject(page, &kSortKey) ?: sort;
     [block showSort:sort mix:mix];
-    // Nothing to show yet is not an answer: the page fills in as it lays out, and the next pass is asked
-    // again rather than the sheet being written off.
     CGFloat height = [block wantedHeight];
     if (height < 1) return;
 

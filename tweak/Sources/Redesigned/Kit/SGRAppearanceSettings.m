@@ -3,8 +3,6 @@
 #import "Settings/SGPageStyle.h"
 #import "SGRAccent.h"
 
-// Going back to Spotify's green is offered only once a colour of the mod's is set, so a stray tap
-// cannot wipe it.
 static void chooseAccent(void) {
     if (!SGRAccentColor()) {
         SGRPickAccent();

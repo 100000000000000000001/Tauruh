@@ -12,11 +12,7 @@ static const CGFloat kFieldChromaLift = 1.3, kFieldChroma = 0.14;
 static const CGFloat kBackdropWidth = 160, kBackdropMaxHeight = 400, kBackdropSigma = 12;
 static const CGFloat kDissolveWidth = 96, kDissolveSigma = 5;
 static const CGFloat kFadeFrom = 0.55, kDissolveOpaque = 0.85;
-// A tint: the artwork's dominant colour brought down to this luminance, then this share of it mixed into
-// the surface it tints.
 static const CGFloat kTintLuminance = 0.05, kTintShare = 0.35;
-// A moving field's colours: luminance held between these (the ceiling 0.07 with Increase Contrast, as a
-// field's), saturation lifted by this much up to a cap, and a near-black one lifted by at most this factor.
 static const CGFloat kFlowLuminanceMin = 0.03, kFlowLuminanceMax = 0.13;
 static const CGFloat kFlowSaturationLift = 1.25, kFlowSaturationMax = 0.9, kFlowMaxLift = 4;
 
@@ -98,8 +94,6 @@ static BOOL fromOklab(CGFloat lightness, CGFloat a, CGFloat b, CGFloat linear[3]
     return YES;
 }
 
-// The colour's own hue, dark and a little more colourful, as the Music app draws a page: capping saturation
-// in HSV instead turned every warm hue brown. Past the chroma sRGB holds at that lightness, chroma gives way.
 static UIColor *fieldColorFor(UIColor *color, CGFloat ceiling) {
     CGFloat r = 0, g = 0, b = 0, a = 1;
     if (![color getRed:&r green:&g blue:&b alpha:&a]) {
@@ -126,8 +120,6 @@ UIColor *SGRFieldColorFor(UIColor *color) {
     return color ? fieldColorFor(color, fieldCeiling()) : SGRNeutralField();
 }
 
-// The artwork squeezed into a small square, whatever its aspect, and the bottom rows of that averaged
-// by coverage. A bitmap context keeps its rows top to bottom, so the last rows are the bottom edge.
 static UIColor *edgeColorOf(CGImageRef image) {
     CGContextRef context = newBitmap(kSample, kSample);
     if (!context) return nil;
@@ -149,8 +141,6 @@ static UIColor *edgeColorOf(CGImageRef image) {
 
 #pragma mark - bitmaps
 
-// The artwork drawn to fill the size, then blurred with its edges clamped so the border does not
-// darken. Returned retained.
 static CGImageRef newBlurred(CGImageRef image, size_t width, size_t height, CGFloat sigma) {
     CGContextRef context = newBitmap(width, height);
     if (!context) return NULL;
@@ -164,8 +154,6 @@ static CGImageRef newBlurred(CGImageRef image, size_t width, size_t height, CGFl
     return [blurContext() createCGImage:output fromRect:input.extent format:kCIFormatRGBA8 colorSpace:sRGB()];
 }
 
-// A black gradient from `a0` at `y0` to `a1` at `y1` (shares of the height, top down), extended
-// past both ends; with kCGBlendModeDestinationIn it becomes an alpha ramp instead of a dim.
 static void drawRamp(CGContextRef context, size_t height, CGFloat y0, CGFloat a0, CGFloat y1, CGFloat a1, CGBlendMode mode) {
     CGFloat components[] = {0, 0, 0, a0, 0, 0, 0, a1};
     CGFloat locations[] = {0, 1};
@@ -195,10 +183,6 @@ static UIImage *finished(CGImageRef blurred, BOOL dim, CGFloat dimBottom, CGFloa
 
 #pragma mark - tint
 
-// The artwork's dominant colour in linear light: its pixels binned 3 bits a channel, each bin scored by its
-// count weighted towards colourful pixels, so a busy cover gives its main colour instead of the grey an
-// average makes. Near-black and near-white count for little unless they are nearly all there is.
-// The same over the rows y0..y1 and columns x0..x1 of a kSample square bitmap (rows top down).
 static BOOL dominantIn(const uint8_t *px, size_t x0, size_t y0, size_t x1, size_t y1, CGFloat out[3]) {
     enum { kBins = 512 };
     double sums[kBins][3] = {{0}}, scores[kBins] = {0};
@@ -236,8 +220,6 @@ static BOOL dominantColorOf(CGImageRef image, CGFloat out[3]) {
 
 #pragma mark - flow
 
-// A dominant colour in linear light made fit for a moving field: a little more colourful, and within
-// the luminance band that keeps white text readable on it.
 static UIColor *flowColorFor(const CGFloat linear[3], CGFloat ceiling) {
     CGFloat r = toEncoded(linear[0]), g = toEncoded(linear[1]), b = toEncoded(linear[2]), h = 0, s = 0, v = 0, a = 1;
     [[UIColor colorWithRed:r green:g blue:b alpha:1] getHue:&h saturation:&s brightness:&v alpha:&a];
@@ -250,8 +232,6 @@ static UIColor *flowColorFor(const CGFloat linear[3], CGFloat ceiling) {
     return [UIColor colorWithRed:toEncoded(MIN(1, lr * k)) green:toEncoded(MIN(1, lg * k)) blue:toEncoded(MIN(1, lb * k)) alpha:1];
 }
 
-// The artwork's main colour in each quarter, then over the whole of it: the field keeps the artwork's
-// colours roughly where the artwork has them.
 static NSArray<UIColor *> *flowColorsOf(CGImageRef image, CGFloat ceiling) {
     CGContextRef context = newBitmap(kSample, kSample);
     if (!context) return nil;
@@ -283,13 +263,6 @@ static UIColor *tintOf(CGImageRef image, UIColor *surface) {
                         g * (1 - t) + toEncoded(linear[1]) * t,
                         b * (1 - t) + toEncoded(linear[2]) * t};
 
-    // The colour mixed in is held under a luminance of 0.05 but has no floor, so a near-black cover mixes the
-    // surface *down*: the tile ends up darker than the untinted surface it was meant to be a step above, and a
-    // neutral one lands in the 1-10% grey band SGRAmoled.x turns pure black, which takes the whole card with
-    // it -- a black square lost on a black page (The Weeknd's Trilogy, Bieber's SWAG; issue #36). So a mix
-    // dimmer than the surface is lifted back to the surface's luminance, in linear light and by one factor
-    // across the channels, which leaves its hue where the mix put it. Lifting cannot clip: the target
-    // luminance is the surface's ~0.014, and the most one channel can carry of it is 0.014 / 0.0722.
     CGFloat want = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
     CGFloat lit[3] = {toLinear(mixed[0]), toLinear(mixed[1]), toLinear(mixed[2])};
     CGFloat have = 0.2126 * lit[0] + 0.7152 * lit[1] + 0.0722 * lit[2];
@@ -315,8 +288,6 @@ static UIColor *tintOf(CGImageRef image, UIColor *surface) {
             CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
             palette = [SGRPalette new];
             palette.edgeColor = edge;
-            // The artwork's main colour, not its edge's: a scanned sleeve's edge is the scanner's grey, a
-            // portrait's is skin.
             CGFloat main[3];
             UIColor *source = dominantColorOf(cg, main)
                 ? [UIColor colorWithRed:toEncoded(main[0]) green:toEncoded(main[1]) blue:toEncoded(main[2]) alpha:1] : edge;

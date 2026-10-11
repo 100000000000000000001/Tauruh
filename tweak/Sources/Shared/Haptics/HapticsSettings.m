@@ -1,8 +1,3 @@
-// The Vibrations sections of the Player page, under either look (App/Pages.m puts them there): a card
-// per switch, the way the Audio effects page has one per effect, each opening out into its settings while
-// its switch is on. Controls has its strength; Music Haptics its strength and what it follows, a choice
-// that also says whether the rumble plays, rather than a switch of its own that one choice would leave
-// with nothing to do.
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Haptics.h"

@@ -1,13 +1,7 @@
-// BiniLyrics, the widest of the sources that serve Apple Music's own TTML: over a million recordings,
-// word timed, and no key to ask for. Searched by title, artist and length, so it needs a source
-// before it in the order — or the player — to have named the track. The search answers with metadata
-// and a link; the TTML itself is a second request, to a plain file host.
 #import "Core/SGCore.h"
 #import "LyricsSources.h"
 
 static NSString *const kAPI = @"https://lyrics-api.binimum.org/";
-// A recording is only taken when its length is this close to the track's, so the words fall on the
-// same beat. The search is by name, and a live or sped up cut of the same song is a different take.
 static const NSInteger kLengthSlack = 4;
 
 // The best of what the search found: word timing wins over line timing, then the closest length.

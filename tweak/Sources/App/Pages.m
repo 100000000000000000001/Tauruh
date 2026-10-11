@@ -26,8 +26,6 @@ void SGSetRedesignedUI(BOOL on) {
     SGSetEnabled(SGKeyRedesign, on);
 }
 
-// The whole look changes hands at launch, so the switch asks for the restart straight away rather than
-// leaving Spotify half in the old look.
 static void offerRestart(BOOL on) {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Restart Spotify"
         message:on ? @"The redesign takes over when Spotify starts again. Spotify closes now; open it again to see it." : @"Spotify's own look comes back when Spotify starts again. Spotify closes now; open it again to see it."
@@ -37,8 +35,6 @@ static void offerRestart(BOOL on) {
     [SGTopController() presentViewController:alert animated:YES completion:nil];
 }
 
-// Below iOS 26 the row is not a switch: Liquid Glass is the redesign, and the system draws it from
-// that version on, so the row reads out what is missing and the card carries the native look's rows alone.
 static SGModRow *unavailableRow(void) {
     SGModRow *row = SGStatActionRow(@"Redesigned UI", nil, ^NSString *{ return @"Needs iOS 26"; }, ^{
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Redesigned UI"

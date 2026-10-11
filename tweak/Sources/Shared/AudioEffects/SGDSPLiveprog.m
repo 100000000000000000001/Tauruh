@@ -19,9 +19,6 @@ struct SGDSPLiveprog {
     void *gram;
 };
 
-// EEL2 locks around its memory being grown and its tables being changed, which only a compile does here. On
-// the render thread nothing is grown: gmem stays unallocated there, and the lock is never waited on. The
-// thread is told apart by pthread_self, not a thread-local, whose first use on a thread allocates.
 static pthread_mutex_t sg_lock = PTHREAD_MUTEX_INITIALIZER;
 static _Atomic(pthread_t) sg_renderThread;
 

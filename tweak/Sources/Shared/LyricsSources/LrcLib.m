@@ -1,11 +1,3 @@
-// LRCLIB, the floor of the order. It is an open library with no key and no catalogue to license, so
-// it holds what the rest cannot: the tracks Apple's word by word programme never reached, and the
-// ones Musixmatch may show nobody. It times lines and not words, which is the whole point of putting
-// it last — the estimate inside a line is still a sweep, where Spotify's own lyrics only scroll.
-//
-// Its /api/get wants the length to agree almost exactly and answers 404 otherwise, so a miss falls
-// back to /api/search, which answers with whole recordings to pick the closest of. LRCLIB asks that
-// clients say who they are, and the mod does.
 #import "Core/SGCore.h"
 #import "LyricsSources.h"
 
@@ -18,9 +10,6 @@ static NSDictionary<NSString *, NSString *> *headers(void) {
     return @{@"User-Agent": @"Taurus " @SG_VERSION @" (https://github.com/samj-exe/taurus)"};
 }
 
-// [00:34.30] Look — the timestamp in minutes, seconds and hundredths, or thousandths where a line
-// carries three digits. A line may be stamped more than once when it is sung more than once, and
-// the tags LRC opens with ([ar:…], [length:…]) are not timestamps, so they fall out on their own.
 static NSArray<SGKaraokeLine *> *linesFromLRC(NSString *lrc) {
     static NSRegularExpression *stamp;
     static dispatch_once_t once;
@@ -95,9 +84,6 @@ static SGLyricsResult *resultFrom(NSDictionary *record) {
     return result;
 }
 
-// How good a recording is for the track: timed beats untimed, then the closest length. With no
-// length to go on, the fullest sheet wins — the search will happily rank a seventeen second stub of
-// a song above the song, and a stub is the one thing a length would have caught.
 static BOOL betterRecord(NSDictionary *record, NSDictionary *best, NSInteger seconds) {
     if (!best) return YES;
     BOOL synced = [record[@"syncedLyrics"] isKindOfClass:NSString.class] && [record[@"syncedLyrics"] length];

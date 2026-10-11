@@ -1,48 +1,3 @@
-// Player redesign: the lyrics come to the player itself, the way the Music app shows them. The player
-// is one screen and does not scroll (PlayerScroll.x), so the footer's lyrics glyph is the only way to
-// them: it shrinks the cover into a thumbnail at the top of the artwork band, lifts the track's title
-// up beside it, and fades the Apple Music style lines (Redesigned/Lyrics/SGRKaraokeView.h) into the
-// room that frees between the title and the progress bar. Tapping it again puts the cover back.
-//
-// Nothing of Spotify's is taken apart for it. The cover is the Kit's now playing artwork drawn again
-// in a view of the redesign's own, flown from where Spotify's cover is drawn to where the thumbnail
-// belongs, while Spotify's list of covers goes to alpha 0 underneath: one view to move instead of a
-// paging list of them, and the two pictures are the same one, so the swap is not seen. The title row
-// is Spotify's own unit translated, the way PlayerFooter.x moves the footer's controls -- a transform
-// survives the stack view laying its arranged views out again -- with a mask over it where the controls
-// it moved towards begin, so a long title fades out before them instead of running under them. The row
-// of chips over it (Switch to video) goes while the lines are up, since they take the room it sits in.
-//
-// Tree (trees/clean/player/01.txt): SPTNowPlayingView (:26) holds the content layers, the header row
-// (:91), and id=npv.bottomStackView {0, 576.67, 402, 236} (:127) whose arranged views are the
-// information unit {0, 0, 402, 64} (:160, the title, the artist and the add button), the duration unit
-// {0, 64, 402, 40} (:209), the controls (:240) and the footer (:295). The title is
-// id=now-playing-title-label and the artist id=now-playing-subtitle-label (:174, :185), both inside one
-// arranged element view {12, 2.33, 304, 43.33} of the unit's row. Every measurement here is taken from
-// the views themselves, since a player with a volume row or another mode's units has other numbers.
-//
-// The geometry is re-applied on every layout pass of the units, since a new track rebuilds the
-// elements inside them, and it is undone before the player closes: the bar morphs back into a full
-// size cover, which a thumbnail would not match.
-//
-// With the lines up and the song playing, the controls go after a few seconds untouched and the lines
-// have the player to themselves, the way the Music app leaves its lyrics alone: the header row, the
-// thumbnail and the bottom stack (the lifted title row with it) fade out, and the lines' room grows
-// from the band between the title row and the progress bar to the whole height of the player. The
-// lines' view is laid over all of that room from the start and only its band moves
-// (SGRKaraokeView's lineInsets), so the lines spring to the new anchor as they move on to a new line,
-// rather than riding a view resized under them. A touch anywhere on the player brings the controls
-// back, and a tap that does so does only that: it does not seek to the line under it. Pausing brings
-// them back as well, and they stay while the song is paused. VoiceOver keeps them.
-//
-// With Sing available (Shared/Sing: switched on in Mod Settings > Karaoke, its voice model downloaded), its
-// microphone (Redesigned/Lyrics/SGRSingControl.h) sits in the bottom trailing corner of the lines' band,
-// opposite their own glass button, and goes down with the band when the controls go. While it is open,
-// preparing or explaining itself the controls do not go, but ones that are away already stay away: a
-// touch on the microphone is for it and brings nothing back, since the band it sits in would move it out
-// from under the finger. The lines open with Sing available even for a song without lyrics, so the
-// microphone can always be reached; switched off, or without its model, there is no microphone and a song
-// without lyrics keeps its cover. Both follow the switch and the model as they change.
 #import <UIKit/UIGestureRecognizerSubclass.h>
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
@@ -60,16 +15,12 @@ static const CGFloat kTitleFade = 20;          // over how much of its end a tit
 static const CGFloat kThumbTop = 8;            // below the top of the artwork band
 static const CGFloat kLyricsTop = 20;          // between the title row and the first line
 static const CGFloat kLyricsBottom = 8;        // above the progress bar
-// The lines are a surface arriving, not something moving: they come up from just under full size as the
-// room for them opens, and go at once when it closes. An exit the eye waits through reads as a stall.
 static const CGFloat kLyricsEnterScale = 0.96;
 static const NSTimeInterval kLyricsIn = 0.3, kLyricsInDelay = 0.12, kLyricsOut = 0.16;
 // A track that changes while the lines are up has this long to bring its own before they are put away.
 static const NSTimeInterval kLyricsGrace = 3;
 // Below this the player has not laid out yet and nothing can be measured from it.
 static const CGFloat kLivingHeight = 200;
-// The lines alone: this long untouched while they play, and the controls go. They go slowly, being
-// nothing the eye waits for, and come back quickly, since a touch asked for them.
 static const NSTimeInterval kAloneAfter = 4;
 static const NSTimeInterval kAloneOut = 0.6, kAloneBack = 0.3;
 
@@ -96,8 +47,6 @@ static BOOL landscapeLyricsEnabled(void);
 
 #pragma mark - the overlay
 
-// The thumbnail and the lines, side by side under one view so the lines' own view has no sibling of
-// ours to hide: SGRKaraokeView takes the whole of whatever it is put in and dims what is next to it.
 @interface SGRPlayerLyricsOverlay : UIView
 @property (nonatomic, readonly) UIView *thumb;       // the cover, at full size, moved by its transform
 @property (nonatomic, readonly) UIImageView *cover;
@@ -488,8 +437,6 @@ static void dismissLandscapeLyrics(void) {
     _cover.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [_thumb addSubview:_cover];
     _stage = [[UIView alloc] initWithFrame:CGRectZero];
-    // What the lines leave when a song has none, which only Sing opens them for. A sibling of the lines'
-    // view, so it goes whenever they have something to show (SGRKaraokeView's syncSiblings).
     _empty = [UILabel new];
     _empty.text = @"Lyrics aren't available for this song.";
     _empty.textColor = SGRSecondary();
@@ -508,17 +455,6 @@ static void dismissLandscapeLyrics(void) {
 - (UIView *)stage { return _stage; }
 - (UILabel *)empty { return _empty; }
 
-// The lines seek when they are tapped and the thumbnail takes no touches, so everywhere else the
-// overlay would only swallow them: a view that takes touches does, even with nothing on it.
-//
-// What it hands them to instead is the title row. Translated to the top of the player it is drawn well
-// outside the stack view it is arranged in, and UIKit stops looking at a view whose bounds the touch is
-// not in, so the add button and the menu that rode up with it are past Spotify's own reach. Asked here
-// directly, the row answers for where it is drawn.
-//
-// The stage is as tall as the lines' room with the controls away, and the lines take touches only in
-// the part they have now, so the stage swallows none either. With the controls away the row is not
-// there to be asked: a touch goes on to the player, whose watcher brings them back.
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hit = [super hitTest:point withEvent:event];
     if (hit != self && hit != _stage) return hit;
@@ -527,9 +463,6 @@ static void dismissLandscapeLyrics(void) {
     return inRow == row ? nil : inRow;
 }
 
-// Made on the first tap and kept afterwards: it measures the song for its width before it can place a
-// line, so a view built again on every tap would show nothing for the first frames. Out of the window
-// it costs nothing -- its display link only runs while it is in one.
 - (SGRKaraokeView *)lyrics {
     if (!_lyrics) {
         _lyrics = [[SGRKaraokeView alloc] initWithFrame:_stage.bounds];
@@ -550,9 +483,6 @@ static SGRPlayerLyricsOverlay *overlayIn(UIView *host) {
         overlay = [[SGRPlayerLyricsOverlay alloc] initWithFrame:host.bounds];
         objc_setAssociatedObject(host, &kOverlayKey, overlay, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    // On top of the player: it reaches from under the header row down to the progress bar, so it is over
-    // the covers and the gradients and clear of every control. Under them instead, the mixing background
-    // Spotify keeps between the two (01.txt:72) would be free to draw over the lines.
     if (overlay.superview != host) [host addSubview:overlay];
     return overlay;
 }
@@ -593,8 +523,6 @@ static SGRLyricsLayout layoutIn(UIView *host) {
     l.shift = title ? kThumbSide + kThumbGap : 0;
     CGFloat lines = MAX(CGRectGetMaxY(l.thumb), top + row.size.height) + kLyricsTop;
     l.stage = CGRectMake(CGRectGetMinX(area), lines, area.size.width, CGRectGetMinY(bar) - kLyricsBottom - lines);
-    // With the controls away: from the header row's top, just under the status bar, down to the home
-    // indicator. The lines fade out at both ends, so nothing needs clearing beyond that.
     UIView *header = sg_header.viewIfLoaded;
     UIEdgeInsets safe = host.window.safeAreaInsets;
     CGFloat roomTop = MIN(header ? CGRectGetMinY(SGFrameIn(header, host)) : safe.top, CGRectGetMinY(l.stage));
@@ -604,8 +532,6 @@ static SGRLyricsLayout layoutIn(UIView *host) {
     return l;
 }
 
-// The lines' part of the stage: the band between the title row and the progress bar while the
-// controls are there, all of it while they are away.
 static UIEdgeInsets bandOf(SGRLyricsLayout l, BOOL alone) {
     if (alone) return UIEdgeInsetsZero;
     return UIEdgeInsetsMake(CGRectGetMinY(l.stage) - CGRectGetMinY(l.room), 0, CGRectGetMaxY(l.room) - CGRectGetMaxY(l.stage), 0);
@@ -613,8 +539,6 @@ static UIEdgeInsets bandOf(SGRLyricsLayout l, BOOL alone) {
 
 #pragma mark - the title row
 
-// Where the row's trailing controls start, in the unit's coordinates: the nearest arranged view on the
-// trailing side of the title that is still there to be seen. The title may not reach it.
 static CGFloat trailingEdgeIn(UIView *info) {
     UIView *title = sg_titleElement, *row = title.superview;
     if (!title || !row) return CGFLOAT_MAX;
@@ -628,11 +552,6 @@ static CGFloat trailingEdgeIn(UIView *info) {
     return limit;
 }
 
-// The title moved right by the thumbnail would run into the add button beside it, and it cannot simply
-// be narrowed: Spotify lays its marquee labels out with constraints, which put the width back the next
-// time anything in the row lays out -- and a long title, being a marquee, lays out often. A mask on the
-// element takes no part in that, so it holds between passes, and it fades the title out where Spotify's
-// own fade would have been rather than cutting it.
 static void clipTitle(UIView *element, CGFloat width) {
     CGRect bounds = element.bounds;
     if (width >= bounds.size.width - 0.5 || bounds.size.height < 1) {
@@ -677,9 +596,6 @@ static void placeTitleRow(SGRLyricsLayout l) {
 
 #pragma mark - the lines alone
 
-// Everything the lines leave the player to: the header row, the bottom stack with the title row lifted
-// out of it, and the thumbnail. Alpha on the header unit's view and the stack, never hidden: views
-// inside Spotify's stacks crash when hidden, and at alpha 0 UIKit hands them no touches either.
 static void showControls(CGFloat alpha, SGRPlayerLyricsOverlay *overlay) {
     sg_header.viewIfLoaded.alpha = alpha;
     UIView *stack = sg_info.viewIfLoaded.superview;
@@ -694,8 +610,6 @@ static void stopAloneTimer(void) {
 
 static void scheduleAlone(void);
 
-// Sing's microphone in the corner of the band the lines have now. Held, it keeps the controls from going
-// and lets the count start over once it lets go.
 static void placeSing(SGRPlayerLyricsOverlay *overlay, SGRLyricsLayout l) {
     CGRect band = [overlay convertRect:sg_alone ? l.room : l.stage fromView:sg_host];
     sg_sing = SGRSingControlForPage(overlay, band, sg_alone, ^(BOOL held) {
@@ -734,8 +648,6 @@ static void setAlone(BOOL alone, BOOL animated) {
           alone ? CGRectGetMinY(l.room) : CGRectGetMinY(l.stage), alone ? CGRectGetMaxY(l.room) : CGRectGetMaxY(l.stage));
 }
 
-// The lines on the player and the song playing, with nothing over the player and no one listening to
-// its controls with VoiceOver.
 static BOOL mayGoAlone(void) {
     UIView *host = sg_host;
     SGRPlayerLyricsOverlay *overlay = host ? objc_getAssociatedObject(host, &kOverlayKey) : nil;
@@ -750,10 +662,6 @@ static BOOL mayGoAlone(void) {
         && UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
 }
 
-// Counts the time untouched from now. A timer that finds the lines not in (a track still bringing its
-// own) or a sheet over the player starts over. One that finds the song paused or the app away lets it
-// be, so a locked phone playing on is not woken for it: playing again starts it (SGRPlayerLyricsWatcher),
-// and so does the app coming back (the %ctor).
 static void scheduleAlone(void) {
     stopAloneTimer();
     if (!sg_open || sg_alone) return;
@@ -775,9 +683,6 @@ static void touched(UIView *view) {
     scheduleAlone();
 }
 
-// Sees every touch that starts on the player and leaves it to whatever it was meant for: it fails as
-// the touch begins, so it holds nothing up, cancels nothing and stands in no gesture's way, the pull
-// that closes the player included.
 @interface SGRPlayerTouchWatcher : UIGestureRecognizer
 @end
 
@@ -814,10 +719,6 @@ BOOL SGRPlayerLyricsOpen(void) {
     return sg_open;
 }
 
-// Puts the overlay's own views where the measurements say, without animating. The thumbnail is laid out
-// at the size and place Spotify draws its cover at and moved by its transform alone, so a pass that
-// runs while it is up leaves it exactly where the eye has it: the two are worked out from one
-// measurement. Bounds and a centre, not a frame, since both views can be under a transform.
 static void place(SGRPlayerLyricsOverlay *overlay, UIView *host, SGRLyricsLayout l) {
     overlay.frame = CGRectUnion(l.cover, CGRectUnion(l.thumb, l.room));
     CGRect cover = [overlay convertRect:l.cover fromView:host], stage = [overlay convertRect:l.room fromView:host];
@@ -832,8 +733,6 @@ static void place(SGRPlayerLyricsOverlay *overlay, UIView *host, SGRLyricsLayout
     overlay.empty.frame = UIEdgeInsetsInsetRect(overlay.stage.bounds, bandOf(l, NO));
 }
 
-// Where the thumbnail's view has to go to land on `l.thumb`, as a transform about its own centre: the
-// shadow and the corners travel with it that way, instead of a shadow redrawn on every frame.
 static CGAffineTransform thumbTransform(SGRLyricsLayout l) {
     CGFloat scale = l.cover.size.width > 0 ? l.thumb.size.width / l.cover.size.width : 1;
     CGAffineTransform move = CGAffineTransformMakeTranslation(round(CGRectGetMidX(l.thumb) - CGRectGetMidX(l.cover)),
@@ -841,8 +740,6 @@ static CGAffineTransform thumbTransform(SGRLyricsLayout l) {
     return CGAffineTransformConcat(CGAffineTransformMakeScale(scale, scale), move);
 }
 
-// The corners as they will be drawn: a radius under a scale is drawn scaled, so the thumbnail asks for
-// the radius it wants divided by the shrink, and the two ends of the animation are 12pt and 8pt corners.
 static CGFloat thumbRadius(SGRLyricsLayout l, BOOL open) {
     if (!open) return SGRRadiusArtwork;
     CGFloat scale = l.cover.size.width > 0 ? l.thumb.size.width / l.cover.size.width : 1;
@@ -861,8 +758,6 @@ static void setOpen(BOOL open, BOOL animated) {
         SGLog(@"redesign player: the lyrics have nowhere to go (stage %.0fx%.0f, lift %.0f)", l.stage.size.width, l.stage.size.height, l.lift);
         return;
     }
-    // The thumbnail is the Kit's picture drawn again, and Spotify's cover goes as it appears: without a
-    // picture there would be a hole where the cover was, so the cover stays and the lyrics wait.
     UIImage *picture = SGRNowPlayingArtwork(NULL, NULL);
     if (open && !picture) {
         SGLog(@"redesign player: no artwork read yet, the lyrics stay down");
@@ -893,9 +788,6 @@ static void setOpen(BOOL open, BOOL animated) {
         [overlay.lyrics setLineInsets:bandOf(l, NO) duration:0];
         placeSing(overlay, l);
         sg_sing.alpha = 0;
-        // Spotify's cover goes the moment the redesign's own takes its place: the same picture at the
-        // same size with the same corners, so there is nothing to see in the swap. Coming back it waits
-        // for the thumbnail to land on it, or the two would be on screen at once, one of them half size.
         SGRPlayerCoverList().alpha = 0;
     }
 
@@ -944,8 +836,6 @@ void SGRPlayerToggleLyrics(void) {
     setOpen(!sg_open, YES);
 }
 
-// A layout pass, a new track or a turn of the phone: the state is put back where it belongs without
-// animating, since the frames it is measured from have just changed.
 static void replace(void) {
     UIView *host = sg_host;
     if (!host || sg_moving) return;   // a pass in the middle of the transition would cut it short
@@ -1048,9 +938,6 @@ static void replace(void) {
 }
 %end
 
-// The chips over the title (Switch to video and whatever else a track brings) sit in the middle of the
-// room the lines take, so they go while the lines are up. The row keeps its height: the rest of the
-// bottom stack stays where it was, which is the whole point of lifting only the title out of it.
 %hook _TtC20NowPlaying_ModesImpl20FloatingElementsUnit
 - (void)viewDidLayoutSubviews {
     %orig;
@@ -1061,9 +948,6 @@ static void replace(void) {
 
 #pragma mark - the track changing under them
 
-// Lyrics arrive a moment after the track does: the glyph is asked again while they would be coming, and
-// the lines already up wait out the same grace before they go. Not in the background, where Spotify may
-// not ask for lyrics until the app is back, so coming back starts it over.
 static void awaitLyrics(void) {
     for (NSNumber *delay in @[@1, @(kLyricsGrace)]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -1077,8 +961,6 @@ static void awaitLyrics(void) {
     }
 }
 
-// Sing switched on or off in Mod Settings > Karaoke, or its voice model arriving or going: the lyrics' glyph and
-// the microphone follow at once, and lyrics that were open only for Sing put the cover back.
 static void singAvailabilityChanged(void) {
     static BOOL available;
     if (SGSingAvailable() == available) return;

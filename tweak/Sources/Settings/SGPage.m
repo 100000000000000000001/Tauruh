@@ -3,13 +3,6 @@
 #import "Core/SGCore.h"
 
 
-// Spotify's navigation controller asserts that everything on its stack is one of its own pages
-// (SPNavigationController.m:645, "[viewController conformsToProtocol:@protocol(SPTPageController)]"),
-// and the tab bar asks it for that page on every tab tap to log the interaction. A plain view
-// controller of the mod's pushed onto that stack therefore takes the app down the next time a tab
-// is pressed, from wherever it was left. The pages below answer the protocol's two questions
-// instead and are registered as conforming at load; if the protocol is gone they are presented
-// rather than pushed, so a rename in some later Spotify costs the push, not the app.
 static BOOL sg_pagesConform;
 
 @implementation SGPage

@@ -8,8 +8,6 @@ struct SGStemWindowResult: Sendable {
     let vocals: [Float] // one hop of stereo interleaved PCM
 }
 
-// A serial worker feeds consecutive overlapping model windows. Only a completed hop
-// is published; its source index never changes to conceal missing or late inference output.
 actor SGStemWindowProcessor {
     let chunkSamples: Int
     let hopSamples: Int

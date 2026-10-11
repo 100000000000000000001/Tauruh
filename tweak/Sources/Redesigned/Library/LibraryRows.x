@@ -1,23 +1,7 @@
-// Library redesign: the rows of Your Library and of a folder inside it, and the cards of its grid.
-//
-// Tree (trees/clean/library/03.txt:30-73, 06.txt:28-40): every cell of the list is a
-// YourLibrarySwipeableCollectionViewCellContainer holding either a 402x80 row -- id=Playlist.Row.Library,
-// Album.Row.Library or Podcast.Row.Library, all three an AutoLayoutStackView {16, 8} 370x64 of
-// id=Artwork.Row.Library 64x64 r=4 and, 12pt after it, the title over its kind and its owner -- or a
-// 112.67x161.33 card, id=Components.UI.CardLibrary, over id=Components.UI.CardLibrary.Artwork r=4.
-//
-// Two things are changed, both of them the Music app's library. The artwork takes the Kit's radius for its
-// size with continuous corners, Spotify's 4pt being the square corner of its own look; an artist's picture
-// already carries a radius half its side and is left the circle it is (r=32 in the trees, 2 of the 90 rows
-// recorded). And a hairline runs between the rows from the text's leading edge, which is where a library list
-// draws one -- a layer rather than a view, since the rows are reused as fast as the list scrolls, with its
-// actions off so a reused row does not slide its line into place.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Library.h"
 
-// What a row leaves between its artwork and its text (03.txt:36 and :39: the artwork ends at 64, the text
-// starts at 76), and where the hairline starts with it.
 static const CGFloat kTextGap = 12;
 
 static char kThumbKey, kCoverKey, kLineKey;
@@ -33,8 +17,6 @@ static void roundCorners(UIView *artwork, CGFloat radius) {
     if (!layer.masksToBounds) layer.masksToBounds = YES;
 }
 
-// The line under a row, from its text's leading edge to the trailing edge of the page. A cell holding a card
-// has none, and one reused from a row into a card loses the line it was left with.
 static void hairline(UIView *cell, UIView *thumb) {
     CALayer *line = objc_getAssociatedObject(cell, &kLineKey);
     CGSize size = cell.bounds.size;

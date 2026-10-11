@@ -1,20 +1,3 @@
-// Search redesign: the Browse page's header the way Home has it (Redesigned/Home/HomeHeader.x). A large title at the
-// leading edge in place of Spotify's small one; the avatar that opens the side drawer at the trailing edge; the camera
-// that scans Spotify codes gone, and the scrim Spotify lays behind the header, the soft scroll edge
-// (Kit/SGREdgeEffect.x) being what keeps the header clear of the cards scrolling under it. The page's layout pass also
-// closes the gap the collapsed sections leave (SearchSections.x).
-//
-// Tree (trees/clean/search/01.txt:376-427): BrowsePageViewController's view holds the list (id=BrowsePage.ContentScrollView),
-// a 402x216 UIView around Reprise_LiquidGlassKit LiquidGlass.GradientView (the scrim), and at {0, 62} the header's
-// ElementView 402x124: a vertical UIStackView {16, 0} 370x108 of the toolbar row and the search field. The toolbar row
-// is a UIStackView id=SearchToolBar.Header 370x48 of ListeningActivity_ElementsKit.AdaptiveFaceContainer {0, 7} 32x34
-// (the avatar), SPTEncoreLabel id=SearchHeaderFind.HeaderLabel {40, 0} 278x48 ("Search", 21pt), the camera
-// (id=SearchToolBar.AccessoryItem.ScannablesButton) and a hidden accessory button.
-//
-// Scrolled, Spotify slides the header up 56pt and fades the toolbar row out (03.txt:647-651, a=0.00), keeping the search
-// field. So the title goes into that row as a subview the stack does not arrange: it slides and fades with the row, and
-// its avatar moves to the trailing edge by the row's layout direction, as on Home. The title's text is Spotify's own
-// label's, so it follows the app's language.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Search.h"
@@ -53,8 +36,6 @@ static UIView *findOutsideList(UIView *view, NSString *identifier) {
     return nil;
 }
 
-// The page's parts, found once per page: the page lays out on every step of its header sliding. A miss costs a walk of the
-// header alone, so the page keeps looking while it loads.
 static BOOL findParts(UIView *view) {
     if (sg_row && sg_list && [sg_row isDescendantOfView:view] && [sg_list isDescendantOfView:view]) return YES;
     for (UIView *sub in view.subviews) {

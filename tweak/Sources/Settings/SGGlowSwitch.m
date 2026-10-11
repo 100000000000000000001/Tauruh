@@ -9,8 +9,6 @@ static NSString *const kTurnKey = @"turn";
 + (instancetype)filterWithType:(NSString *)type;
 @end
 
-// Around the capsule the way a conic gradient runs, starting and ending on the same pink so the turn
-// has no seam.
 NSArray<UIColor *> *SGGlowRainbowColors(void) {
     static NSArray *colors;
     static dispatch_once_t once;
@@ -76,8 +74,6 @@ static CAShapeLayer *newStroke(CGFloat width) {
     [_wash addSublayer:_washColors];
     [self.layer addSublayer:_wash];
 
-    // The glow: the rainbow cut to a wide stroke, blurred as a whole, in a layer larger than the switch
-    // so the blur has room to spread.
     _glow = [CALayer layer];
     _glowShape = [CALayer layer];
     _glowMask = newStroke(kGlowWidth);
@@ -162,8 +158,6 @@ static CAShapeLayer *newStroke(CGFloat width) {
     _knob.layer.cornerRadius = side / 2;
 }
 
-// Colours for the state. Off is meant to tempt: the rainbow already circles the rim, softer, with a
-// fainter glow. On it comes in full, glow and all.
 - (void)paint {
     BOOL on = self.on;
     BOOL glow = !UIAccessibilityIsReduceTransparencyEnabled();

@@ -1,44 +1,3 @@
-// Speed and Pitch (SpeedPitchMenu.x draws them), both done on Spotify's audio, under either look.
-//
-// Hook ownership is Shared/Audio/SGAudioPipeline.x; this file registers its DSP there.
-// Spotify's player takes a speed only for podcasts: for songs its restrictions refuse it (device test,
-// 2026-09-18: the slider read "Unavailable here"), its own music speed being a per track setting kept on
-// playlist items. So speed, like pitch, is done to the sound, by SGTimePitch between Spotify's mixer and
-// its speaker unit.
-//
-// Spotify's audio (AudioUnitDriver2 in the binary) is a chain of units it wires with MakeConnection:
-// converter (fed by its decoder through a render callback), EQ, mixer, RemoteIO. Its import of
-// AudioUnitSetProperty is rebound (Core/SGRebind.h), and the one call connecting the mixer to the RemoteIO
-// unit's input is answered by the central pipeline's render callback, which pulls the mixer itself. At
-// normal speed and pitch the callback passes the mixer's sound straight through. Otherwise it renders the
-// time and pitch unit, which pulls the mixer for rate times the frames it hands back, so Spotify's decoder
-// is drained that much faster: the song plays faster or slower, at its own pitch unless Pitch moves it.
-// Switching the unit in or out skips or repeats its 93 ms, so it stays in for a moment after both return
-// to normal, and a finger dragging across normal does not switch it back and forth.
-//
-// While pitch follows speed (the switch between the sliders), the chain's unit is a varispeed instead
-// (SGTimePitchCreateVarispeed): the song resampled, as a record played faster, its pitch going with the
-// speed exactly. The time and pitch unit could only get near that, a whole semitone at a time, and even
-// exact it smears every attack, keeping about a quarter of a click's energy sharp at 1.25x where the
-// varispeed keeps all of it (harness/pitch). The varispeed is 1 ms late rather than 93.
-//
-// Spotify's clock keeps running at its own speed between the player's reports: -[SPTPlayerState position]
-// is positionAsOfTimestamp minus timeIntervalSinceNow times [self playbackSpeed] (disassembly,
-// 0x1057735ec), so playbackSpeed is hooked to include this speed, and the scrubber, the lyrics and the lock
-// screen move with the sound. That bets the player's reported positions follow what the decoder handed
-// over, which is what it counts.
-//
-// When the connection is never seen, pitch falls back to the way it first shipped: a render notify on the
-// RemoteIO unit, registered in the central pipeline before audio effects and Music Haptics, runs each buffer
-// through a unit working in place; speed is then unavailable. Those buffers are in the unit's output format,
-// the hardware's, not the one Spotify hands the unit (harness/audio-effects/sim), so the fallback's unit is made
-// for that one.
-//
-// Speed and pitch last until Spotify quits; whether pitch follows speed is stored, and on until turned off.
-//
-// Threading: the render callback and the notify run on the render thread and touch only atomics and the
-// units; Spotify sets its properties and starts its unit on its audio thread; everything else is main
-// thread.
 #import <AudioToolbox/AudioToolbox.h>
 #import <pthread.h>
 #import <stdatomic.h>
@@ -57,15 +16,10 @@ static float sg_speed = 1, sg_semitones;     // main thread
 static BOOL sg_follows;                      // main thread, pitch follows speed as stored
 static atomic_uint sg_speedBits;             // sg_speed for SPTPlayerState, read on any thread
 
-// The units, each made for the output's format when first needed: the time and pitch unit in the chain
-// (pull), the varispeed in the chain while pitch follows speed, and the one in place (pitch only). The
-// render thread pulls sg_chain, one of the chain's two, and runs either only while engaged.
 static _Atomic(SGTimePitch *) sg_pull, sg_varispeed, sg_inPlace, sg_chain;
 static atomic_bool sg_engaged, sg_busy;
 static pthread_mutex_t sg_buildLock = PTHREAD_MUTEX_INITIALIZER;
 
-// The formats when Spotify started its output: the one it hands the RemoteIO unit, which the chain's unit
-// feeds, and the unit's output side, the hardware's, which the in place fallback's notify gets.
 typedef struct {
     atomic_uint_fast64_t rateBits;
     atomic_uint flags, channels, bytes;
@@ -222,8 +176,6 @@ static void readFormat(AudioUnit unit) {
 static void apply(void);
 
 static void prepareOutput(AudioUnit unit) {
-    // The pipeline has excluded rendering while the graph changes. Do not run the previous
-    // route's unit while the main queue prepares one for the newly reported format.
     atomic_store(&sg_engaged, false);
     readFormat(unit);
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -244,8 +196,6 @@ static void disengage(void) {
     for (int i = 0; i < 200 && atomic_load(&sg_busy); i++) usleep(250);
 }
 
-// The unit for the output's format and the way in use, made when there is none or the format changed. A
-// replaced one is never freed: the render thread may still hold it, and a format change is rare.
 static SGTimePitch *unitForFormat(void) {
     BOOL pull = tapped(), varispeed = following();
     Format *format = pull ? &sg_client : &sg_hardware;

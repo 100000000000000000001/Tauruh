@@ -1,12 +1,3 @@
-// The AirPods gesture engine: listens to the AirPods' motion through CoreMotion, watches how the head
-// turns and runs the player action the two gestures are set to. Nothing but rotation is looked at.
-//
-// A gesture is a run of "strokes": one stroke is the head turning one way, and the next turn the other
-// way is the next stroke, so a stroke ends where the rotation rate passes back through zero or turns
-// around. A double nod is four strokes on the pitch axis (down, up, down, up); a shake is three on the
-// yaw axis (left, right, left). A run counts only when the strokes alternate, each is quick enough and
-// far enough, they fall within one short window, the right axis leads the others, and the head is not
-// being jostled by walking. The result is one action per gesture, held off for a moment afterwards.
 #import <AVFoundation/AVFoundation.h>
 #import <CoreMotion/CoreMotion.h>
 #include <math.h>
@@ -28,8 +19,6 @@ static BOOL sgBluetoothRoute(void) {
     return NO;
 }
 
-// Rotation rate above which the head counts as turning, and the peak a stroke must reach, both in
-// radians a second.
 static const double kOnset = 0.7;
 static const double kPeak = 1.1;
 // How long a stroke may take, and how long the whole gesture may run, in seconds.
@@ -39,8 +28,6 @@ static const double kWindow = 1.6;
 // Strokes a gesture needs: a double nod is down, up, down, up; a shake is left, right, left.
 static const NSInteger kNodStrokes = 4;
 static const NSInteger kShakeStrokes = 3;
-// The gesture's axis must lead the other by this much, and the head must be stiller than this (in g's)
-// so a nod while walking is not taken.
 static const double kDominance = 1.6;
 static const double kWalk = 0.3;
 // Held off this long after a gesture, so the tail of one is not read as the next.
@@ -104,8 +91,6 @@ typedef struct {
         [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(routeChanged:)
                                                    name:AVAudioSessionRouteChangeNotification object:nil];
     }
-    // The first call asks for Motion & Fitness; the samples only start once the AirPods are connected
-    // and the sound is coming out of them.
     [self updateListening];
 }
 
@@ -262,8 +247,6 @@ typedef struct {
 
 #pragma mark - what the switch and the Status row read
 
-// A manager of its own for the questions the page asks: one exists whether or not the feature is
-// listening, and building one starts nothing.
 static CMHeadphoneMotionManager *sgStatusManager(void) {
     static CMHeadphoneMotionManager *manager;
     static dispatch_once_t once;

@@ -13,8 +13,6 @@ static NSString *flagState(const SGFlagDef *flag, id value) {
     }
 }
 
-// Every flag in SGFlagTable, filtered by the search words; forced flags first while the search
-// is empty. Bool flags get an Auto / Off / On control, the others a text field in an alert.
 @interface SGFlagsPage : SGPage <UISearchBarDelegate>
 @end
 

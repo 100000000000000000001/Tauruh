@@ -1,7 +1,3 @@
-// Spotify's own newer design, which it ships behind several flags switched off: the glass navigation
-// bar, the new player slider, the sheet style player, the queue and Connect sheets, the redesigned
-// player header, the sleep timer's options sheet. The redesign is built on all of it, so while
-// Redesigned UI is on each is forced and its row elsewhere shows it locked.
 #import "Core/SGCore.h"
 #import "SGRedesign.h"
 

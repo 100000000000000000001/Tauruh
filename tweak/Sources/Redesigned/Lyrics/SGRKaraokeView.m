@@ -1,12 +1,3 @@
-// The redesign's Apple Music style lyrics, always on: the line being sung lights up word by word, the
-// rest dim and blur with distance. Lines two voices sing at once are lit together, an instrumental
-// break holds three dots, and a line can show its pronunciation and its translation under it. The
-// lines and the clock are Shared/Lyrics/Lyrics.h's.
-//
-// Only words the source timed are swept. A line timed by the line lights up whole as it starts, as
-// Apple Music lights such a line, unless the Lyrics page's "Simulate word-by-word timing" asks for
-// its estimated words to be swept; lyrics with no timing at all are shown as plain text, every line
-// lit, nothing following the clock.
 #import "Core/SGCore.h"
 #import "SGRKaraokeView.h"
 #import "LyricsText.h"
@@ -20,20 +11,14 @@ static const CGFloat kFontSize = 30, kMargin = 24, kLineGap = 24, kRowTighten = 
 static const CGFloat kDimAlpha = 0.3, kFillEdge = 22, kLift = 2.5, kDimScale = 0.97;
 static const CGFloat kAnchor = 0.28;   // where the sung line rests, as a share of the height
 static const CGFloat kEdgeFade = 0.1;  // the lines fade out over this share at the top and bottom
-// The small preview under the player's cover: the room the page's lines have in it and the gap under
-// the sung one, which the room leaves only a peek of the next line through.
 static const CGFloat kCompactMargin = 24, kCompactGap = 6;
 static const CGFloat kBlurPerLine = 1.4, kMaxBlur = 6;
 // The (oh, aye) hanging under a line: smaller, a little dimmer, and just clear of it.
 static const CGFloat kBackingScale = 0.62, kBackingAlpha = 0.8, kBackingGap = 4;
-// The mark of a line Genius explains: a bubble after it for the artist's own word, a dotted underline
-// for anyone else's.
 static const CGFloat kBubbleSide = 22, kBubbleGap = 8, kBubbleGlyph = 11, kBubbleAlpha = 0.75, kBubbleReach = 14;
 static const CGFloat kUnderlineDrop = 1, kUnderlineWidth = 2, kUnderlineAlpha = 0.35;
 // The line naming the source, under the lyrics and outside the fade so it does not dim with them.
 static const CGFloat kCreditSize = 12, kCreditAlpha = 0.4, kCreditBottom = 10;
-// The button for the pronunciation and the translation, in the bottom leading corner as Apple Music
-// has it, and the gap between it and the credit beside it.
 static const CGFloat kExtrasSide = 44, kExtrasBottom = 12, kExtrasGlyph = 17, kExtrasCreditGap = 12;
 static const NSTimeInterval kRestyleFade = 0.3;   // the lines crossfading to a new style
 static const NSTimeInterval kBrowseHold = 3;   // after scrolling by hand, how long until it follows the song again
@@ -42,26 +27,14 @@ static const double kFloatMinMs = 700, kFloatLeadMs = 80;   // a short word stil
 static const NSTimeInterval kWholeFade = 0.35;
 static const double kWholeRiseMs = 900;
 static const double kClockSnapMs = 250, kClockPull = 0.08;
-// Lines get views this far outside the visible part, in screen heights: half a screen above it
-// and below, and a quarter more before a view is let go. Every view held is one more for the window
-// to take in and let go when the lyrics come up; a line comes into view about once in three seconds,
-// and a page flung by hand fills in at a few lines a frame.
 static const CGFloat kSightBehind = 0.5, kSightAhead = 0.5, kSightSlack = 0.25;
 static const NSTimeInterval kTransitionSlack = 0.05;   // after the player's animation, before the link is back
 static NSString *const kBlurPath = @"filters.gaussianBlur.inputRadius";
 // Two voices can sing at once, rarely more; past this many, the latest ones wait their turn.
 enum { kMostSung = 6 };
-// A pause in the singing this long is an instrumental break, and three dots hold its place: from the
-// end of the last line sung before it to the start of the next, or from the top of the song to the
-// first line. BiniLyrics' web player, which copies Apple Music's, draws them from seven seconds.
 static const NSInteger kBreakMinMs = 7000;
 // The dots' size and the room between them, as shares of the font, which is Apple Music's proportion.
 static const CGFloat kDotShare = 0.5, kDotGapShare = 0.27;
-// Their timeline, Apple Music's as that player reads it off: in over 0.4 s, breathing between 85 % and
-// 112 % of their size in eight second cycles, filling one after another, then swelling to 120 % and
-// shrinking away in 0.35 s, which ends half a second before the next line starts so it has that long
-// to move up into their place. A cycle is timed to end small, so the swell starts from the bottom.
-// They wait a quarter of a second before they come, for the line before them to move up out of the way.
 static const double kBreakWait = 0.25, kBreakIn = 0.4, kBreakFadeIn = 0.16, kBreathHalf = 4, kBreathLow = 0.85, kBreathHigh = 1.12;
 static const double kBreakOut = 0.35, kBreakSwell = 1.2, kBreakSwellShare = 0.35, kBreakCollapse = 0.5;
 // The dots' clock is set again only once it is this far from the song's, or the song stops or starts.
@@ -73,9 +46,6 @@ static const CFTimeInterval kStillFor = 0.1;
 + (instancetype)filterWithType:(NSString *)type;
 @end
 
-// Whether a line is written right to left, told by its first letter the way the Unicode bidi algorithm
-// tells a paragraph's direction. Each line is asked on its own, since a song can mix scripts, and the
-// phone's language has no say in it.
 static BOOL readsRightToLeft(NSString *text) {
     static NSCharacterSet *rightToLeft, *leftToRight;
     static dispatch_once_t once;
@@ -107,8 +77,6 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
     label.font = font;
     label.textColor = color;
     if (!rightToLeft) return label;
-    // A word of a line written right to left is set in the line's direction, so the punctuation at its
-    // ends falls where the whole line would put it, a word of a left to right script among them too.
     NSMutableParagraphStyle *paragraph = [NSMutableParagraphStyle new];
     paragraph.baseWritingDirection = NSWritingDirectionRightToLeft;
     label.attributedText = [[NSAttributedString alloc] initWithString:text attributes:@{
@@ -118,14 +86,10 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
 
 #pragma mark - a word
 
-// The word twice: dim underneath, white on top behind a mask whose feathered edge slides across it,
-// from the edge its script starts at.
 @interface SGRKaraokeWordView : UIView
 @property (nonatomic, readonly) SGKaraokeWord *word;
 @property (nonatomic, readonly) UILabel *lit;
 @property (nonatomic) CGFloat offset;   // where the word starts along its line, rows laid end to end
-// Lit with the rest of its line at once rather than swept, and floated up with it over riseStart to
-// riseEnd, which are the word's own times until the sweep says otherwise.
 @property (nonatomic) BOOL whole;
 @property (nonatomic) double riseStart, riseEnd;
 - (void)fillTo:(CGFloat)cursor;
@@ -149,8 +113,6 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
     _rightToLeft = rightToLeft;
     [self addSubview:wordLabel(word.text, font, [UIColor colorWithWhite:1 alpha:kDimAlpha], self.bounds, rightToLeft)];
     _lit = wordLabel(word.text, font, UIColor.whiteColor, self.bounds, rightToLeft);
-    // Hidden until the line is sung: a masked layer is drawn offscreen every frame even when the
-    // mask leaves nothing of it, and a song has hundreds of words waiting their turn.
     _lit.hidden = YES;
     [self addSubview:_lit];
 
@@ -166,9 +128,6 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
     return self;
 }
 
-// The cursor is in line units and the feathered edge is centred on it, so the edge runs on through
-// the space into the next word instead of starting over at each one. Right to left, the mask is the
-// same one turned around: white from the word's right edge, the feather `local` in from it.
 - (void)fillTo:(CGFloat)cursor {
     CGFloat width = self.bounds.size.width, height = self.bounds.size.height;
     CGFloat local = MAX(-kFillEdge / 2, MIN(width + kFillEdge / 2, cursor - _offset));
@@ -181,8 +140,6 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
     [CATransaction commit];
 }
 
-// Rises like a critically damped spring let go as the word starts: no jolt, a long soft landing.
-// x = 5 at the end of the word is 96 % of the way up.
 - (void)floatAt:(double)ms {
     double x = MAX(0, ms - _riseStart + kFloatLeadMs) / MAX(_riseEnd - _riseStart, kFloatMinMs) * 5;
     CGFloat lift = kLift * (1 - (1 + x) * exp(-x));
@@ -200,10 +157,6 @@ static UILabel *wordLabel(NSString *text, UIFont *font, UIColor *color, CGRect f
 
 #pragma mark - how a line is set
 
-// Which of a line's texts are shown and how big, from the Lyrics page's order of the three and the
-// lyrics menu's switches: the first shown is set at the lyrics' own size, and the next two keep the
-// sizes of their places whatever is hidden above them, so a translation stays the smallest with the
-// pronunciation off. A song is laid out and measured by one of these, so a change of it is a new one.
 @interface SGRKaraokeStyle : NSObject
 @property (nonatomic, readonly) NSArray<NSNumber *> *order;   // SGRLyricsText, largest first, shown ones only
 @property (nonatomic, readonly) UIFont *lyrics, *pronunciation, *translation;   // nil for a text not shown
@@ -252,14 +205,8 @@ static const CGFloat kSecondShare = 0.67, kThirdShare = 0.54;
 
 #pragma mark - where a line's words go
 
-// Between a row of words and the row spelling them out under it, between one such pair and the next,
-// and between two texts of a line set apart.
 static const CGFloat kPairTighten = 2, kPairGap = 4, kPartGap = 6;
 
-// Where everything of a line goes, from its text alone: each word's frame and its place along the
-// sweep, the translation's frame and the backing's top. The page lays every line of a song out with
-// it off the main thread to stack them, and a line view lays itself out by it when it is made, so the
-// two can never disagree about a height.
 @interface SGRKaraokeLayout : NSObject
 @property (nonatomic) BOOL right;
 @property (nonatomic) CGFloat height;
@@ -272,9 +219,6 @@ static const CGFloat kPairTighten = 2, kPairGap = 4, kPartGap = 6;
 @implementation SGRKaraokeLayout
 @end
 
-// A run of words set in rows as wide as the page: where each goes along its row, which row, and where
-// it sits along the sweep, the rows laid end to end. A joined word follows the one before it flush:
-// the scripts that do not space their words would otherwise read with a gap between every syllable.
 typedef struct {
     CGFloat x, width, offset;
     NSUInteger row;
@@ -299,10 +243,6 @@ static NSUInteger flow(NSArray<SGKaraokeWord *> *words, UIFont *font, CGFloat wi
     return words.count ? row + 1 : 0;
 }
 
-// Written right to left, rows are laid out left to right and turned around, so the first word is at
-// the right edge and each row runs leftwards from it. Then each group of rows goes against the line's
-// edge, a second voice's against the far one, as Apple Music sets the two sides of a duet apart; a
-// group too wide to fit stays where its first word put it.
 static void settle(CGRect *frames, NSUInteger *groups, NSUInteger count, NSUInteger groupCount, CGFloat width, BOOL rightToLeft, BOOL right) {
     if (rightToLeft) {
         for (NSUInteger i = 0; i < count; i++) frames[i].origin.x = width - CGRectGetMaxX(frames[i]);
@@ -357,9 +297,6 @@ static CGFloat layRun(NSArray<SGKaraokeWord *> *words, UIFont *font, CGFloat wid
     return top + (rows ? rows - 1 : 0) * row + high;
 }
 
-// Two texts of words where the second spells out the first, or the first the second: each row of the
-// leading one with the other's words under it, each under the word it starts with, as Apple Music sets
-// its pronunciation, so a syllable reads under the syllable it sounds. Returns where the pair ends.
 static CGFloat layPair(NSArray<SGKaraokeWord *> *lead, UIFont *leadFont, NSArray<SGKaraokeWord *> *under, UIFont *underFont,
                        CGFloat width, BOOL right, CGFloat top, NSArray<NSValue *> **leadFrames, NSArray<NSNumber *> **leadOffsets,
                        NSArray<NSValue *> **underFrames, NSArray<NSNumber *> **underOffsets) {
@@ -387,10 +324,6 @@ static CGFloat layPair(NSArray<SGKaraokeWord *> *lead, UIFont *leadFont, NSArray
             groups[i] = r;
         }
         bottom = y + leadHigh;
-        // Under the row, each word at the start of its own, pushed along past the one before it, and the
-        // pieces of one word flush together, the way the row above has them. A row spelt out wider than
-        // it is written, as Korean is, cannot keep to its words and still fit: it is set as plain words
-        // from the edge instead, in as many rows as it takes.
         NSUInteger from = j, until = j;
         while (until < unders && places[matched[until]].row == r) until++;
         CGFloat underTop = y + leadHigh - kPairTighten, reached = 0;
@@ -435,9 +368,6 @@ static CGFloat layPair(NSArray<SGKaraokeWord *> *lead, UIFont *leadFont, NSArray
     return bottom;
 }
 
-// The texts a line has, in the style's order, the lyrics and their pronunciation set as a pair where
-// the order has them side by side, and the backing row after the lyrics. `right` is the side a backing
-// row keeps to, its line's; -1 for a line of its own, which takes its side from its voice and script.
 static SGRKaraokeLayout *layOut(SGKaraokeLine *line, CGFloat width, SGRKaraokeStyle *style, NSInteger right) {
     SGRKaraokeLayout *layout = [SGRKaraokeLayout new];
     layout.right = right >= 0 ? right : alignsRight(line);
@@ -496,9 +426,6 @@ static SGRKaraokeLayout *layOut(SGKaraokeLine *line, CGFloat width, SGRKaraokeSt
     return layout;
 }
 
-// Where each line starts in the stack, from the heights alone. Measuring text is safe off the main
-// thread, and a song's worth of it is kept off it: the first card of a track lays out while the
-// player is opening, and a frame that measured every line then was a frame the animation lost.
 static NSArray<NSNumber *> *topsOf(NSArray<SGKaraokeLine *> *lines, CGFloat width, SGRKaraokeStyle *style, CGFloat gap) {
     NSMutableArray<NSNumber *> *tops = [NSMutableArray arrayWithCapacity:lines.count];
     CGFloat top = 0;
@@ -515,8 +442,6 @@ typedef struct {
     double ms, x, slope;
 } SGSweepKnot;
 
-// One run of words lit by one sweep: a line's own, or its pronunciation's, each timed by its own words.
-// A whole one lights every word of the run at once from `start`, for a run whose words are not timed.
 @interface SGRKaraokeSweep : NSObject
 @property (nonatomic, readonly) NSArray<SGRKaraokeWordView *> *words;
 - (instancetype)initWithWords:(NSArray<SGRKaraokeWordView *> *)words wholeFrom:(double)start;
@@ -554,8 +479,6 @@ static double secant(SGSweepKnot *knots, NSUInteger i) {
     return (knots[i + 1].x - knots[i].x) / (knots[i + 1].ms - knots[i].ms);
 }
 
-// The fill cursor reaches each word's left edge as the word starts and clears the last word as it
-// ends, on a monotone cubic through those points, so the pace changes between words without a kink.
 - (void)buildSweep {
     _knots = calloc(_words.count + 1, sizeof(SGSweepKnot));
     if (!_words.count) return;
@@ -610,13 +533,9 @@ static double secant(SGSweepKnot *knots, NSUInteger i) {
 
 @interface SGRKaraokeLineView : UIView
 @property (nonatomic, readonly) SGKaraokeLine *line;
-// Laid against the right edge: a line written right to left, or a second voice's written left to
-// right. A backing row keeps to the edge of the line it hangs under, whatever script each is in.
 @property (nonatomic, readonly) BOOL right;
 @property (nonatomic) BOOL active;
 @property (nonatomic) CGFloat blur;
-// under: the line a backing row hangs under, nil for a line of its own. sweepsEstimates: the words of a
-// line timed only by the line are swept on their estimated times, rather than lit whole.
 - (instancetype)initWithLine:(SGKaraokeLine *)line width:(CGFloat)width style:(SGRKaraokeStyle *)style under:(SGRKaraokeLineView *)under
                      blurred:(BOOL)blurred sweepsEstimates:(BOOL)sweepsEstimates;
 - (void)showTime:(double)ms;
@@ -641,8 +560,6 @@ static const CGFloat kTranslationLit = 0.6;
     SGRKaraokeLineView *_backing;
 }
 
-// A sweep's word views, each put where the layout has it and told where it sits along the sweep.
-// start: NAN for words timed one by one, else when the run lights up whole.
 - (SGRKaraokeSweep *)sweepOf:(NSArray<SGKaraokeWord *> *)words font:(UIFont *)font frames:(NSArray<NSValue *> *)frames
                      offsets:(NSArray<NSNumber *> *)offsets wholeFrom:(double)start {
     if (!words.count || frames.count != words.count) return nil;
@@ -659,8 +576,6 @@ static const CGFloat kTranslationLit = 0.6;
     return [[SGRKaraokeSweep alloc] initWithWords:views wholeFrom:start];
 }
 
-// When a run of the line lights up whole, or NAN to sweep it: only words the source timed are swept,
-// unless the estimate is asked for.
 static double wholeFrom(SGKaraokeLine *run, BOOL sweepsEstimates) {
     if (run.timing == SGKaraokeTimingWords || (run.timing == SGKaraokeTimingLine && sweepsEstimates)) return NAN;
     return run.start;
@@ -759,8 +674,6 @@ static const NSUInteger kLinesPerFrame = 4;
                          animations:^{ for (SGRKaraokeWordView *word in whole) word.lit.alpha = 1; } completion:nil];
         return;
     }
-    // A sung line fades back to dim rather than dropping its fill at once, and its words sink back
-    // on a spring slow enough to still be seen doing it.
     [UIView animateWithDuration:0.9 delay:0 usingSpringWithDamping:1 initialSpringVelocity:0
                         options:UIViewAnimationOptionAllowUserInteraction
                      animations:^{
@@ -857,14 +770,6 @@ static const NSUInteger kLinesPerFrame = 4;
 
 #pragma mark - a break
 
-// Three dots in place of the lines through an instrumental break, the way Apple Music keeps a long
-// pause from reading as lyrics gone missing: they come in as the break begins, breathe while it
-// lasts, fill one after another over its length and swell and go as the next line comes up.
-//
-// All of it is one Core Animation timeline the length of the break, on a layer whose clock is laid
-// against the song's: set once as the break opens and again only when the song jumps, stops or
-// starts, so the frames in between cost the page nothing. The view itself is moved by the page like
-// a line, so the clock is a layer inside it, where a stopped clock cannot stop that move too.
 @interface SGRKaraokeBreakView : UIView
 @property (nonatomic) BOOL right;         // against the right edge, where the line after it is
 @property (nonatomic) BOOL rightToLeft;   // filling from the right, the way the line after it reads
@@ -873,12 +778,8 @@ static const NSUInteger kLinesPerFrame = 4;
 - (void)showTime:(double)ms running:(BOOL)running at:(CFTimeInterval)shown;
 @end
 
-// Local time on the dots' clock is this far into the break plus this, so no animation begins at 0,
-// which Core Animation reads as "now".
 static const CFTimeInterval kBreakEpoch = 1;
 
-// The rate the page's display link asks for, asked for here too: an animation that settles for less
-// could hold the player's own 120 Hz animations down, as a link asking for 60 once did.
 static void atFullRate(CAAnimation *animation) {
     animation.preferredFrameRateRange = CAFrameRateRangeMake(80, 120, 120);
 }
@@ -941,8 +842,6 @@ static double smoothstep(double p) {
     [self setNeedsLayout];
 }
 
-// The break's whole run, sampled the way the numbers above describe it: densely where the dots come
-// and go, every fifth of a second through the slow breath between.
 - (void)playFrom:(NSInteger)start to:(NSInteger)end {
     _start = start;
     [_group removeAllAnimations];
@@ -1050,9 +949,6 @@ typedef struct {
     NSUInteger _sightArrangement;
     NSUInteger _build;   // counts the songs and widths measured, so a measurement that is late is dropped
     UIFont *_font;
-    // What is sung now. Most of the time one line, the one at the anchor; where voices overlap, every
-    // line being sung, the stack arranged around the one that began first; through a break, none,
-    // and the dots at the anchor with the line after them just below.
     SGRKaraokeSpan *_spans;
     SGRKaraokeBreak *_breaks;
     NSUInteger _breakCount;
@@ -1123,16 +1019,11 @@ typedef struct {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionEndedNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(restyle) name:SGRLyricsTextDidChangeNotification object:nil];
-    // A locked phone leaves the card in its window, so the link has to be put down by the app going
-    // away rather than by the view going: see scheduleLink.
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(scheduleLink) name:UIApplicationDidBecomeActiveNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(scheduleLink) name:UIApplicationWillResignActiveNotification object:nil];
     return self;
 }
 
-// The small preview under the player's cover: one line, the one being sung, without the credit, the
-// pronunciation and translation button or their meanings, with nothing to scroll and no touches, so a
-// tap on the preview is still Spotify's to take. The font follows the room the player gives it.
 - (void)useCompactFontSize:(CGFloat)size {
     if (!_compact) {
         _compact = YES;
@@ -1213,8 +1104,6 @@ typedef struct {
 
 #pragma mark - scrolling by hand
 
-// Lines are placed for a content offset of 0, so following the song means scrolling back to 0.
-// While the user browses, placement stands still and every line is sharp.
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(followSong) object:nil];
     _browsing = YES;
@@ -1253,17 +1142,6 @@ typedef struct {
     [self scheduleLink];
 }
 
-// The player opens and closes in animations that run at 120 Hz, and while a display link asked
-// for 30 to 60, the range Apple's ProMotion guide says Core Animation gives priority to, those
-// animations ran rough; the player and the lyrics themselves were smooth throughout. The card's
-// link now asks for 60 but takes 120, and is put down for as long as the player animates, which
-// NowPlayingBar.x announces as each animation starts and again as it ends. The timer is for an end
-// that is never announced.
-//
-// The link is also put down whenever the app is not in front. Spotify keeps playing there, and a
-// phone locked on the player kept the card ticking at 120 Hz against a screen that was off: 117 of
-// the 137 wake ups a second the mod cost over stock Spotify were this one link, measured with
-// scripts/battery-probe.sh. Nothing of the card is seen from the background, so nothing is drawn.
 - (void)scheduleLink {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(startLink) object:nil];
     [_link invalidate];
@@ -1286,13 +1164,6 @@ typedef struct {
     [self scheduleLink];
 }
 
-// The mask sits in the scroll view's own coordinates, which move with the content as it scrolls, so
-// it is put back over the visible part on every frame, where the presentation layer says the
-// content is: that holds through a drag and through the animated scroll home alike. Left where
-// layout put it, it covered the first screenful of lines only, and a scroll past them showed nothing.
-//
-// It covers the lines' room alone, and while that grows or shrinks it is moved on every frame too, so
-// its edges travel with the room instead of jumping to where it ends up.
 - (void)alignFade {
     CALayer *shown = (CALayer *)_scroll.layer.presentationLayer ?: _scroll.layer;
     UIEdgeInsets band = [self shownBand];
@@ -1326,8 +1197,6 @@ typedef struct {
     return _band;
 }
 
-// The lines spring to the anchor of the new room the way they move on to a new line, the ones further
-// down a beat later, while the fade's edges and the credit travel over `duration`.
 - (void)setLineInsets:(UIEdgeInsets)insets duration:(NSTimeInterval)duration {
     if (UIEdgeInsetsEqualToEdgeInsets(insets, _band)) return;
     BOOL animated = duration > 0 && self.window && !SGRReduceMotion();
@@ -1368,8 +1237,6 @@ typedef struct {
     [self forgetSung];
 }
 
-// Nothing sung, no break open: the state a song starts from, before the clock places it. The dots
-// are made again for the next, in case it is laid out in another font.
 - (void)forgetSung {
     _sungCount = 0;
     _focus = _openBreak = -1;
@@ -1401,8 +1268,6 @@ typedef struct {
     [self askMeanings];
 }
 
-// Measures the song for the width and, once that is in, places it; Spotify's own lines stay in view
-// until then, since the page shows nothing of its own before it has lines to show.
 - (void)rebuild {
     [self dropLineViews];
     _browsing = NO;
@@ -1437,9 +1302,6 @@ typedef struct {
                                      translation:_hasTranslation && SGFlag(SGRKeyLyricsTranslation, NO)];
 }
 
-// A switch of the menu or the Lyrics page's order: the song is measured again in the new style off
-// the main thread, as for a new width, but the lines on the page stay until it is in, and then the
-// new ones crossfade over them where they were, so nothing blinks and nothing is lost of the place.
 - (void)restyle {
     [self offerExtras];
     if (!_lines || !_tops || _builtWidth <= 0) return;   // the next build picks the style up
@@ -1468,14 +1330,10 @@ typedef struct {
     _sightArrangement = NSUIntegerMax;
     [self placeLinesAnimated:NO];
     [self showLinesInSight];   // placing stands still while the page is scrolled by hand; the views do not
-    // The new views come in as the old ones were: the lines being sung lit, and every blur where it
-    // was rather than easing in from sharp, which a view made out of sight does unseen.
     for (NSUInteger i = 0; i < _sungCount; i++) [self viewForLine:_sung[i]].active = YES;
     for (SGRKaraokeLineView *view in _shown.allValues) [view.layer removeAnimationForKey:@"blur"];
 }
 
-// The button shows only for a song with a pronunciation or a translation to show, and its menu only
-// what the song has: a switch for each, reading what tapping it will do.
 - (void)offerExtras {
     if (_compact) {   // the preview has no room for the button, and nothing to open
         _extras.hidden = YES;
@@ -1489,8 +1347,6 @@ typedef struct {
     if (!_extras) {
         UIImage *glyph = [UIImage systemImageNamed:@"translate" withConfiguration:
                           [UIImageSymbolConfiguration configurationWithPointSize:kExtrasGlyph weight:UIImageSymbolWeightSemibold]];
-        // The system's glass, which turns solid under Reduce Transparency by itself; before iOS 26, the
-        // Kit's solid fill in its place.
         UIButtonConfiguration *config;
         if (@available(iOS 26.0, *)) {
             config = [UIButtonConfiguration glassButtonConfiguration];
@@ -1526,8 +1382,6 @@ typedef struct {
     [self setNeedsLayout];
 }
 
-// Where a line starts on the page, for the stack as it is arranged now: an open break holds the room
-// of one row at the anchor, and the lines from the one after it on are moved down by it.
 - (CGFloat)topOfLine:(NSInteger)index {
     CGFloat room = self.bounds.size.height - _band.top - _band.bottom;
     CGFloat top = _band.top + room * kAnchor + _tops[index].doubleValue - _focusTop;
@@ -1545,9 +1399,6 @@ typedef struct {
     return NO;
 }
 
-// How many lines away from what is sung a line is, which is what dims, shrinks and blurs it: from the
-// nearest line being sung, from an open break as if it were a line of its own, and before the first
-// line from the line before it, as ever.
 - (NSInteger)distanceOf:(NSInteger)index {
     if (_plain) return 0;   // nothing is sung, so every line reads as clearly as the rest
     if (_openBreak >= 0) return index >= _openBreak ? index - _openBreak + 1 : _openBreak - index;
@@ -1571,10 +1422,6 @@ typedef struct {
     return view;
 }
 
-// Views for the lines just outside the visible part as well as in it, wherever that is: around the
-// sung line while following the song, around wherever the page has been scrolled to while browsing.
-// The ones further off are let go, so a long song costs a couple of dozen line views rather than
-// one for every line, and the lines in sight are the only ones the compositor has to draw.
 - (void)showLinesInSight {
     if (!_tops.count) return;
     CGFloat offset = ((CALayer *)_scroll.layer.presentationLayer ?: _scroll.layer).bounds.origin.y;
@@ -1604,8 +1451,6 @@ typedef struct {
         if (bottom < from || top > to) continue;
         [wanted addObject:@(index)];
     }
-    // A few a frame, the nearest the middle of the visible part first, so a page scrolled by hand
-    // fills in what is in view before what is not; the next frame picks up where this one left off.
     CGFloat middle = seen + height / 2;
     [wanted sortUsingComparator:^NSComparisonResult(NSNumber *a, NSNumber *b) {
         CGFloat da = fabs([self topOfLine:a.integerValue] - middle), db = fabs([self topOfLine:b.integerValue] - middle);
@@ -1621,8 +1466,6 @@ typedef struct {
     }
 }
 
-// One line's place in the stack: the anchor sits on the edge its text is aligned to, so it scales
-// toward its own text, and it dims and blurs with its distance from what is sung.
 - (void)placeLine:(SGRKaraokeLineView *)view at:(NSInteger)index animated:(BOOL)animated {
     CGFloat height = self.bounds.size.height;
     NSInteger distance = [self distanceOf:index], below = index - _focus;
@@ -1647,9 +1490,6 @@ typedef struct {
     } completion:nil];
 }
 
-// The sung line rests at the anchor and the rest stack around it; lines below it follow a beat
-// later, the further down the later, as Apple Music's do. A line sung over it stays where it is
-// below, lit; the stack moves on to it once the line at the anchor is sung out.
 - (void)placeLinesAnimated:(BOOL)animated {
     if (_browsing || !_tops.count) return;
     _focusTop = _tops[(NSUInteger)MAX(_focus, 0)].doubleValue;
@@ -1661,8 +1501,6 @@ typedef struct {
     _scroll.contentInset = UIEdgeInsetsMake(_focusTop, 0, MAX(0, lastTop - _focusTop), 0);
 }
 
-// The dots, at the anchor for as long as a break is open, against the edge the line after it is on.
-// They are only ever where they belong: they come and go by their own timeline, not by moving.
 - (void)placeBreak {
     if (_openBreak < 0) {
         [_dots removeFromSuperview];
@@ -1709,9 +1547,6 @@ typedef struct {
     }
 }
 
-// The player's position run on by the frame times the display will show and eased toward each new
-// reading, so the sweep follows neither the callback's jitter nor the small jumps of the core's
-// corrections. A seek or a new track is too far off to ease and is taken at once.
 - (double)clockMs {
     NSInteger raw = SGKaraokePositionMs();
     CFTimeInterval shown = _link.targetTimestamp;
@@ -1752,8 +1587,6 @@ typedef struct {
         [self timeLines];
         [self setNeedsLayout];
     }
-    // The preview has no clock of its own for words: with nothing timed there is no line to sweep, and
-    // Spotify's own reading is left in its place.
     [self setShowing:_tops != nil && !(_compact && _plain)];
     // The source is settled a moment after the lines are, so it is asked for until it answers.
     if (_crediting && _lines && !_credit.text.length) [self creditTo:SGLyricsCreditFor(track)];
@@ -1792,10 +1625,6 @@ typedef struct {
     if (_dots.superview) [_dots showTime:now running:!_stillSince || _link.targetTimestamp - _stillSince < kStillFor at:_link.targetTimestamp];
 }
 
-// What is sung at `now`: each line from its start until it is sung out, so two voices over each
-// other are both lit, and the last line begun on through the pause after it, as Apple Music keeps a
-// line lit until the next one comes. A pause that is a break is the dots' instead, until the moment
-// before its end when the line after it moves up to the anchor, sharp but not yet lit.
 - (NSUInteger)sungAt:(double)now into:(NSInteger *)sung focus:(NSInteger *)focus openBreak:(NSInteger *)openBreak {
     NSInteger count = (NSInteger)_lines.count, last = -1;
     while (last + 1 < count && _spans[last + 1].start <= now) last++;

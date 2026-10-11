@@ -13,9 +13,6 @@ typedef struct {
     int input, output, response;
 } Route;
 
-// One partition size: the responses' spectra, the inputs' spectra of as many partitions back, and what
-// is being summed for each output. Split complex, packed as vDSP's real FFT packs them (bin 0 holds the DC
-// and the Nyquist bins).
 typedef struct {
     int size, log2n, partitions;
     float *responseRe[4], *responseIm[4];
@@ -58,8 +55,6 @@ static bool makeLevel(Level *level, FFTSetup setup, int size, const float *const
         ok = (level->historyRe[c] = zeroed(floats)) && (level->historyIm[c] = zeroed(floats)) && (level->window[c] = zeroed(2 * size))
              && (level->sumRe[c] = zeroed(size)) && (level->sumIm[c] = zeroed(size));
     }
-    // A response's partitions transformed once, scaled so that the inverse transform of their products is
-    // the convolution itself (vDSP's forward transform doubles, its inverse multiplies by the length).
     float scale = 1.0f / (8.0f * size);
     for (int r = 0; r < count && ok; r++) {
         ok = (level->responseRe[r] = malloc(floats * sizeof(float))) && (level->responseIm[r] = malloc(floats * sizeof(float)));
@@ -194,8 +189,6 @@ void SGDSPConvolverProcess(SGDSPConvolver *convolver, float *left, float *right)
             vDSP_vadd(convolver->output[c], 1, convolver->tailOutput[convolver->reading][c] + phase * kBlock, 1, convolver->output[c], 1, kBlock);
         }
         if (phase == kSpread - 1) {
-            // A tail partition of input is complete: the sum for the one before it is finished and becomes the
-            // next kSpread blocks' output, and this one's spectrum starts a new sum.
             int next = 1 - convolver->reading;
             for (int c = 0; c < 2; c++) {
                 if (convolver->pending) {

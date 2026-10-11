@@ -1,10 +1,3 @@
-// Spicy Lyrics, the source behind the Spicetify extension of the same name (spicylyrics.org). Like
-// Musixmatch it is asked by Spotify's own track id rather than by name, so it never answers with a
-// live cut of the song by mistake; unlike Musixmatch, what it has is Apple Music's syllable timing,
-// down to the backing vocals and the two sides of a duet.
-//
-// Its Developer Platform API returns the best sync from its catalogue and names the provider it
-// chose. The user supplies a publishable client key; it is kept in Keychain, never in preferences.
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
@@ -83,10 +76,6 @@ SGModRow *SGSpicyLyricsAPIKeyRow(void) {
 
 #pragma mark - the packed shape
 
-// Legacy packed replies use [values, stream]: every distinct string, number, boolean and null in the document, and
-// a stream of integers rebuilding it. A number at or above zero is an index into the values; below
-// zero it opens a structure. Straight from the extension's own packer, which is the only writer of
-// this shape there is.
 typedef NS_ENUM(NSInteger, SGSpicyOp) {
     SGSpicyOpObject = -1,        // key count, that many key indexes, then that many values
     SGSpicyOpArray = -2,         // item count, then that many values
@@ -96,8 +85,6 @@ typedef NS_ENUM(NSInteger, SGSpicyOp) {
     SGSpicyOpEmptyObject = -6,
 };
 
-// Deep enough for any lyrics document and shallow enough that a malformed reply cannot run the
-// stack out: the shape below nests six levels, not sixty.
 static const NSUInteger kMaxDepth = 64;
 
 @interface SGSpicyReader : NSObject {
@@ -149,8 +136,6 @@ static id decode(SGSpicyReader *reader, NSUInteger depth) {
     NSInteger op = nextNumber(reader);
     if (reader->bad) return nil;
     if (op >= 0) return valueAt(reader, op);
-    // A count is read before anything is built with it, so a reply claiming a million keys cannot
-    // have a million slots reserved for it before the stream is found to be shorter than that.
     NSInteger count = op == SGSpicyOpObject || op == SGSpicyOpArray || op == SGSpicyOpRows ? nextNumber(reader) : 0;
     if (reader->bad || count < 0 || (NSUInteger)count > reader->stream.count) {
         reader->bad = YES;
@@ -218,8 +203,6 @@ static id decode(SGSpicyReader *reader, NSUInteger depth) {
 }
 
 static id unpack(id packed) {
-    // Should the server ever answer a caller of ours with the document itself, it is already what
-    // the rest of this file wants.
     if ([packed isKindOfClass:NSDictionary.class]) return packed;
     if (![packed isKindOfClass:NSArray.class] || [packed count] != 2) return nil;
     id values = packed[0], stream = packed[1];
@@ -252,9 +235,6 @@ static NSArray *arrayIn(id value) {
     return [value isKindOfClass:NSArray.class] ? value : nil;
 }
 
-// One voice's syllables as words. A syllable is a piece of a word — the API marks the ones that run
-// into the next with IsPartOfWord, which is the same thing the mod calls a word being joined to the
-// one before it, read from the other end.
 static NSArray<SGKaraokeWord *> *wordsFrom(NSArray *syllables) {
     NSMutableArray<SGKaraokeWord *> *words = [NSMutableArray array];
     BOOL joinToPrevious = NO;
@@ -297,16 +277,12 @@ static NSArray<SGKaraokeLine *> *linesFromSyllables(NSArray *content) {
         if (!lead) continue;
         SGKaraokeLine *line = lineFrom(wordsFrom(arrayIn(lead[@"Syllables"])), lead[@"StartTime"], lead[@"EndTime"]);
         if (!line) continue;
-        // The (oh, aye) sung under the line. The API keeps it in groups, one per run of it; the page
-        // has one backing line under each line, so the runs read on as one.
         NSMutableArray<SGKaraokeWord *> *backing = [NSMutableArray array];
         for (id rawGroup in arrayIn(vocal[@"Background"]) ?: @[]) {
             NSDictionary *group = dictionaryIn(rawGroup);
             if (group) [backing addObjectsFromArray:wordsFrom(arrayIn(group[@"Syllables"]))];
         }
         line.backing = lineFrom(backing, nil, nil);
-        // The far side of a duet. The API says outright which lines belong to the second voice, so
-        // unlike TTML there are no voices here to work an alignment out from.
         if ([vocal[@"OppositeAligned"] boolValue] || [lead[@"OppositeAligned"] boolValue]) {
             line.align = SGKaraokeAlignTrailing;
         }
@@ -315,8 +291,6 @@ static NSArray<SGKaraokeLine *> *linesFromSyllables(NSArray *content) {
     return lines.count ? lines : nil;
 }
 
-// Content: [ { Type: "Vocal", Text, StartTime, EndTime } ] — timed by the line, the words inside it
-// left to the mod's own estimate, as Spotify's own lines and LRCLIB's are.
 static NSArray<SGKaraokeLine *> *linesFromLines(NSArray *content) {
     NSMutableArray<NSNumber *> *starts = [NSMutableArray array];
     NSMutableArray<NSString *> *texts = [NSMutableArray array];
@@ -330,8 +304,6 @@ static NSArray<SGKaraokeLine *> *linesFromLines(NSArray *content) {
     return SGKaraokeEstimatedLines(starts, texts);
 }
 
-// What the server actually sent, named rather than quoted: the field names and counts, never the
-// words. For telling a document that has no timing from one whose timing we failed to read.
 static NSString *shapeOf(NSDictionary *document) {
     NSMutableString *shape = [NSMutableString stringWithFormat:@"Type=%@ keys=[%@]",
                               document[@"Type"], [document.allKeys componentsJoinedByString:@" "]];
@@ -346,8 +318,6 @@ static NSString *shapeOf(NSDictionary *document) {
     if (syllable) [shape appendFormat:@" Syllable[0]=[%@]", [syllable.allKeys componentsJoinedByString:@" "]];
     NSArray *staticLines = arrayIn(document[@"Lines"]);
     if (staticLines) [shape appendFormat:@" Lines=%lu", (unsigned long)staticLines.count];
-    // Whose words these are, where the document says so: a static reply is text Spicy is passing on
-    // from somewhere else, and its name tells us why it came without timing.
     if (document[@"source"]) [shape appendFormat:@" source=%@", document[@"source"]];
     NSDictionary *staticLine = dictionaryIn(staticLines.firstObject);
     if (staticLine) [shape appendFormat:@" Lines[0]=[%@]", [staticLine.allKeys componentsJoinedByString:@" "]];
@@ -356,8 +326,6 @@ static NSString *shapeOf(NSDictionary *document) {
 
 #pragma mark - the source
 
-// Uses the official Developer Platform API and a user-supplied publishable key. Secret keys never
-// ship in this client; the API's native-client no-Origin option must be enabled for the key.
 SGLyricsAsk SGSpicyLyricsAsk = ^(SGLyricsQuery *query, void (^done)(SGLyricsResult *result)) {
     NSString *key = SGSpicyLyricsAPIKey();
     if (!query.trackID.length || !key.length) {
@@ -398,8 +366,6 @@ SGLyricsAsk SGSpicyLyricsAsk = ^(SGLyricsQuery *query, void (^done)(SGLyricsResu
             result.starts = starts;
             result.texts = texts;
         } else if ([type isEqualToString:@"Static"]) {
-            // The words with nothing to time them by: the page shows them, and a source under this
-            // one in the order can still time them.
             NSMutableArray<NSNumber *> *starts = [NSMutableArray array];
             NSMutableArray<NSString *> *texts = [NSMutableArray array];
             for (id raw in arrayIn(document[@"Lines"]) ?: @[]) {

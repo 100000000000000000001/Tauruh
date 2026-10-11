@@ -1,5 +1,3 @@
-// One immutable playback generation. Create/retire off the audio thread, after its users stop.
-// The render endpoint owns the timeline; the worker only exchanges stamped PCM packets.
 #pragma once
 #include "Shared/Sing/SGSingTimeline.h"
 
@@ -17,8 +15,6 @@ void SGSingStreamDestroy(SGSingStream *stream);
 void SGSingStreamPause(SGSingStream *stream, bool paused);
 void SGSingStreamBypass(SGSingStream *stream);
 void SGSingStreamSetLevel(SGSingStream *stream, float level);
-// Disable before attaching a cold model; enable once Ready. The render owner seeds the worker
-// from retained live PCM, so a slow model load cannot fill an unused input queue.
 void SGSingStreamSetModelReady(SGSingStream *stream, bool ready);
 SGSingTimelineState SGSingStreamState(const SGSingStream *stream);
 uint64_t SGSingStreamPresented(const SGSingStream *stream);
@@ -34,7 +30,5 @@ int32_t SGSingStreamRender(SGSingStream *stream, uint32_t frames, float *stereo,
                           SGSingSourceRead source, void *context, uint32_t available);
 // Worker endpoint. Input holds SGSingStreamPacketFrames stereo frames; output holds one completed hop.
 bool SGSingStreamReadInput(SGSingStream *stream, SGAudioStamp *stamp, float *stereo);
-// The production worker starts at the first still-audible source frame after model loading.
-// Only the initial expired prefix is skipped; subsequent packets must remain consecutive.
 bool SGSingStreamReadLiveInput(SGSingStream *stream, SGAudioStamp *stamp, float *stereo);
 bool SGSingStreamWriteVocals(SGSingStream *stream, SGAudioStamp stamp, const float *stereo);

@@ -1,6 +1,3 @@
-// Player redesign: the player never scrolls up. Scrolling stays on because Spotify's dismiss pull rides on
-// the list's own pan and starts only at its top, so the offset is clamped instead; the insets stay
-// Spotify's, since changing one mid-drag moves the offset under the finger.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 

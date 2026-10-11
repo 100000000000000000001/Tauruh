@@ -1,9 +1,3 @@
-// A double tap on the player, read against the grid Settings draws: the recognizer, what each cell does
-// and the playback controller it does it with. Which view of the player it goes on is each look's own
-// hookup (Native/Player/PlayerGestures.x, Redesigned/Player/PlayerGestures.x), which call SGGestureAttach.
-//
-// The player already answers a sideways swipe with the next track and a vertical drag with the
-// cards below, which leaves the double tap as the one gesture free to take.
 #import "Core/SGCore.h"
 #import "Gestures.h"
 #import "Headers/SPTNowPlayingPlaybackController.h"
@@ -13,8 +7,6 @@
 static __weak SPTNowPlayingPlaybackControllerImplementation *sg_player;
 static void (^sg_observer)(SGGestureAction action);
 
-// The now playing screen's model for liking, captured below: the only object Spotify gives that
-// knows how to put the song into Liked Songs. Absent until that screen has been built once.
 static __weak id sg_auxModel;
 
 void SGGestureSetObserver(void (^observer)(SGGestureAction action)) {
@@ -23,8 +15,6 @@ void SGGestureSetObserver(void (^observer)(SGGestureAction action)) {
 
 #pragma mark - what a cell does
 
-// The two sides of Like that Spotify's model answers to; the model is not part of any header the mod
-// carries, so it is called through these. The track is asked whether it can be liked at all.
 @protocol SGAuxActions <NSObject>
 - (void)addToCollection;
 - (BOOL)isInCollection;
@@ -92,11 +82,7 @@ void SGPerformGestureAction(SGGestureAction action) {
 @implementation SGGestureTarget
 
 - (void)doubleTapped:(UITapGestureRecognizer *)tap {
-    // The recognizer outlives the switch: it stays on the player once attached, so the switch is
-    // read here as well and the gesture stops the moment it goes off.
     if (!SGFlag(SGKeyGestures, NO)) return;
-    // The host is the queue scrolled sideways, so a tap lands in content coordinates a few million
-    // points out; its bounds origin is that scroll, and taking it off gives the point on screen.
     UIView *host = tap.view;
     CGRect visible = host.bounds;
     CGPoint point = [tap locationInView:host];
@@ -117,8 +103,6 @@ static SGGestureTarget *target(void) {
     return shared;
 }
 
-// Spotify's own single tap on the player scrolls it to the cards below, and would fire on the first
-// of a pair as well; every one above the artwork is asked to wait for the double tap to miss.
 static void yieldSingleTaps(UIView *host, UITapGestureRecognizer *tap) {
     for (UIView *view = host; view; view = view.superview) {
         for (UIGestureRecognizer *other in view.gestureRecognizers) {
@@ -131,8 +115,6 @@ static void yieldSingleTaps(UIView *host, UITapGestureRecognizer *tap) {
 
 static char kTapKey, kSeenKey;
 
-// Spotify adds its own recognizers as the player's controllers load, which is not ordered against
-// this hook: the count of what stands above the artwork is watched so a later one still yields.
 static NSUInteger tapsAbove(UIView *host) {
     NSUInteger count = 0;
     for (UIView *view = host; view; view = view.superview) count += view.gestureRecognizers.count;
@@ -165,8 +147,6 @@ void SGGestureAttach(UIView *host) {
 }
 %end
 
-// The now playing screen's own model is built with the screen; held weak so its going away is not
-// kept alive, and so the Like action simply does nothing while there is none.
 %hook SPTNowPlayingAuxiliaryActionsModel
 - (id)initWithCollectionPlatform:(id)collectionPlatform testManager:(id)testManager statefulPlayer:(id)statefulPlayer yourEpisodesSaveManager:(id)saveManager curationPlatform:(id)curationPlatform smartShuffleHandler:(id)shuffleHandler playingTrackProvider:(id)provider {
     id model = %orig;
@@ -175,9 +155,6 @@ void SGGestureAttach(UIView *host) {
 }
 %end
 
-// A single tap on the cover is Spotify's way into the tilt mode, the artwork alone in 3D. That is
-// the half of a double tap that misses, so while the zones are on it would open on the way to every
-// gesture; the tap goes back to Spotify with the switch.
 %ctor {
     %init;
     SGRequireClasses(@[@"SPTNowPlayingPlaybackControllerImplementation"]);

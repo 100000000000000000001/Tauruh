@@ -1,5 +1,3 @@
-// The header's text and controls, the redesign's own. Laid out top down from where the content has to start
-// for its bottom to sit SGRHeaderInfoBottom above the view's.
 #import "Core/SGCore.h"
 #import "SGRHeaderInfo.h"
 #import "SGRActionRow.h"
@@ -52,8 +50,6 @@ static BOOL setText(UILabel *label, NSString *text) {
 
     _shuffle = [[SGRMirrorButton alloc] initWithFrame:CGRectZero];
     _shuffle.fallbackGlyph = [UIImage systemImageNamed:@"shuffle"];
-    // White like the buttons beside it while off -- Spotify's off grey read as a disabled button next to the
-    // white download (issue #65) -- and the accent while on, so its state still shows.
     _shuffle.glyphColor = SGRPrimary();
     _shuffle.onGlyphColor = SGRAccent();
     _play = [[SGRPlayCapsule alloc] initWithFrame:CGRectZero];
@@ -66,12 +62,8 @@ static BOOL setText(UILabel *label, NSString *text) {
     return self;
 }
 
-// Touches only for the buttons and, where there is one, the creator line: the rest of the text lets a
-// pull or a tap through to the page under it.
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
     UIView *hit = [super hitTest:point withEvent:event];
-    // The creator label is the width of the view, so the label itself answers a touch well away from the
-    // name; both it and the view answer only where the name is drawn.
     if (hit == self || hit == _creator) return [self sgr_creatorHit:point];
     return hit;
 }
@@ -86,9 +78,6 @@ static BOOL setText(UILabel *label, NSString *text) {
     return changed;
 }
 
-// The creator line, tappable. The label is as wide as the view and centred, so the target is narrowed to
-// the text itself -- a tap either side of a short name belongs to the page under it, which a pull down
-// starts on. Spotify's own control stays concealed where it is and only fires.
 - (void)showCreatorLink:(UIView *)control {
     _creatorLink = control;
     BOOL live = control != nil;
@@ -137,8 +126,6 @@ static BOOL setText(UILabel *label, NSString *text) {
         if (button.hidden == hide) continue;
         button.hidden = hide;
         changed = YES;
-        // One of Spotify's buttons that turns up after the page is on screen (save, on a playlist opened for
-        // the first time) fades in beside the others rather than popping in.
         if (!hide && self.window) {
             button.alpha = 0;
             SGRAnimate(SGRMotionFade, ^{ button.alpha = 1; }, nil);
@@ -182,8 +169,6 @@ static BOOL setText(UILabel *label, NSString *text) {
     }
     if (previous) y += kRowAbove;
 
-    // Play on the middle of the page, the other two hung off its sides, so it holds its place whether both
-    // are there or not.
     CGFloat side = SGRActionHeight;
     CGFloat playWidth = MAX(kPlayWidth, [_play sgr_width]);
     CGRect play = CGRectMake(round((width - playWidth) / 2), y, playWidth, side);

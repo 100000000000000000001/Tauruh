@@ -1,5 +1,3 @@
-// Spotify's own list look, for every page of the mod's: a 13pt white title over an 11pt grey
-// subtitle on #121212, 38pt uppercase section headers, green switches.
 #import <UIKit/UIKit.h>
 
 UIColor *SGGrey(void);

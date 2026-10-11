@@ -7,15 +7,10 @@
 @implementation SGKaraokeLine
 @end
 
-// A line is sung at about this pace and never takes longer than the gap to the next one. A slow
-// line gets at least 60 % of its gap, but not more than 1.8x the estimate, so a long instrumental
-// after it does not stretch its last word across the break.
 static const NSInteger kLineBaseMs = 350, kMsPerLetter = 75;
 static const double kMinGapShare = 0.6, kMaxStretch = 1.8;
 // Added to every word's letters, for the breath between words and so a one-letter word still shows.
 static const NSUInteger kWordWeight = 2;
-// A syllable of an unspaced script is one character but a whole beat, so it counts for this many
-// letters; without it a Japanese line reads as a handful of letters and its sweep finishes early.
 static const NSUInteger kSyllableLetters = 3;
 
 #pragma mark - the model
@@ -42,8 +37,6 @@ NSInteger SGKaraokeLeadLine(NSArray<SGKaraokeLine *> *lines, NSInteger ms) {
     return last;
 }
 
-// Japanese, Chinese and Korean, and the punctuation set with them. Kana and Hangul are listed as
-// well as the ideographs: a line of either is written without spaces just the same.
 static NSCharacterSet *unspacedScript(void) {
     static NSCharacterSet *set;
     static dispatch_once_t once;
@@ -100,9 +93,6 @@ static void appendPiece(NSMutableArray<SGKaraokeWord *> *pieces, NSString *text)
     [pieces addObject:word];
 }
 
-// The line split into what the sweep lights one at a time: words where the script spaces them, a
-// syllable at a time where it does not, so a Japanese line sweeps instead of lighting up whole.
-// Everything a token holds past its first piece is joined to the one before it.
 static NSArray<SGKaraokeWord *> *piecesOf(NSString *line) {
     NSMutableArray<SGKaraokeWord *> *pieces = [NSMutableArray array];
     for (NSString *token in [line componentsSeparatedByCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]) {
@@ -201,10 +191,6 @@ SGKaraokeTiming SGKaraokeLinesTiming(NSArray<SGKaraokeLine *> *lines) {
 
 #pragma mark - Spotify's own bodies
 
-// Lyrics { 1 data: { 1 time_synchronized, 2 repeated line: { 1 offset_ms, 2 content } }, 2 colors }
-// Not time_synchronized, the lines are plain text and their offsets all 0. The flag alone is not
-// trusted: Spotify's page body has come without it for lines its JSON calls LINE_SYNCED, so any
-// offset past 0 counts as timed too.
 static NSArray<SGKaraokeLine *> *fromProtobuf(NSData *body) {
     SGPBField *data = SGPBFirst(SGPBParse(body), 1);
     if (data.wire != 2) return nil;
@@ -223,8 +209,6 @@ static NSArray<SGKaraokeLine *> *fromProtobuf(NSData *body) {
     return synced ? SGKaraokeEstimatedLines(starts, texts) : SGKaraokeStaticLines(texts);
 }
 
-// { "lyrics": { "syncType": "LINE_SYNCED", "lines": [ { "startTimeMs": "1234", "words": "..." } ] } },
-// or "UNSYNCED" with every start 0.
 static NSArray<SGKaraokeLine *> *fromJSON(NSData *body) {
     NSDictionary *root = [NSJSONSerialization JSONObjectWithData:body options:0 error:nil];
     NSDictionary *lyrics = [root isKindOfClass:NSDictionary.class] ? root[@"lyrics"] : nil;

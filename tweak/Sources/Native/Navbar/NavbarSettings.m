@@ -3,8 +3,6 @@
 #import "Settings/SGPageStyle.h"
 #import "Navbar.h"
 
-// What "Add a tab" offers: URIs Spotify's own router resolves to a page of its own, each with the
-// name of the SPTEncoreIcon class method that draws its glyph.
 static NSArray<NSDictionary *> *tabPresets(void) {
     return @[
         @{SGNavbarTitle: @"Home", SGNavbarURI: @"spotify:home", SGNavbarIcon: @"home"},
@@ -27,8 +25,6 @@ static NSArray<NSDictionary *> *tabPresets(void) {
     ];
 }
 
-// The list the Navbar page edits: the saved order first, then every tab of Spotify's it does not
-// name, in Spotify's order. Entries for tabs Spotify no longer has drop out.
 static NSMutableArray<NSMutableDictionary *> *navbarEntries(void) {
     NSArray<NSString *> *stock = SGNavbarStock();
     NSMutableArray<NSMutableDictionary *> *entries = [NSMutableArray array];
@@ -47,8 +43,6 @@ static NSMutableArray<NSMutableDictionary *> *navbarEntries(void) {
     return entries;
 }
 
-// A tab of the mod's own carries an identity of its own, so the same page can sit on the bar twice
-// and renaming one does not shuffle the order.
 static void appendTab(NSDictionary *tab) {
     NSMutableDictionary *entry = [tab mutableCopy];
     entry[SGNavbarID] = NSUUID.UUID.UUIDString;
@@ -159,9 +153,6 @@ typedef NS_ENUM(NSInteger, SGNavbarSection) {
     SGNavbarSectionCount,
 };
 
-// The tabs, in the order the bar shows them: drag to reorder, tap to show or hide, swipe a tab of
-// your own away. Spotify's own tabs can only be hidden, never removed. Mod Settings and the welcome
-// tour show the same editor.
 @interface SGNavbarPage : SGPage
 @end
 

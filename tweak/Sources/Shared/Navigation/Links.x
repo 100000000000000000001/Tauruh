@@ -1,5 +1,3 @@
-// The dispatcher is a singleton the app builds at startup; -setMainUILoaded: is the last call of its
-// setup (objc-methods.txt:38809).
 #import "Core/SGCore.h"
 #import "Headers/SPTLinkDispatcherImplementation.h"
 #import "Links.h"
@@ -20,13 +18,6 @@ BOOL SGOpenSpotifyURI(NSURL *uri) {
 
 #pragma mark - asking before opening
 
-// The chain a spotify: link takes in 9.1.78, read off the binary: -[SPTLinkDispatcherImplementation
-// navigateToURI:…] hands it to the URI scheme dispatcher, whose "spotify" handler is the dispatcher's
-// -spotifyLinkHandler (SPTSpotifyLinkHandler). That one passes the cleaned URI to its
-// -URISubtypeRegistry (SPTURISubtypeRegistryImplementation), which keeps the handlers of its -handlers
-// hash table that answer -URISubtypeHandlerCanHandleURI: YES and opens with the first by priority;
-// pages go through Navigation's PageResolverURISubtypeHandler. With no taker, -handleSpotifyURL:
-// tries again once with -remapURI: (its fallback resolver's URI), and only then shows the alert.
 static id sg_send(id target, NSString *selector) {
     SEL sel = NSSelectorFromString(selector);
     if (![target respondsToSelector:sel]) return nil;
@@ -39,9 +30,6 @@ static id sg_send1(id target, NSString *selector, id arg) {
     return ((id (*)(id, SEL, id))objc_msgSend)(target, sel, arg);
 }
 
-// The class of the first handler that takes `uri`, nil for none. A handler whose name says it only
-// listens (Jam's SGSNavigationURIHandledEventSource) is not asked, so a question is not taken for a
-// navigation.
 static NSString *takerFor(id<NSFastEnumeration> handlers, NSURL *uri, NSUInteger *asked) {
     SEL canHandle = NSSelectorFromString(@"URISubtypeHandlerCanHandleURI:");
     for (id handler in handlers) {

@@ -5,8 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// The worker's input queue holds this many packets, about 24 s of source: a cold model load
-// collects its audio in the timeline instead, so the queue only ever holds a backlog of seconds.
 enum { kInputPackets = 1024, kOutputHops = 8 };
 // Forwarding the retained original to a worker catching up: at most this many packets (64 KB) a render.
 enum { kForwardPacketsPerRender = 8 };
@@ -35,9 +33,6 @@ SGSingStream *SGSingStreamCreate(SGAudioStamp origin, uint32_t window, uint32_t 
     atomic_store(&s->publishedCaptured, origin.sourceFrame);
     s->origin = origin; s->captured = origin.sourceFrame; s->window = window; s->hop = hop;
     atomic_store(&s->modelReady, true);
-    // Start with a full window of ready vocals (two completed hops). The first inference
-    // duration cannot predict the next worker scheduling delay. Less overlap reduces repeated
-    // inference work; the reserve still covers a full future hop before vocal reduction begins.
     s->timeline = SGSingTimelineCreate(SGSingTimelineFrames, window);
     s->input = SGAudioRingCreate(kInputPackets, SGSingStreamPacketFrames, 2);
     s->output = SGAudioRingCreate(kOutputHops, hop, 2);
@@ -89,8 +84,6 @@ bool SGSingStreamReadInput(SGSingStream *s, SGAudioStamp *stamp, float *pcm) {
 }
 bool SGSingStreamReadLiveInput(SGSingStream *s, SGAudioStamp *stamp, float *pcm) {
     if (s->workerStarted) return SGSingStreamReadInput(s, stamp, pcm);
-    // Off-render, bounded by the input queue's capacity. Hashing/compilation may have taken
-    // seconds; inferring already emitted audio only delays activation and wastes energy.
     uint64_t first = SGSingStreamPresented(s);
     for (unsigned i = 0; i < kInputPackets; i++) {
         if (!SGSingStreamReadInput(s, stamp, pcm)) return false;
@@ -155,8 +148,6 @@ int32_t SGSingStreamRender(SGSingStream *s, uint32_t frames, float *pcm, SGSingS
     }
     if (atomic_load(&s->modelReady) && !atomic_load(&s->bypass)) {
         if (!s->forwardingStarted) { s->forwarded = s->presented; s->forwardingStarted = true; }
-        // Cold-load catch-up included: the playback ring, not the worker queue, owns the audio
-        // accumulated while the model loaded.
         for (unsigned n = 0; n < kForwardPacketsPerRender; n++) {
             uint32_t count = SGSingTimelineCopyOriginal(s->timeline, s->forwarded, s->source, SGSingStreamPacketFrames);
             if (!count) break;

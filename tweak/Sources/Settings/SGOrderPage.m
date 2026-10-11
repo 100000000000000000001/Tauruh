@@ -129,8 +129,6 @@ typedef NS_ENUM(NSInteger, SGOrderSection) {
     return NO;
 }
 
-// Dragging stays inside the order; a source is switched on and off by tapping it, not by dropping
-// it into the other section, so an order is never lost to a stray drag.
 - (NSIndexPath *)tableView:(UITableView *)table targetIndexPathForMoveFromRowAtIndexPath:(NSIndexPath *)from toProposedIndexPath:(NSIndexPath *)to {
     return to.section == SGOrderSectionOn ? to : from;
 }

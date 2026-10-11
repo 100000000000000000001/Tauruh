@@ -1,11 +1,3 @@
-// Spotify's responses on their way in, through the URLSession delegates it reads them by:
-// SPTDataLoaderService for most of spclient, HttpClientURLSession for what some regions route the
-// other way. A request for an ad is answered empty. With Spoof Premium on, the bootstrap
-// and customize bodies are rewritten by Premium.m before the client sees them, the endpoints the
-// server would use to log the account out are answered as if they succeeded, and past the first
-// thirty seconds the re-fetches that could bring the real state back are cancelled before they
-// leave. Feeds go through Feeds.m. Everything here is EeveeSpotify's, less its Ably hooks, which
-// it does not turn on for 9.1 either.
 #import "Core/SGCore.h"
 #import "AdBlock.h"
 
@@ -28,8 +20,6 @@ static BOOL has(NSString *text, NSString *needle) {
 static BOOL isBootstrap(NSString *path) { return has(path, @"v1/bootstrap"); }
 static BOOL isCustomize(NSString *path) { return has(path, @"v1/customize"); }
 
-// The feeds Home, Search and the page under the player are built from. casita/v1/feeds is the flat
-// list of tab chips, not sections.
 static BOOL isFeed(NSString *path) {
     if (has(path, @"/casita/v1/feeds")) return NO;
     return has(path, @"/browsita/") || has(path, @"/casita/") || has(path, @"/scrollsita/");
@@ -61,8 +51,6 @@ static BOOL isAd(NSURL *url, NSString *path) {
         || [@[@"ad.spotify.com", @"ads.spotify.com", @"aet.spotify.com"] containsObject:host];
 }
 
-// The first thirty seconds are a fresh login's: signup/public and customize are part of it, and
-// answering them broke first launch.
 static BOOL isRefetch(NSString *path) {
     return has(path, @"signup/public") || has(path, @"select-ondemand-set") || has(path, @"trials-facade/start-trial")
         || has(path, @"premium-marketing/upselloffer") || (has(path, @"pendragon") && has(path, @"fetchmessagelist"))
@@ -87,8 +75,6 @@ static NSData *json(NSString *text) {
     return [text dataUsingEncoding:NSUTF8StringEncoding];
 }
 
-// The body a blocked request is answered with: what its reader parses for, so that nothing is
-// retried and no logout path taken.
 static NSData *blockedReply(NSString *path) {
     if (has(path, @"signup/public")) return json(@"{\"status\":1,\"country\":\"US\",\"is_country_launched\":true}");
     if (has(path, @"trials-facade")) return json(@"{\"result\":\"NOT_ELIGIBLE\"}");
@@ -116,8 +102,6 @@ static NSData *patched(NSURL *url, NSData *body) {
 
 #pragma mark - the delegate's three calls
 
-// Data handed to the delegate by the mod goes through its hooked didReceiveData like Spotify's own,
-// with the pass mark on the task so the hook lets it by.
 static void deliver(id<NSURLSessionDataDelegate> delegate, NSURLSession *session, NSURLSessionTask *task, NSData *data) {
     objc_setAssociatedObject(task, &kPassKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     [delegate URLSession:session dataTask:(NSURLSessionDataTask *)task didReceiveData:data];
@@ -133,8 +117,6 @@ static NSHTTPURLResponse *replayFor(NSURLSessionTask *task, NSURLResponse *respo
     return [[NSHTTPURLResponse alloc] initWithURL:url statusCode:200 HTTPVersion:@"HTTP/2.0" headerFields:@{}];
 }
 
-// YES when the data is not the delegate's to see yet: dropped for a blocked request, kept back for
-// one whose reply is rewritten when it finishes.
 static BOOL holds(NSURLSessionTask *task, NSData *data) {
     if (objc_getAssociatedObject(task, &kPassKey)) return NO;
     switch (classify(task.currentRequest.URL)) {
@@ -172,8 +154,6 @@ static void complete(id<NSURLSessionDataDelegate> delegate, NSURLSession *sessio
                 finish(error);
                 return;
             }
-            // Nothing to rewrite: a 304, or a body of no bytes. The delegate is told of a body either
-            // way, since a completion with none hangs some readers.
             if (!buffer) {
                 deliver(delegate, session, task, (isCustomize(path) ? cached() : nil) ?: [NSData data]);
                 finish(nil);
@@ -217,9 +197,6 @@ static void complete(id<NSURLSessionDataDelegate> delegate, NSURLSession *sessio
 
 #pragma mark - before a request leaves
 
-// The re-fetches that could put the real product state back, or drop the push token, use sessions
-// of their own that the delegate hooks do not see; they are cancelled at the task. login5 and the
-// Google token stay: blocking those was a crash loop.
 %group Premium
 %hook NSURLSessionTask
 - (void)resume {
@@ -238,10 +215,6 @@ static void complete(id<NSURLSessionDataDelegate> delegate, NSURLSession *sessio
 %end
 %end
 
-// The config comes back 304 with no body when the app holds a copy of it and asks whether that is still
-// current, and a copy taken while Spoof Premium was off is the server's own: the mod then has nothing to
-// rewrite, and the account stays free until the server changes the config (device 2026-09-21). So the two
-// go out without the question, and the server always answers in full.
 static NSURLRequest *unconditional(NSURLRequest *request) {
     NSString *host = request.URL.host.lowercaseString ?: @"", *path = request.URL.path.lowercaseString ?: @"";
     if (!(has(host, @"spotify") || has(host, @"spclient")) || !(isBootstrap(path) || isCustomize(path))) return nil;
@@ -262,8 +235,6 @@ static NSURLRequest *unconditional(NSURLRequest *request) {
 %end
 %end
 
-// The sessions Spotify makes are __NSURLSessionLocal; hooked as well only when that class answers
-// dataTaskWithRequest: itself, since a hook on an inherited method would sit on NSURLSession's twice.
 %group PremiumLocalRequests
 %hook __NSURLSessionLocal
 - (NSURLSessionDataTask *)dataTaskWithRequest:(NSURLRequest *)request {

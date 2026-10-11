@@ -1,5 +1,3 @@
-// The tour goes up the first time Home appears, not at launch: a fresh sideload lands on the login
-// screen first, and a tour over that is wrong. A moment after, so Home has drawn under the glass.
 #import "Core/SGCore.h"
 #import "Onboarding.h"
 

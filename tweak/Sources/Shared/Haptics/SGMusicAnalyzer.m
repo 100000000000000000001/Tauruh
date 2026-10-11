@@ -10,14 +10,6 @@ static const double kWarmupSeconds = 0.12;
 static const float kFloorDb = -62;             // quieter than this is silence
 static const float kPeakFallDbPerSecond = 0.5;
 
-// How far over its average a band's energy has to go to hit, how far under it to hit again, how much it
-// has to have risen over the last SGMusicAttackHops (a swell rises too slowly), the rest after a hit,
-// the dB over the threshold that makes a tap as strong as it gets, how quiet the band may be and still
-// hit, and the level a band is called loud at even when it has not been louder lately. The energy a
-// band is judged by is the mean of its last `windowHops`, which for the bass has to span a cycle of a
-// 40 Hz note (25 ms), or the note's own ripple reads as hits. `midRatio` is how far over its own average
-// the middle of the sound (250 Hz to 2 kHz, over the bass that fills the whole) has to go at the same
-// time: a snare or a clap lifts it, a hi-hat hardly does.
 typedef struct {
     float ratio, rearm, attackDb;
     double restSeconds;
@@ -27,13 +19,9 @@ typedef struct {
 } BandTuning;
 static const BandTuning kKickTuning = {1.6f, 1.05f, 3, 0.1, 9, -42, -16, 4, 0};
 static const BandTuning kSnapTuning = {2.2f, 1.0f, 6, 0.18, 9, -52, -26, 2, 1.6f};
-// A hit keeps rising for at most this many hops before it is taken at its highest. Longer finds no
-// more hits (a 172 BPM track gave 3.2 taps a second at 2, 3 and 5) and only makes every tap later.
 static const int kMaxRisingHops = 3;
 // Quieter than the band's loud level by this much, a hit is as weak as a tap gets.
 static const float kLoudRangeDb = 24;
-// A hit this much louder than the last one is taken even while the band rests, once this long has passed:
-// a soft rise just before a big one would otherwise hold the big one back.
 static const float kLouderRatio = 4;
 static const double kLouderAfterSeconds = 0.05;
 // A snap this near a kick is felt as the same hit.
@@ -110,8 +98,6 @@ static double hopDuration(const SGMusicAnalyzer *analyzer) {
     return analyzer->hopFrames / analyzer->sampleRate;
 }
 
-// Moves a band on by one hop's energy: the energy of its last `windowHops` hops, and the average of the
-// last second before this hop in `average`.
 static float track(SGMusicAnalyzer *analyzer, SGMusicBand *band, int windowHops, double energy, double *average) {
     band->window[band->windowNext] = (float)energy;
     band->windowNext = (band->windowNext + 1) % SGMusicWindowHops;
@@ -182,8 +168,6 @@ static int listen(SGMusicAnalyzer *analyzer, SGMusicBand *band, const BandTuning
             band->pendingEnergy = instant;
             band->pendingDb = db;
             band->pendingBright = brightness;
-            // The window crosses the threshold about when half of it holds the hit, so the hit began half a
-            // window back; a haptic lands a touch after its sound rather than before.
             band->pendingTime = time - (uint64_t)(0.5 * tuning->windowHops * hop * analyzer->ticksPerSecond);
         }
     }

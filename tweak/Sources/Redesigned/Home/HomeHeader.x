@@ -1,23 +1,3 @@
-// Home redesign: the header the way the Music app has it. The filter pills (All, Music, Podcasts) go and
-// a large title takes their place at the leading edge; the avatar that opens the side drawer moves to the
-// trailing edge; the scrim Spotify lays behind the header goes too, the soft scroll edge (Kit/SGREdgeEffect.x)
-// being what keeps the title clear of the page scrolling under it, as on every other redesigned page.
-//
-// Tree (trees/clean/home/10.txt:3018-3051): FunkisViewController's view holds a 402x112 UIView around
-// Reprise_LiquidGlassKit LiquidGlass.GradientView (the scrim) and, at {0, 62}, an
-// ElementView<HomeHeaderElement> 402x50 holding HomeHeaderView > UIStackView {0, 8} 402x34 of two arranged
-// views: ListeningActivity_ElementsKit.AdaptiveFaceContainer {16, 0} 32x34 (the avatar,
-// id=Components.UI.SideDrawerButton) and LiquidGlass.LeadingFadeMaskView {48, 1} 354x32 around
-// Home_PillUIKit.PillScrollView.
-//
-// The avatar moves by the stack's layout direction rather than by a frame of ours. Right to left, the stack
-// lays its first view out at the trailing edge itself on every pass, whatever width the face container
-// takes when friends listening show beside the avatar; its leading margin, 16pt, is the one Spotify gives
-// the header in a right to left language. The pills stay in the stack with no alpha rather than hidden,
-// the way the redesign takes any view out of a stack Spotify arranges (Kit/SGRRestyle.h).
-//
-// The title is Spotify's own name for the tab, read off its tab bar item (id=TabBar.Item.Home, 10.txt:3100),
-// so it follows the app's language.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"

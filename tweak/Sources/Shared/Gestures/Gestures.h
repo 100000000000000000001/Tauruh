@@ -1,5 +1,3 @@
-// Double tap zones over the player's artwork: the artwork already answers a sideways swipe with the
-// next track and a vertical drag with the cards below, so a double tap is what is left free.
 #import <UIKit/UIKit.h>
 
 #define SGKeyGestures @"spotifyglass.gestures"
@@ -19,8 +17,6 @@ typedef NS_ENUM(NSInteger, SGGestureAction) {
     SGGestureLike,   // the current song into Liked Songs, through the now playing screen's model
 };
 
-// Runs one of the actions above against the player, exactly as a double tap on a zone does; the
-// haptics observer hears it too. Main thread. Used by the double tap and by the AirPods gestures.
 void SGPerformGestureAction(SGGestureAction action);
 
 NSArray<NSString *> *SGGestureActionNames(void);
@@ -43,10 +39,6 @@ NSInteger SGGestureCellAt(CGPoint point, CGSize size);
 
 UIViewController *SGGesturesSettingsPage(void);
 
-// Told of each action a double tap is about to perform, before the player has acted on it; one observer,
-// for a look that answers the gesture (the redesign's haptics). Main thread.
 void SGGestureSetObserver(void (^observer)(SGGestureAction action));
 
-// Puts the double tap on `host`, the view the player's grid covers, while the switch is on; again on
-// every layout pass of the host, so taps Spotify adds later still wait for it. Main thread.
 void SGGestureAttach(UIView *host);

@@ -73,8 +73,6 @@ static SGPlayerObserver *sg_ownObserver;
 }
 %end
 
-// Observers are added from several threads as the app starts; the first player seen is the one
-// watched, the way KaraokeSource.x takes the first player the app asks.
 %hook SPTEsperantoPlayer
 - (void)addPlayerObserver:(id)observer {
     %orig;

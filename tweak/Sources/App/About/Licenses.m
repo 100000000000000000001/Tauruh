@@ -1,5 +1,3 @@
-// Mod > Licenses: the mod's own license, then each third-party one the build ships code under, in full,
-// since the MIT license asks for its text to travel with every copy.
 #import "Core/SGCore.h"
 #import "Settings/SGPageStyle.h"
 #import "About.h"

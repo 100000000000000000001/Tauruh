@@ -3,8 +3,6 @@
 #import "About.h"
 #import "App/Onboarding/Onboarding.h"
 
-// Every key of the mod's is under one prefix, so a reset is a sweep of the defaults with the stock
-// marker of SGPrefs.h left behind; the hooks read them at launch, so it ends in a restart.
 static void resetAll(void) {
     NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
     NSUInteger removed = 0;

@@ -1,5 +1,3 @@
-// SPTEsperantoPlayer, the app's player, and the state it reports.
-// The URIs are typed id: the runtime says only that they are objects, so a reader takes NSURL or NSString.
 #import <Foundation/Foundation.h>
 
 @interface SPTPlayerTrack : NSObject
@@ -39,8 +37,6 @@
 - (void)addPlayerObserver:(id)observer;
 - (void)skipToNextTrack;
 - (void)seekTo:(double)seconds;
-// The commands below take Spotify's options object, nil for the defaults, and return the command's
-// pending result.
 - (id)pause:(id)options;
 - (id)resume:(id)options;
 - (id)skipToNextTrackWithOptions:(id)options;

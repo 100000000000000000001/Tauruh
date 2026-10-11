@@ -1,13 +1,7 @@
-// Word timing from NetEase Cloud Music, for the tracks the other sources only line-time, e.g. most
-// of Eminem. It has no text of its own to offer Spotify's page, only the time of every word, so it
-// earns its place at the end of the order rather than the front. Searched by title, artist and
-// length; NetEase censors swear words with asterisks.
 #import "Core/SGCore.h"
 #import "LyricsSources.h"
 
 static const NSTimeInterval kTimeout = 3;
-// A NetEase recording is only taken when its length is this close to the track's, so the words fall
-// on the same beat.
 static const NSInteger kLengthSlack = 3;
 static const NSUInteger kTriedSongs = 3;
 
@@ -28,9 +22,6 @@ static void get(NSString *path, NSDictionary<NSString *, NSString *> *query, voi
     }] resume];
 }
 
-// [43060,3600](43060,120,0)To (43180,330,0)seize (43510,420,0)everything …
-// A line's start and length in ms, then each piece's start and length before its text. A piece not
-// ending in a space runs on into the next one ("wanted" "…"), as in richsync.
 static NSArray<SGKaraokeLine *> *linesFromYrc(NSString *yrc) {
     static NSRegularExpression *header, *piece;
     static dispatch_once_t once;
@@ -52,8 +43,6 @@ static NSArray<SGKaraokeLine *> *linesFromYrc(NSString *yrc) {
             NSString *text = [raw stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
             NSInteger start = [row substringWithRange:[pieces[i] rangeAtIndex:1]].integerValue;
             NSInteger end = start + [row substringWithRange:[pieces[i] rangeAtIndex:2]].integerValue;
-            // yrc times a Chinese or Japanese syllable a piece at a time and never spaces them, so
-            // each one is a word of its own; only a spaced script runs its pieces together.
             BOOL unspaced = SGKaraokeUnspacedScript(text);
             if (text.length && open && !unspaced) {
                 open.text = [open.text stringByAppendingString:text];
@@ -100,8 +89,6 @@ static void tryLyrics(NSArray<NSNumber *> *songs, NSUInteger index, void (^done)
     });
 }
 
-// A recording is only taken when its length is this close to the track's, so the words fall on the
-// same beat as the recording Spotify is playing.
 SGLyricsAsk SGNetEaseAsk = ^(SGLyricsQuery *query, void (^done)(SGLyricsResult *result)) {
     void (^answer)(NSArray<SGKaraokeLine *> *) = ^(NSArray<SGKaraokeLine *> *lines) {
         if (!lines.count) {

@@ -31,8 +31,6 @@ static double downstreamLatency(void) {
     return (AVAudioSession.sharedInstance.outputLatency + SGPlayerAudioLatency()) * SGPlayerSpeed();
 }
 
-// The callback context owns the session until Finished; the controller owns it while audio is
-// attached. Neither endpoint can observe freed storage, including cancellation during model load.
 @interface SGSingSession : NSObject
 @property (nonatomic) SGSingAudio *audio;
 @property (nonatomic) void *worker;
@@ -169,8 +167,6 @@ static void workerStatus(void *context, int32_t status) {
     session.retiring = YES;
     SGSingStreamBypass(stream(session));
     [self cancelWorker:session unload:unload];
-    // A prepared, paused model may be attached to a stopped graph. There is no audio to
-    // drain, and waiting for a render callback would make Off hang until the user pressed Play.
     if (discard || !session.attached || (_state == SGSingReady && SGSingStreamQueued(stream(session)) == 0)) {
         SGSingAudioDetach(session.audio); session.attached = NO;
         if (!session.finished) [_retired addObject:session];
@@ -186,8 +182,6 @@ static void workerStatus(void *context, int32_t status) {
         [self publish:SGSingFailed explanation:reason]; return;
     }
     SPTPlayerState *state = SGPlayerState();
-    // Loading/pausing the player is not a request to turn Sing off. Model preparation is
-    // independent of the render callback and can complete before the user presses Play.
     if (state.isLoading) { [self publish:SGSingPreparing explanation:nil]; [self startTimer]; return; }
     SGSingSession *session = [SGSingSession new];
     session.finished = YES;
@@ -209,8 +203,6 @@ static void workerStatus(void *context, int32_t status) {
     [self startTimer];
 }
 - (void)attachSession:(SGSingSession *)session {
-    // Capture while the model loads. The timeline emits original audio until it has a full
-    // vocal reserve, so compilation/warm-up and read-ahead no longer happen sequentially.
     if ((!session.loading && !session.ready) || session.attached || session.retiring || _interrupted) return;
     SPTPlayerState *state = SGPlayerState();
     if (state.isLoading || ![session.track isEqualToString:trackOf(state)]) return;
@@ -222,8 +214,6 @@ static void workerStatus(void *context, int32_t status) {
         session.attachDeadline = 0;
         [self publish:session.ready ? SGSingReady : SGSingPreparing explanation:nil];
     } else if (!session.attached) {
-        // Retain the loaded worker while the graph settles; a missing graph on the first poll is
-        // not a bad format.
         CFTimeInterval now = CACurrentMediaTime();
         if (!session.attachDeadline) {
             session.attachDeadline = now + kGraphWait;
@@ -253,8 +243,6 @@ static void workerStatus(void *context, int32_t status) {
         }
         [self attachSession:session];
     } else if (status == SGStemFinished && SGSingStreamStopReason(stream(session)) != SGSingStopNone) {
-        // A render-side underrun asks the worker to finish normally. Its final callback can
-        // reach main before the polling timer; don't misreport it as a broken voice model.
         [self streamStopped:session];
     } else if (status == SGStemFailed || status == SGStemFinished) {
         _blockedTrack = session.track; [self stop:NO unload:YES];
@@ -268,8 +256,6 @@ static void workerStatus(void *context, int32_t status) {
     NSString *explanation = reason == SGSingStopSourceError ?
         @"The audio source stopped supplying Sing. The original audio will continue." :
         @"Sing could not keep up with playback. The original audio will continue.";
-    // Keep a healthy, loaded model warm. Reloading it after a scheduling delay adds GPU work
-    // and startup latency to a retry; memory/thermal events still purge it immediately.
     _blockedTrack = session.track; [self stop:NO unload:NO];
     [self publish:SGSingFailed explanation:explanation];
 }
@@ -306,8 +292,6 @@ static void workerStatus(void *context, int32_t status) {
             SGSingAudioInvalidate(); [self stop:YES unload:NO];
             [self publish:SGSingPreparing explanation:nil];
         } else if (session.attached) {
-            // Repeat-one has no URI change to notify observers. Its verified sample boundary
-            // still resets the audible clock without replacing the running separator.
             if (!session.retiring && [session.nextTrack isEqualToString:session.track] &&
                 SGSingAudioContinueTrack(session.audio, SGSingTrackIdentifier(trackOf(state)))) {
                 session.nextTrack = nil;
@@ -344,8 +328,6 @@ static void workerStatus(void *context, int32_t status) {
     if (_session && ![_session.track isEqualToString:track]) {
         if (!_session.retiring && [_session.nextTrack isEqualToString:track] &&
             SGSingAudioContinueTrack(_session.audio, SGSingTrackIdentifier(track))) {
-            // The source already crossed a verified natural boundary while its previous tail
-            // was audible. Preserve those samples, the ready stems and the loaded worker.
             SGLog(@"Sing continuing the prepared next track with %llu queued frames",
                   (unsigned long long)SGSingStreamQueued(stream(_session)));
             _session.track = track; _session.nextTrack = nil;
@@ -392,9 +374,6 @@ static void workerStatus(void *context, int32_t status) {
         SGLog(@"Sing interruption: type %@, reason %@, options %@", note.userInfo[AVAudioSessionInterruptionTypeKey],
               note.userInfo[AVAudioSessionInterruptionReasonKey], note.userInfo[AVAudioSessionInterruptionOptionKey]);
         self.interrupted = [note.userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue] == AVAudioSessionInterruptionTypeBegan;
-        // Spotify owns whether playback resumes. Retain the model and queued audio across a
-        // temporary interruption; reconcile pauses the worker's source input.
-        // If Spotify replaces its audio graph, reattach a fresh generation after the interruption.
         [self reconcile];
     });
 }
@@ -403,8 +382,6 @@ static void workerStatus(void *context, int32_t status) {
     if (!_model) [self publish:SGSingUnavailable explanation:nil];
     else if (_state == SGSingUnavailable) [self publish:SGSingIdle explanation:nil];
 }
-// The model downloaded or removed from Mod Settings > Karaoke. Going, it takes Sing with it: the original audio
-// still retained plays out in order, and the warm model is let go before its files are.
 - (void)modelChanged:(NSNotification *)note {
     NSString *model = SGSingModelPath();
     if (model == _model || [model isEqualToString:_model]) return;

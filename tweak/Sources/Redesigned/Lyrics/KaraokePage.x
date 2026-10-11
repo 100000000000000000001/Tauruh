@@ -1,7 +1,3 @@
-// The karaoke view goes over the lyrics part of the full screen lyrics page (trees/lyrics.txt:
-// Lyrics_FullscreenElementPageImpl.LyricsView, between the header and the controls), so Spotify's
-// header, close button and controls stay working. It is laid over rather than swapped in: Spotify's
-// list keeps running underneath and comes back the moment a track has no synced lyrics.
 #import "Core/SGCore.h"
 #import "SGRKaraokeView.h"
 

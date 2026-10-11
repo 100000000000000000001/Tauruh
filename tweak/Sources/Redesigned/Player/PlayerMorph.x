@@ -1,26 +1,3 @@
-// Player redesign: the player grows out of the now playing bar's card and the cover flies out of the
-// card's artwork, the way the Music app opens its player, instead of Spotify's slide up and fade.
-//
-// Spotify 9.1.78 runs the open and the close through SPTBarOverlayPresentationTransition: it hides the
-// real bar and tab bar, moves stand-ins, and sets -setProgress: (0 the bar, 1 the player, clamped) on
-// every frame of its own display link, from a spring when tapped and from the finger when dragged
-// (setProgress: at 0x109815464). There it sets the player's frame to the container's bounds moved down by
-// the bar's bottom edge times (1 - progress), and the player's alpha, and moves and fades the bar's stand-in.
-//
-// The morph rides on that progress, after Spotify's own, so taps, drags and cancelled drags follow:
-//   the sheet   a rounded rect from the card's frame and radius to the screen's, filled with the
-//               field's colour, under the player, showing at once;
-//   the player  masked to the sheet, its content scaled and moved so its top left is the sheet's
-//               (sublayerTransform, and the frame's top moved to the sheet's; Spotify's gesture code
-//               reads back only the frame's height), its own background colour lifted off meanwhile
-//               (a sublayerTransform does not move it), and faded in over the first part of the growth;
-//   the bar     Spotify's stand-in riding the sheet's top edge, gone by a quarter of the way;
-//   the cover   a copy flown from the card's artwork to the player's cover, moved within the sheet,
-//               the player's own cover and shadow hidden meanwhile.
-// All of it is taken down in -destroyTransitioningContext, which Spotify calls from -animationEnded:.
-//
-// Skipped on a regular width (Spotify's iPad branch), with Reduce Motion on, or while the bar has no
-// card (hidden, not styled yet): Spotify's own transition then runs untouched.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
@@ -99,8 +76,6 @@ static CGFloat screenRadius(void) {
     _sheet.clipsToBounds = YES;
     [container insertSubview:_sheet belowSubview:overlay];
 
-    // The player's own paint is not a sublayer, so the content's transform would leave it where Spotify
-    // put the player, a band below the sheet's top edge; the sheet paints instead.
     _overlayColor = CGColorRetain(overlay.layer.backgroundColor);
     overlay.layer.backgroundColor = NULL;
 
@@ -138,9 +113,6 @@ static CGFloat screenRadius(void) {
     CGRect sheet = lerpRect(_card, full, t);
     CGFloat radius = lerp(_cardRadius, screenRadius(), t);
     CGFloat scale = full.size.width > 0 ? sheet.size.width / full.size.width : 1;
-    // The player's top goes to the sheet's: a mask clips nothing above the layer's bounds, so content
-    // raised above Spotify's frame would show square corners. Spotify reads back only the player's
-    // height (0x109815b4c, 0x109815c28), which stays.
     CGPoint origin = CGPointMake(_spotifyFrame.origin.x, sheet.origin.y);
     CGSize size = overlay.bounds.size;
     CGPoint middle = CGPointMake(size.width / 2, size.height / 2);
@@ -174,8 +146,6 @@ static CGFloat screenRadius(void) {
         }
 
         if (self->_cover) {
-            // Worked out relative to the sheet, so the cover stays on it the whole way rather than
-            // heading for where the player's cover is while that is still below the screen.
             CGRect from = CGRectOffset(self->_barArtwork, -self->_card.origin.x, -self->_card.origin.y);
             if (CGRectIsNull(coverInPlayer)) {
                 self->_cover.hidden = YES;

@@ -1,20 +1,3 @@
-// Artist redesign: the Music list without the artist's videos, and nothing of it painted over the field.
-//
-// Tree (trees/clean/artist/05.txt, the Music list top to bottom): Popular, Artist pick, Popular releases and
-// its Show all, Featuring, Release Countdown, Music videos, Watch more from…, About, Artist playlists, Fans
-// also like, Appears on. Every section is three Element_List cells in a row -- a 16pt spacer, a heading
-// (Components.UI.SectionHeadingHome) and what the section holds -- and every kind of content carries an
-// identifier of its own, in any language: Components.UI.RetrievalRowElementUI (tracks), PinnedItemUI (the
-// pick), HomeCard (a carousel), UpcomingReleaseRow, CreatorBiographyCard (About),
-// Components.UI.MusicVideoShelfHeader and WatchFeedCarouselEntryPointElement (videos).
-//
-// So the rule is by kind, never by the heading's words, which are the app's language: a video shelf reports
-// no height, and so do the heading and the spacer in the two cells before it. They were sized before it, so
-// the list is asked to lay out again once they are known. Every carousel is the same kind whatever it holds,
-// so the carousels all stay; merch has a tab of its own, which ArtistField.x takes away.
-//
-// A dropped cell is 0 tall but what it holds keeps the height it measured at, hidden and cut off by the
-// cell: content squeezed to 0 breaks Spotify's required constraints on every pass (Album/AlbumSections.x).
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Artist.h"
@@ -102,8 +85,6 @@ static NSIndexPath *before(UICollectionView *list, NSIndexPath *path, NSInteger 
     return item >= 0 ? [NSIndexPath indexPathForItem:item inSection:section] : nil;
 }
 
-// A video shelf takes its heading and the spacer over it with it. Those were sized before it, so the list lays
-// out again, once, to ask them again.
 static void dropHeadingOf(UICollectionView *list, NSIndexPath *path) {
     NSMutableDictionary *kinds = kindsOf(list);
     NSMutableSet *dropped = droppedOf(list);
@@ -168,11 +149,7 @@ static void logOnce(NSString *what) {
     UICollectionView *list = listOf(cell);
     UIView *page = list && ![listOf(list) isKindOfClass:UICollectionView.class] ? SGRArtistPageOf(cell) : nil;
     if (page) {
-        // What the cell paints over the field -- the "You liked" row, every carousel's collection and the
-        // fade Popular's "See more" draws over its last track (device, trees/continuous/3.txt 2026-09-18).
         SGRClearCellPaint(cell);
-        // The first of Popular's tracks with its title in is the list the page waits for (Kit/SGRReveal.h); a
-        // row still loading is RetrievalRowLoadingElementUI, grey bars with empty labels.
         if (SGRRevealWaitsFor(page, SGRRevealList)) {
             UIView *track = SGRFindByIdentifier(cell, @"Components.UI.RetrievalRowElementUI*", &kTrackKey);
             if (track && SGRRevealShowsText(track)) SGRRevealMark(page, SGRRevealList);

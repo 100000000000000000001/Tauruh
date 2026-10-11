@@ -34,8 +34,6 @@ SGModRow *SGOptionRow(NSString *title, NSString *subtitle, NSString *key) {
     return row;
 }
 
-// A switch whose work is not finished: turning it on says so first, and offers the repo to anyone
-// who would rather fix it than live with it.
 SGModRow *SGUnstableRow(NSString *title, NSString *subtitle, NSString *key, NSString *warning) {
     SGModRow *row = SGSwitchRow(title, subtitle, key);
     row.warning = warning;
@@ -70,8 +68,6 @@ SGModRow *SGActionRow(NSString *title, NSString *subtitle, void (^action)(void))
     return row;
 }
 
-// Red, with a warning symbol. SGFillCell tints the title and the symbol; the cell below takes the
-// colour down to the subtitle too, so the whole row reads as the warning it is.
 SGModRow *SGWarningRow(NSString *title, NSString *subtitle, void (^action)(void)) {
     SGModRow *row = SGActionRow(title, subtitle, action);
     row.color = SGRed();
@@ -87,9 +83,6 @@ SGModRow *SGPageRow(NSString *title, UIViewController *(^page)(void)) {
     return row;
 }
 
-// The list a choice row opens: the names it was given, each over its note where it has one, a green
-// checkmark against the one set. Picking one writes the index, tells the row, and goes back, where the row
-// it came from reads the new name out and the page it sits on rebuilds around it.
 @interface SGChoicePage : SGPage
 - (instancetype)initWithTitle:(NSString *)title key:(NSString *)key choices:(NSArray<NSString *> *)choices notes:(NSArray<NSString *> *)notes
                        footer:(NSString *)footer fallback:(NSInteger)fallback chosen:(void (^)(NSInteger index))chosen;
@@ -167,9 +160,6 @@ SGModRow *SGPageRow(NSString *title, UIViewController *(^page)(void)) {
 
 @end
 
-// No key on the row: the key lives in the blocks, so the page draws the row as the link it is
-// rather than as a switch. The notes and the callback are read off the row when its list opens, so they
-// can be set after this returns.
 SGModRow *SGChoiceRow(NSString *title, NSString *subtitle, NSString *key, NSArray<NSString *> *choices, NSInteger fallback) {
     SGModRow *row = [SGModRow new];
     row.title = title;
@@ -203,8 +193,6 @@ SGModRow *SGLinkRow(NSString *title, NSString *subtitle, NSString *url) {
     return SGActionRow(title, subtitle, ^{ SGOpenURL(url); });
 }
 
-// A value on the right and a tap: the Updates row reads its status out of About/Update.m every tick,
-// and a tap asks the site again instead of waiting for the six hour cache to lapse.
 SGModRow *SGStatActionRow(NSString *title, NSString *subtitle, NSString *(^value)(void), void (^action)(void)) {
     SGModRow *row = [SGModRow new];
     row.title = title;
@@ -232,8 +220,6 @@ SGModRow *SGWithSymbol(SGModRow *row, NSString *symbol) {
     return row;
 }
 
-// What a page row carrying a value shows on the right: the value, then the chevron, the same
-// distance apart as Spotify's own rows keep them.
 static UIView *valueAndChevron(NSString *text) {
     UILabel *label = [UILabel new];
     label.font = SGTitleFont();
@@ -250,21 +236,15 @@ static UIView *valueAndChevron(NSString *text) {
     return box;
 }
 
-// On means the row's own override is in place; anything else, including the opposite override
-// somebody set from the All flags page, reads as off.
 static BOOL flagRowOn(SGModRow *row) {
     id value = SGFlagOverride(row.key);
     return value && [value boolValue] != row.forceOff;
 }
 
-// A flag something of the mod's forces (Core/SGFlagForce.h: the redesign, the ad blocking): its row
-// shows what is forced and takes no touch, so the flag has one place to change.
 static BOOL flagRowLocked(SGModRow *row) {
     return row.flag && SGLockedFlagValue(row.key, NULL) != nil;
 }
 
-// What a locked row shows: the forced value, read the row's way, so a Disable Canvas row reads on
-// while Canvas is forced off.
 static BOOL lockedRowOn(SGModRow *row) {
     id value = SGLockedFlagValue(row.key, NULL);
     return value ? [value boolValue] != row.forceOff : YES;
@@ -306,9 +286,6 @@ static UIFont *tabular(UIFont *font) {
 
 @end
 
-// The Audio effects page's slider row (Shared/AudioEffects/AudioEffectsPage.m), for any page: the title and the
-// value over a slider in the accent colour, a subtitle between them when there is one, each step stored
-// as the thumb reaches it.
 @interface SGModSliderCell : UITableViewCell
 + (CGFloat)heightFor:(SGModRow *)row;
 - (void)showRow:(SGModRow *)row;
@@ -410,8 +387,6 @@ static const CGFloat kSliderTop = 12, kSliderLine = 18, kSliderSubtitle = 14, kS
 
 static const NSInteger kProgressTag = 0x5347;
 
-// A row's progress as a thin bar along the bottom of its cell, on the card's own side margins; a cell
-// reused for a row without one loses it.
 static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
     UIProgressView *bar = (UIProgressView *)[cell viewWithTag:kProgressTag];
     double progress = row.progress ? row.progress() : -1;
@@ -457,8 +432,6 @@ static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
     _shown = [self rowsToShow];
     _intro = intro ? SGNote(intro) : nil;
     _footer = footer ? SGNote(footer) : nil;
-    // A page row reads its value out when the page appears rather than on the ticker, so only the
-    // rows whose numbers climb on their own keep one running.
     NSMutableSet<NSNotificationName> *refreshOn = [NSMutableSet set];
     for (SGModSection *s in sections) for (SGModRow *row in s.rows) {
         _live |= row.value && !row.page;
@@ -478,9 +451,6 @@ static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
     return shown;
 }
 
-// The rows that are to show now fade in where they sit and the others fade out, and whatever came in is
-// scrolled into view: it opens under the switch that brought it, which may be the page's last row. Answers
-// whether anything moved; `done` runs once it has, and only then.
 - (BOOL)showRowsThen:(void (^)(void))done {
     NSArray<NSArray<SGModRow *> *> *next = [self rowsToShow];
     if ([next isEqualToArray:_shown]) return NO;
@@ -512,8 +482,6 @@ static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
     return YES;
 }
 
-// The row a switch or an ⓘ belongs to, by the cell it sits in: rows coming and going move the rows under
-// them, so a position remembered when the cell was made may be stale.
 - (NSIndexPath *)pathOf:(UIView *)control {
     UIView *view = control;
     while (view && ![view isKindOfClass:UITableViewCell.class]) view = view.superview;
@@ -539,8 +507,6 @@ static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    // Reloaded whether or not anything ticks: a choice row is showing whatever was picked on the
-    // page it opened, which is gone by the time this one comes back, and may bring rows or take them.
     _shown = [self rowsToShow];
     [self.tableView reloadData];
     for (NSNotificationName name in _refreshOn) {
@@ -548,9 +514,6 @@ static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
         [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(readValues) name:name object:nil];
     }
     if (!_live) return;
-    // The counters climb while the page is open; the labels are written straight into the cells so
-    // that a reload never lands under a switch being dragged. A cancelled back swipe appears the
-    // page again without it ever disappearing, so the old timer goes first.
     [_ticker invalidate];
     _ticker = [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(readValues) userInfo:nil repeats:YES];
 }
@@ -732,8 +695,6 @@ static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
     if (row.flag) SGSetFlagOverride(row.key, on ? @(!row.forceOff) : nil);
     else SGSetEnabled(row.key, on);
     if (row.changed) row.changed(on);
-    // A glowing switch is let finish its slide before the reload puts a new one in its place; rows coming
-    // or going are let finish first too.
     NSTimeInterval wait = [toggle isKindOfClass:SGGlowSwitch.class] ? 0.45 : 0;
     void (^reload)(void) = ^{
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wait * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self.tableView reloadData]; });

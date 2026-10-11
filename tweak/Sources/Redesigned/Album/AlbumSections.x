@@ -1,23 +1,3 @@
-// Album redesign: everything under the track list dropped but what the album itself says.
-//
-// Spotify closes an album page with a run of sections the server sends -- more by the artist, related music
-// videos, concerts, merch, you might also like -- and more of them whenever it likes. None of them is the
-// album. So the rule is not a list of their names, which would be a list in one language that the next
-// section walks past: every one of those cells reports no height, and only two are kept.
-//
-// Tree (trees/clean/album/04.txt:979-2576). Everything under the tracks comes as an Element_List cell whose
-// content is an ElementContentView over Album_PageImpl.FooterStructuredData -- the headings, the carousels,
-// the merch cards, the 16pt spacers between them, and the two worth keeping:
-//
-//     Album.ConsumptionExperience   "22 songs • 1hr 24min", the line the Music app puts under a track list
-//     Album.Copyright               the © and ℗ lines, which are the label's and stay
-//
-// The tracks themselves are the same cell class over RetrievalListStructuredData and are never touched here.
-//
-// A dropped cell is 0 tall, but what it holds keeps the height it measured at, hidden and cut off by the
-// cell: Spotify's content squeezed to 0 with the cell breaks its own required constraints on every layout
-// pass, which is what held the main thread where dropped sections scrolled in on Home (2026-09-17). The two
-// kept cells are given the gap the spacers used to draw and their content is pinned under it.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Album.h"
@@ -40,8 +20,6 @@ static BOOL isFooterContent(UIView *content) {
     return answer.boolValue;
 }
 
-// The two the album says about itself, restyled as it is kept: Spotify draws both in white, and under a
-// track list they are a footnote, not a line to read.
 static BOOL isKept(UIView *content) {
     UIView *kept = nil;
     for (NSString *identifier in @[@"Album.ConsumptionExperience", @"Album.Copyright"]) {
@@ -56,8 +34,6 @@ static BOOL isKept(UIView *content) {
     return YES;
 }
 
-// The content laid at `lead` down the cell, at the height it measured at, and the cell sized for both.
-// Kept on the cell so its own passes, which size the content to the cell again, do not undo it.
 static void settle(UICollectionViewCell *cell, CGFloat natural, CGFloat lead) {
     UIView *content = cell.contentView;
     objc_setAssociatedObject(cell, &kSettledKey, @[@(natural), @(lead)], OBJC_ASSOCIATION_RETAIN_NONATOMIC);

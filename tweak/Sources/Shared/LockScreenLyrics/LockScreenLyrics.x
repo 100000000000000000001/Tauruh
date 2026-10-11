@@ -1,9 +1,3 @@
-// Spotify's now playing info passes through with the artist swapped for the current line, and a timer
-// sends it again each time the line changes. Spotify itself only ever sees its own dictionary back.
-//
-// The timer follows the playback rate rather than running from launch: a paused player's line does not
-// move, so working it out four times a second only wakes the phone. The lock screen keeps the line it
-// was left on until the sound starts again.
 #import <MediaPlayer/MediaPlayer.h>
 #import "Core/SGCore.h"
 #import "LockScreenLyrics.h"
@@ -32,8 +26,6 @@ static NSString *textOf(NSArray<SGKaraokeWord *> *words) {
     return SGKaraokeLineText(line);
 }
 
-// A line longer than the artist row holds, split into even pieces rather than a full one and a stub.
-// Each piece shows from its first word's estimated start.
 static NSArray<NSArray<SGKaraokeWord *> *> *piecesOf(SGKaraokeLine *line) {
     NSUInteger length = textOf(line.words).length;
     NSUInteger count = MAX((length + kMaxChars - 1) / kMaxChars, 1);
@@ -133,8 +125,6 @@ static void setTicking(BOOL on) {
     [NSRunLoop.mainRunLoop addTimer:sg_timer forMode:NSRunLoopCommonModes];
 }
 
-// Whether the sound is moving. A rate Spotify did not report at all counts as moving: the line would
-// stand still either way, and a missing key is no reason to leave the feature switched off for good.
 static BOOL playingBy(NSDictionary *info) {
     NSNumber *rate = info[MPNowPlayingInfoPropertyPlaybackRate];
     return !rate || rate.doubleValue > 0;
@@ -165,8 +155,6 @@ static BOOL playingBy(NSDictionary *info) {
     double elapsed = elapsedAt(info, now, now);
     NSString *line = lineFor(info, elapsed);
     sg_shownLine = line;
-    // Like the update's own rewrite: the line replaces the artist when there is one, and the clock is
-    // written either way. Spotify's dictionary keeps every other key.
     %orig(line ? withLine(info, line, elapsed) : withElapsed(info, elapsed));
 }
 

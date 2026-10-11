@@ -1,30 +1,3 @@
-// Vibrations > Music Haptics: the Taptic Engine playing along with the song, taps on the drums and a
-// rumble under the bass, the way Apple Music's Music Haptics feels, worked out live from the sound.
-//
-// Spotify plays through Core Audio units of its own (AudioUnitDriver2 in the binary: converter, EQ, mixer
-// and a RemoteIO output unit, started with AudioOutputUnitStart(_outputUnit)), with no Objective-C
-// method between it and the unit. So Spotify's import of AudioOutputUnitStart is rebound
-// (Core/SGRebind.h), and every RemoteIO unit it starts gets a render notify: after each render, the
-// buffer bound for the speaker is mixed to mono and handed to the analyzer (SGMusicAnalyzer.h) on
-// the render thread, which puts what it hears into a ring of events. That buffer is in the unit's output
-// format, the hardware's, not the one Spotify hands the unit (in the simulator 48 kHz float with a buffer
-// per channel, whatever the client: harness/audio-effects/sim, harness/haptics/sim), so the analyzer runs at
-// the hardware's rate, and a listener on the format follows it to a new one. The render timestamp says when
-// that buffer reaches the output; AVAudioSession's output latency (large over Bluetooth) is added, so
-// a tap lands when its drum is heard. A thread of this file's own takes the events off the ring and
-// schedules them with Core Haptics at those times: each hit a transient, the rumble one looping
-// continuous event whose intensity follows the level. The strength scales both as they are played, and
-// what Music Haptics follows leaves out the snares' taps (Bass) or the rumble (Beat) there too, so a change
-// applies to the next event.
-//
-// The rebinding and the notify are in place under either look, so the switch works at once;
-// with the switch off the notify returns straight away. Nothing listens while Spotify is not the active
-// app, since iOS plays no haptics for an app in the background. Sound that is not Spotify's own
-// output (Connect, AirPlay to another device, video) never passes the unit, and plays no haptics.
-//
-// Threading: the notify runs on the render thread and only touches atomics, the analyzer and the
-// ring; the Core Haptics objects belong to the player thread; the switch, its settings and the app's
-// state are set on the main thread.
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
 #import <CoreHaptics/CoreHaptics.h>
@@ -50,8 +23,6 @@ static const double kRumbleStopAfter = 0.3;
 static const double kRumbleInterval = 0.025;
 static const float kRumbleStep = 0.08f;
 static const NSTimeInterval kRumbleLength = 30;
-// Without events for this long, or for this many IO buffers if that is longer, the rumble goes quiet (the
-// output stopped rendering), and after the longer wait the engine is stopped.
 static const double kQuietAfter = 0.1, kQuietAfterBuffers = 2.5, kEngineStopAfter = 5;
 // An engine that would not start is not asked again for this long.
 static const double kStartRetryAfter = 2;
@@ -64,8 +35,6 @@ static atomic_bool sg_enabled, sg_active, sg_listening;
 static atomic_uint sg_generation;
 static atomic_uint_fast64_t sg_latencyBits;
 static atomic_uint sg_lastFrames;
-// The format of the buffers the notify gets: the rate, and the layout packed into one word so the render
-// thread never reads half of a change (flags in the low 32 bits, then channels, then bytes per sample).
 static atomic_uint_fast64_t sg_sampleRateBits, sg_layout;
 static atomic_uint_fast64_t sg_skipped;   // renders whose buffers were not laid out as the format says
 // The strength's factor and what is followed, set on the main thread, read on the player thread.
@@ -113,9 +82,6 @@ static inline float sampleAt(const void *data, UInt32 index, UInt32 bytes, BOOL 
     return ((const int16_t *)data)[index] / 32768.0f;
 }
 
-// The hardware's format is float with a buffer per channel, but it is read rather than assumed (readFormat),
-// and buffers not laid out the way it says are left alone rather than read as noise: the format read at the
-// start can be a moment old.
 static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
                          UInt32 frames, AudioBufferList *data) {
     if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
@@ -184,9 +150,6 @@ static NSString *formatText(AudioStreamBasicDescription format) {
             (format.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? @", a buffer per channel" : @", interleaved"];
 }
 
-// The format the notify's buffers are in: the RemoteIO unit's output side (element 0, output scope), the
-// hardware's, not the one Spotify hands the unit (the input scope). A format the analyzer cannot read
-// leaves the buffers alone.
 static void readFormat(AudioUnit unit) {
     AudioStreamBasicDescription format = {0}, client = {0};
     UInt32 size = sizeof format;
@@ -196,8 +159,6 @@ static void readFormat(AudioUnit unit) {
     UInt32 bytes = format.mBitsPerChannel / 8;
     BOOL takes = status == noErr && format.mFormatID == kAudioFormatLinearPCM && format.mSampleRate > 0 && format.mChannelsPerFrame >= 1
                  && (bytes == 2 || bytes == 4) && ((format.mFormatFlags & kAudioFormatFlagIsFloat) || (format.mFormatFlags & kAudioFormatFlagIsSignedInteger));
-    // Spotify starts its output again after every pause; the format is logged when it is not the last one.
-    // Spotify's thread and a format change's may both be here.
     static os_unfair_lock lock = OS_UNFAIR_LOCK_INIT;
     static NSString *logged;
     NSString *text = [NSString stringWithFormat:@"music haptics: listening to Spotify's output at %@, from %@ Spotify hands it%@", formatText(format),

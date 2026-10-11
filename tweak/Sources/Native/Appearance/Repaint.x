@@ -18,8 +18,6 @@ __weak UIView *sg_npvBackdropRoot = nil;
                 // The album colour arrives on the plane per track, outside any layout pass.
                 color = NULL;
             } else if (SGIsBaseSurface(color) && SGIsInside(view, sg_homeRoot)) {
-                // Home keeps its cards and its placeholders; only the base surface the gradient
-                // of Native/Home/HomeGradient.x sits behind goes.
                 color = NULL;
             }
         }

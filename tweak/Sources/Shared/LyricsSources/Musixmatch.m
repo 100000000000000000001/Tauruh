@@ -1,8 +1,3 @@
-// Lyrics from Musixmatch. It is the catalogue Spotify licenses, and for part of it Musixmatch also
-// has the time of every word (richsync), which Spotify never sends. The token is an anonymous one
-// asked for as Musixmatch's iOS app, so Musixmatch learns the track's id and nothing of the Spotify
-// account. It is the one source that matches by Spotify's own track id, so it never has to guess at
-// a title, and what it learns about the track is passed to the sources asked after it.
 #import "Core/SGCore.h"
 #import "LyricsSources.h"
 
@@ -105,9 +100,6 @@ static void withToken(void (^use)(NSString *token)) {
 
 #pragma mark - the three shapes Musixmatch has lyrics in
 
-// [{ "ts": 27.16, "te": 28.25, "x": "I've been tryna call", "l": [{ "c": "I've", "o": 0.03 }, { "c": " ", "o": 0.41 }, …] }]
-// o is from the line's start. A space entry ends the word before it; a word can come in more than
-// one entry ("Milion", "+", ","), so everything between two spaces is one word.
 static SGKaraokeLine *richsyncLine(NSDictionary *entry, NSInteger start, NSInteger end) {
     NSMutableArray<SGKaraokeWord *> *words = [NSMutableArray array];
     BOOL open = NO;     // the word last added may still take further entries
@@ -129,9 +121,6 @@ static SGKaraokeLine *richsyncLine(NSDictionary *entry, NSInteger start, NSInteg
             last.text = [last.text stringByAppendingString:trimmed];
             continue;
         }
-        // A syllable of an unspaced script stands as a word of its own. Musixmatch times each one,
-        // but sends no space to end it, so running them together is what left a Japanese or Chinese
-        // line lighting up whole instead of sweeping.
         last.end = MAX(at, last.start);
         SGKaraokeWord *word = [SGKaraokeWord new];
         word.text = trimmed;
@@ -179,8 +168,6 @@ static SGLyricsResult *fromRichsync(id body) {
     return lyrics;
 }
 
-// [{ "text": "Yeah, yeah", "time": { "total": 3.32 } }, …, { "text": "", "time": { "total": 241.15 } }]
-// An empty text is a break, and the last one marks the end.
 static SGLyricsResult *fromSubtitles(id body) {
     if (![body isKindOfClass:NSArray.class] || ![body count]) return nil;
     NSMutableArray<NSNumber *> *starts = [NSMutableArray array];
@@ -243,8 +230,6 @@ static void finish(NSString *trackID, SGLyricsResult *lyrics, BOOL answered) {
     for (void (^done)(SGLyricsResult *) in waiting) done(lyrics);
 }
 
-// What the matcher settled on, kept even when Musixmatch may show no lyrics: the sources asked after
-// this one search by name, and this is the best name anyone has.
 static SGLyricsResult *withTrack(SGLyricsResult *lyrics, id track) {
     if (![track isKindOfClass:NSDictionary.class]) return lyrics;
     SGLyricsResult *result = lyrics ?: [SGLyricsResult new];

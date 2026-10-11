@@ -272,8 +272,6 @@ static NSString *signedNumber(double value, int decimals) {
 
     [_reset sizeToFit];
     _reset.frame = CGRectMake(width - kSide - _reset.bounds.size.width, 0, _reset.bounds.size.width, kBarHeight);
-    // Measured here: a button's configuration catches up with a new title only on its next pass, so
-    // sizeToFit would still be fitting the old name.
     if (_presets) {
         NSString *title = _presets.configuration.title ?: @"";
         CGFloat needed = ceil([title sizeWithAttributes:@{NSFontAttributeName: SGTitleFont()}].width) + 5 + 12;
@@ -343,8 +341,6 @@ static NSString *signedNumber(double value, int decimals) {
     if (_equalizer) SGDSPEqualizerResponse(_gains, kPoints, frequencies, values);
     else SGDSPCompanderResponse(_gains, kPoints, frequencies, values);
 
-    // Past the plot's edges the mask cuts the curve off; points kept near them keep a runaway value
-    // from stretching the path.
     CGRect plot = [self plotRect];
     CGFloat low = CGRectGetMinY(plot) - 40, high = CGRectGetMaxY(plot) + 40, zero = [self yFor:0];
     UIBezierPath *line = [UIBezierPath bezierPath], *area = [UIBezierPath bezierPath];
@@ -363,8 +359,6 @@ static NSString *signedNumber(double value, int decimals) {
     }
     [area closePath];
 
-    // A shape layer's path has no implicit animation, so the curve morphs by hand, from wherever it is
-    // now; the handles are plain layers and slide on their own.
     CAMediaTimingFunction *easing = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
     if (animated) {
         [self morph:_curve to:line timing:easing];
@@ -457,8 +451,6 @@ static NSString *signedNumber(double value, int decimals) {
     return _equalizer ? [number stringByAppendingString:@" decibels"] : number;
 }
 
-// The band whose handle is under `point`: the nearest by frequency, if the finger is close enough to its
-// handle. Anywhere else on the plot a drag scrolls the page instead.
 - (NSInteger)bandAt:(CGPoint)point {
     NSInteger nearest = -1;
     CGFloat distance = CGFLOAT_MAX;

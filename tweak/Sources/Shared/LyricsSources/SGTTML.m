@@ -1,26 +1,5 @@
-// TTML, the shape Apple Music writes its lyrics in and the one BiniLyrics and Unison serve.
-//
-// <p begin="0:13.148" end="0:15.705" ttm:agent="v1">
-//   <span begin="0:13.148" end="0:13.385">You</span> <span …>called</span>
-//   <span ttm:role="x-bg"><span begin="0:15.083" end="0:15.401">(Aye,</span> …</span>
-// </p>
-//
-// Two things here exist in no other source the mod reads. ttm:agent names the voice, which is how a
-// duet ends up on two sides of the page; a span with the x-bg role holds the backing vocals sung
-// under the line. The third is quieter but matters more: the spans of a Japanese or Chinese line sit
-// flush against each other with no whitespace between them, and that is the only way to tell that a
-// syllable continues a word rather than starting one.
-//
-// The head can carry the lines again in two more ways, each keyed to its line by the itunes:key of
-// the <p>: Apple's translations, as text, and its pronunciations (transliterations), spelt in the
-// Latin alphabet and timed by spans that start with the words of the line they spell out.
-//
-// <iTunesMetadata><translations><translation xml:lang="en-US"><text for="L1">I'm so drunk …
-// <transliterations><transliteration xml:lang="ja-Latn"><text for="L1"><span begin=…>zenbu</span> …
 #import "LyricsSources.h"
 
-// A begin or end: seconds ("1.241"), minutes ("0:01.241"), hours ("1:02:03.456"), or a clock value
-// with a unit after it ("1.5s", "500ms"). Negative on a value that is none of these.
 static NSInteger msOfClock(NSString *clock) {
     NSString *text = [clock stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
     if (!text.length) return -1;
@@ -152,8 +131,6 @@ typedef NS_ENUM(NSInteger, SGTTMLPart) {
         _bgDepth = _spanDepth;
         return;
     }
-    // A span nested inside one that is already being read is ruby or a translation: its characters
-    // belong to the word around it rather than making a word of their own.
     if (_word) return;
     NSInteger start = msOfClock(attributes[@"begin"]), end = msOfClock(attributes[@"end"]);
     if (start < 0) return;
@@ -264,8 +241,6 @@ typedef NS_ENUM(NSInteger, SGTTMLPart) {
 
 #pragma mark - what the head adds to the lines
 
-// The letters and digits alone, lowercased: a pronunciation or a translation that reads the same as its
-// line is the line again, as an English line of a Japanese song is spelt out as itself.
 static NSString *bareText(NSString *text) {
     NSMutableString *bare = [NSMutableString string];
     NSCharacterSet *kept = NSCharacterSet.alphanumericCharacterSet;
@@ -277,8 +252,6 @@ static NSString *bareText(NSString *text) {
     return bare;
 }
 
-// The translation the Lyrics page asks for: the one in that language, whichever the region ("en"
-// takes "en-US"), and none in any other; with no language asked for, the first the document has.
 static NSString *translationLanguage(NSArray<NSString *> *languages) {
     NSString *wanted = SGLyricsTranslationLanguage();
     if (!wanted.length) return languages.firstObject;
@@ -344,8 +317,6 @@ NSArray<SGKaraokeLine *> *SGTTMLLines(NSString *xml) {
     SGTTMLReader *reader = [SGTTMLReader new];
     NSXMLParser *parser = [[NSXMLParser alloc] initWithData:data];
     parser.delegate = reader;
-    // The TTML namespaces carry nothing the reader needs, and the prefixes it matches on
-    // ("ttm:agent") only survive while they are left alone.
     parser.shouldProcessNamespaces = NO;
     [parser parse];
     if (!reader.lines.count) return nil;

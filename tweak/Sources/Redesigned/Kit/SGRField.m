@@ -9,8 +9,6 @@ NSNotificationName const SGRFieldColorDidChangeNotification = @"spotifyglass.red
 
 static const CGFloat kFallbackHeight = 874;   // a window-less field sizes for an iPhone 17 Pro
 
-// Where the colour starts fading to black and where it is black, as shares of the window's height:
-// the redesign is AMOLED throughout (SGRAmoled.x).
 static const CGFloat kBlackFrom = 0.55, kBlackTo = 1;
 
 static CGFloat windowHeight(UIView *view) {
@@ -18,8 +16,6 @@ static CGFloat windowHeight(UIView *view) {
     return height > 0 ? height : kFallbackHeight;
 }
 
-// The field paints on sublayers of its own rather than on the view's layer: a repaint hook only clears
-// the paint of a view's own layer, so the neutral colour cannot be taken for Spotify's base surface.
 static NSDictionary *noActions(void) {
     static NSDictionary *none;
     static dispatch_once_t once;

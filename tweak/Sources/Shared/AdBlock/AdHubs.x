@@ -1,8 +1,3 @@
-// Ad components taken out of the Hub JSON Home, Browse and Search pages are built from, before
-// the builder renders them (EeveeSpotify's HubsAdBlocker). A component is an ad when its
-// namespace, name, id, type or the keys of its metadata, logging or custom dictionaries say so;
-// its title never counts, "Billboard Hot 100" is a playlist. The plain ad words go with the ads
-// switch, a promotion word next to a surface word with the upsells one.
 #import "Core/SGCore.h"
 #import "AdBlock.h"
 

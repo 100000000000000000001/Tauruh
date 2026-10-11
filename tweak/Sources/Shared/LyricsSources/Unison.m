@@ -1,9 +1,3 @@
-// Unison, the lyrics people write for Better Lyrics by hand. It is a small corpus next to the rest,
-// but what is in it is Apple Music's own TTML at its best, so it earns being asked early: what it
-// misses the next source answers, and what it has beats what that source would have given.
-//
-// Reads need no key. The write half of its API — submitting, voting, reporting — is signed, and the
-// mod does none of it: it asks for lyrics and nothing else.
 #import "Core/SGCore.h"
 #import "LyricsSources.h"
 

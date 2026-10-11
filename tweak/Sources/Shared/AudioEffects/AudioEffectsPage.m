@@ -1,7 +1,3 @@
-// The Audio effects page. It is not an SGModPage: its sliders store as they move, its cards open out
-// into their controls as their switches go on, and its status line and the effects' errors come and go
-// while it is open, none of which a page of fixed rows does. It keeps Settings/'s look all the same: the
-// cards, the 13pt titles over 11pt subtitles, the tiles, the value and the chevron, the checkmark lists.
 #import <CoreText/SFNTLayoutTypes.h>
 #import "Core/SGCore.h"
 #import "Settings/SGPage.h"
@@ -175,8 +171,6 @@ static double snapped(NSString *key, double value) {
     return MAX(range.min, MIN(range.max, value));
 }
 
-// "−3.5 dB", "+2 dB", "60 ms", "0.22 s", "60%": the step's decimals unless the number is whole, a sign
-// where the range runs both ways, and a real minus.
 static NSString *numberText(SGDSPRow *row, double value) {
     if (row.names.count) {
         NSInteger index = (NSInteger)lround(value);
@@ -317,8 +311,6 @@ static UIFont *tabular(UIFont *font) {
 
 #pragma mark - a choice's list
 
-// The names a choice picks from, a checkmark against the one set. Unlike Settings' own list it stays
-// open after a pick, so one reverb room after another can be heard before going back.
 @interface SGDSPChoicePage : SGPage
 - (instancetype)initWithRow:(SGDSPRow *)row;
 @end
@@ -631,8 +623,6 @@ static UIView *valueAndChevron(NSString *text) {
     return SGDequeueCell(table, @"row");
 }
 
-// The value on the right beside the chevron where it fits next to the title, and under the title
-// where it does not: the compressor's transforms are longer than a narrow phone has room for.
 - (UITableViewCell *)valueCell:(UITableView *)table title:(NSString *)title value:(NSString *)value {
     UITableViewCell *cell = SGDequeueCell(table, @"value");
     CGFloat card = table.bounds.size.width - table.layoutMargins.left - table.layoutMargins.right;
@@ -683,8 +673,6 @@ static UIView *valueAndChevron(NSString *text) {
     [self showStatus];
 }
 
-// The effect's rows come in under its switch, or go, rather than the page reloading around them; then the
-// card is scrolled into view, as much of it as the screen holds.
 - (void)effectToggled:(UISwitch *)toggle {
     NSInteger section = toggle.tag;
     SGDSPEffect *e = [self effectIn:section];

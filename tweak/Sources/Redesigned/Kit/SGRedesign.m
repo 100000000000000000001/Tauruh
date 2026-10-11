@@ -2,8 +2,6 @@
 #import "Core/SGCore.h"
 #import "SGRedesign.h"
 
-// Written from the constructors, read by the configuration provider on whatever thread it asks from;
-// the lock only guards the swap of the immutable table.
 static os_unfair_lock sg_flagsLock = OS_UNFAIR_LOCK_INIT;
 static NSDictionary<NSString *, id> *sg_flags;
 

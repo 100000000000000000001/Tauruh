@@ -1,21 +1,3 @@
-// Player redesign: previous, play and next as bare glyphs, the way the Music app draws them, and the
-// timestamps under the slider in digits of one width, so they stop twitching every second.
-//
-// The glyphs are drawn over Spotify's controls rather than instead of them: each button keeps its
-// action, its enabled state, its accessibility and the Gestures zones around it, and the glyph takes no
-// touches. Previous and next get theirs inside the button's content view, so the button's own press
-// and disabled look carry over; Spotify's icon under it goes transparent on every pass (SPTEncoreIconView
-// is a Swift class, which SGRSuppress cannot keep). Play loses its white disc, a plain UIImageView the
-// size of the button, which SGRSuppress keeps transparent, and the glyph over it follows the player's state.
-//
-// Tree (trees/clean/player/01.txt): PlaybackControlsElementsUnit's view holds
-// id=SPTNowPlayingPreviousTrackButton 56x56 > UIView > StackView > StackView > SPTEncoreIconView (:257),
-// id=SPTNowPlayingPlayButton (PlayButtonView 64x64, :266) > CondensedButton (a UIButton,
-// objc-meta-Spotify.txt:207312) > UIImageView 64x64 and a hidden SpinnerView, next to a hidden UIView
-// holding a UIImageView (:277), and id=SPTNowPlayingNextTrackButton. DurationElementUnit's view holds
-// id=now-playing-time-take-label and id=now-playing-time-remaning-label, SPTEncoreLabels whose UILabel
-// is id=...-internal (:227). The sticky header has a play button of its own (:492), which a search
-// inside the unit's view never reaches.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Player.h"
@@ -24,8 +6,6 @@ static const CGFloat kSkipGlyphSize = 32, kPlayGlyphSize = 44;
 // A spinner that is still up this long after a state change is buffering, not a track starting.
 static const NSTimeInterval kSpinnerCheck = 0.6;
 
-// After a tap the glyph shows what the tap asked for, and a state still saying the opposite is taken for
-// one sent before the player caught up, for this long; after it the player's word is final.
 static const NSTimeInterval kTapTrust = 1.2;
 
 static char kPreviousKey, kNextKey, kPlayKey, kGlyphKey, kTakeKey, kRemainingKey;
@@ -60,9 +40,6 @@ static SGRGlyphView *glyphFor(UIView *owner, NSString *symbol, CGFloat size) {
     return glyph;
 }
 
-// Centred by the autoresizing mask as well as here: the unit lays out before the buttons in its row
-// have a size, so a centre set then is the middle of nothing, (0, 0), and no later pass of the unit's
-// comes to move it (trees/continuous/1.txt, 2026-09-17: glyphs at {-23.7, -14.7} in 56pt buttons).
 static void keepOnTop(UIView *view, UIView *host) {
     if (view.superview != host) {
         view.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin
@@ -118,9 +95,6 @@ static void refreshPlayGlyph(BOOL animated) {
     [glyph setSymbol:symbolFor(state.isPaused) animated:animated];
 }
 
-// The player's state reaches the glyph a beat after the tap (the request goes through the player core
-// and comes back as a state), which read as a slow button; Spotify's own disc turns at the touch. So the
-// glyph turns at the touch too, to the opposite of what it shows, and the state settles it after.
 static void playTapped(void) {
     SGRGlyphView *glyph = sg_playGlyph;
     if (!glyph || glyph.alpha == 0) return;
@@ -215,9 +189,6 @@ static UILabel *monospaced(UIView *host, NSString *identifier, const void *findK
     return label;
 }
 
-// The action the play button's own UIButton sends (objc-methods.txt: -[PlayButtonView uiButtonTapped]).
-// Only the player's button turns the glyph: the sticky header and every page with a play button of
-// its own use the same class.
 %hook _TtC28EncoreConsumerMobile_BaseKit14PlayButtonView
 - (void)uiButtonTapped {
     %orig;

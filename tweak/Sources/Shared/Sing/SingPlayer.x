@@ -1,5 +1,3 @@
-// SPTPlayerState.position and SPTEsperantoPlayer's commands are verified in Spotify 9.1.78
-// (Headers/SPTPlayer.h). The position hook is the one audible clock used by Spotify's progress UI.
 #import "Core/SGCore.h"
 #import "SGSingController.h"
 #import "Shared/Player/PlayerState.h"
@@ -19,8 +17,6 @@ double SGSingSourcePosition(SPTPlayerState *state) {
 %end
 
 %hook SPTEsperantoPlayer
-// seekTo: answers with an object (@24@0:8d16 in 9.1.78) that its caller may keep, so the hook hands it
-// on: declared void, the call after %orig would leave the caller whatever that call left in x0.
 - (id)seekTo:(double)seconds {
     SGSingPlaybackWillChange();
     id result = %orig;
@@ -49,8 +45,6 @@ double SGSingSourcePosition(SPTPlayerState *state) {
 
 %hook MPNowPlayingInfoCenter
 - (void)setNowPlayingInfo:(NSDictionary *)info {
-    // PlayerState is main-thread data. Off-main reports are corrected by the controller's next
-    // clock publication; never read its Objective-C ownership from an audio/player callback.
     SPTPlayerState *state = NSThread.isMainThread ? SGPlayerState() : nil;
     double position;
     if (info[MPNowPlayingInfoPropertyElapsedPlaybackTime] &&

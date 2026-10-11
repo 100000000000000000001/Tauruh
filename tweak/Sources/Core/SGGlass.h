@@ -10,5 +10,3 @@ void SGHideGlassFrom(UIView *host, NSUInteger count);
 // Glass takes its shape from cornerConfiguration on iOS 26; layer.cornerRadius is the fallback.
 void SGShapeGlass(UIView *glass, CGFloat radius, BOOL capsule);
 
-// The areas each look keeps transparent are its own: Native/Appearance/Repaint.h and
-// Redesigned/Kit/SGRRepaint.h.

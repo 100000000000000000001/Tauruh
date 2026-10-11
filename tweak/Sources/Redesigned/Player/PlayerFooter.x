@@ -1,24 +1,3 @@
-// Player redesign: the footer as the Music app's row of three glyphs, lyrics, devices and queue, spread
-// evenly across the player, and no share button.
-//
-// Spotify's footer is Connect with the device's name at the leading edge, share, and the queue at the
-// trailing edge. Connect and the queue stay Spotify's controls (the device sheet, the remote device
-// tint, the Jam avatars) and are only moved, by a translation of the arranged view that holds each: a
-// transform survives the stack view laying them out again, and moving the holder keeps its touches
-// inside its own bounds. The device name goes transparent, since the glyph alone sits in the middle.
-// Spotify has no lyrics control down here, so that one is the Kit's glyph button, and it turns the
-// lyrics in the player on and off (PlayerLyrics.x): filled while they are up, dimmed and dead for a
-// track that has none.
-//
-// The row sits lower than Spotify puts it, just over the home indicator the way the Music app's does
-// (issue #54): the footer unit's view is translated down, the controls follow it part of the way, and a
-// band of the redesign's hands the touches below the bottom stack's bounds back to the row.
-//
-// Tree (trees/clean/player/01.txt:295-320): FooterElementsUnit's view 402x44 > UIStackView 382x44 >
-// ElementView > ConnectButtonOutputSwitcherViewHolder id=Components.ConnectButtonOutputSwitcher 153x36
-// (a 19x19 UIImageView glyph and a MarqueeLabel with the device name), a spacer, a hidden media trimmer,
-// ElementView > EncoreButton id=ShareButtonNowPlayingView 44x44, ElementView > Queue control
-// id=QueueButtonNowPlaying 47x32.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Player.h"
@@ -30,13 +9,7 @@ static NSString *const kLyricsSymbol = @"quote.bubble", *const kLyricsSymbolOpen
 static const CGFloat kLeading = 0.2, kMiddle = 0.5, kTrailing = 0.8;
 static const CGFloat kGlyphMaxWidth = 30;
 
-// Issue #54: Spotify ends its bottom stack 61pt above the screen's bottom (01.txt:127, 576.67 + 236 of
-// 874), so the row's middle sat 83pt up, well clear of the home indicator, and the controls crowded it.
-// The Music app keeps that row just over the home indicator: its middle this far above the safe area's
-// bottom, and never less than kRowMinBottom above the screen's on a phone without a home indicator.
 static const CGFloat kRowAboveSafeArea = 20, kRowMinBottom = 34;
-// The controls follow a share of the row's move when nothing stands between them, so the gaps above
-// and below them even out instead of all the room opening under them.
 static const CGFloat kControlsShare = 0.3;
 
 static char kConnectKey, kShareKey, kTrimmerKey, kQueueKey, kLyricsGlyphKey, kReachKey;
@@ -89,8 +62,6 @@ void SGRPlayerLyricsChanged(void) {
     BOOL enabled = SGRPlayerLyricsAvailable() || SGRPlayerLyricsOpen(), open = SGRPlayerLyricsOpen();
     BOOL wasOpen = [glyph.glyph.symbol isEqualToString:kLyricsSymbolOpen];
     if (glyph.enabled == enabled && wasOpen == open) return;
-    // Lyrics turn up once the player has fetched them, well after the footer laid out: a fade, not a pop.
-    // While the player opens or closes the glyph and the lyrics come and go together, so nothing animates.
     BOOL animated = glyph.window && !SGRPlayerIsTransitioning();
     [glyph.glyph setSymbol:open ? kLyricsSymbolOpen : kLyricsSymbol animated:animated];
     void (^mark)(void) = ^{
@@ -132,10 +103,6 @@ static UIView *connectGlyphIn(UIView *holder) {
 
 #pragma mark - lower down
 
-// Moved down, the row is drawn partly below the bottom stack it is arranged in, and UIKit does not look
-// into a view for a touch outside its bounds. This band over the part that hangs out hands such a touch
-// to the row itself, and lets every other one through. It asks nothing of a row that cannot be seen, the
-// stack it is in faded out included (the lines alone, PlayerLyrics.x).
 @interface SGRFooterReach : UIView
 @property (nonatomic, weak) UIView *row;
 @end

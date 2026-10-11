@@ -25,8 +25,6 @@ static id ownerOf(UIView *button, NSString *kind) {
     return nil;
 }
 
-// `length` bytes of the stored property `name`, NULL when the class has no such property or it would reach
-// past the end of the instance.
 static const uint8_t *propertyBytes(id object, const char *name, size_t length) {
     if (!object) return NULL;
     Class cls = object_getClass(object);
@@ -54,10 +52,6 @@ BOOL SGRReadDownload(UIView *source, SGRDownloadState *state, CGFloat *progress)
     SGRDownloadState said = SGRDownloadNone;
     BOOL named = stateFromIdentifier(button.accessibilityIdentifier, &said);
 
-    // What the button draws from. Its state is a Swift enum without payloads, one byte, its cases numbered
-    // in the order they are declared; its progress an optional 8 byte number, the value then a byte that is
-    // 1 when there is none. The identifier says the same state in words, and is what counts when the model
-    // cannot be read.
     id owner = ownerOf(button, @"GranularDownloadButton");
     const uint8_t *current = propertyBytes(owner, "currentState", 1);
     const uint8_t *stored = propertyBytes(owner, "progress", 9);
@@ -218,8 +212,6 @@ static UIColor *tintFor(SGRDownloadState state) {
 
 - (void)didMoveToWindow {
     [super didMoveToWindow];
-    // Core Animation drops a repeating animation when the layer leaves the window; the turning ring is put
-    // back on the way in.
     if (self.window && _showsState && _state == SGRDownloadWaiting) [self sgr_setProgress:-1 animated:NO];
 }
 
@@ -279,8 +271,6 @@ static UIColor *tintFor(SGRDownloadState state) {
         return;
     }
 
-    // One symbol for another (not downloaded to downloaded, say, when it happened while the page was away):
-    // the symbol replaces itself in place.
     if (!ring && !wasRing) {
         UIImage *image = symbolFor(state);
         if (@available(iOS 17.0, *)) {
@@ -298,8 +288,6 @@ static UIColor *tintFor(SGRDownloadState state) {
         return;
     }
 
-    // One shape for the other: the old one shrinks away as the new one grows in with a little bounce. A
-    // download that ends closes its ring first, so the last moment of it is seen before the arrow lands.
     UIView *outgoing = wasRing ? _ring : _symbol, *incoming = ring ? _ring : _symbol;
     BOOL closeRing = wasRing && state == SGRDownloadDownloaded;
     if (closeRing) [self sgr_closeRing];

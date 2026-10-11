@@ -1,12 +1,3 @@
-// Spoof Premium: the UCS response, which carries the account's product state and its remote
-// config, rewritten as it arrives. The attributes and the flag rules are EeveeSpotify's. Offline,
-// audio quality and the social session attributes are left alone: the server still decides those,
-// and a spoofed one only shows UI the request behind it will fail.
-//
-// UcsResponse: 1 ResolveResponse { 1 ResolveConfiguration { 3 repeated AssignedValue } },
-//   3 AccountAttributesResponse { 1 repeated entry { 1 key, 2 AccountAttribute { 2 bool, 4 string } } }
-// AssignedValue: 1 { 1 scope, 2 name }, 3 BoolValue { 1 }, 4 IntValue { 1 }, 5 EnumValue { 1 }
-// A customize body is CustomizeMessage { 1 UcsResponse }; bootstrap wraps that in 2 { 1 { 1 { it } } }.
 #import "Core/SGCore.h"
 #import "AdBlock.h"
 #import "Protobuf.h"
@@ -384,8 +375,6 @@ static NSData *patchConfiguration(NSData *configuration) {
             switch (rules[i].kind) {
                 case SGRuleRemove: removed = YES; break;
                 case SGRuleSet:
-                    // Set changes a boolean that is there; a value of another kind (a count of seconds, say)
-                    // under the same name is left as the server sent it rather than turned into a false.
                     if (SGPBFirst(value, 3)) setValue(value, SGPBBytes(3, boolValue(rules[i].on)));
                     break;
                 case SGRuleForce: setValue(value, SGPBBytes(3, boolValue(rules[i].on))); break;

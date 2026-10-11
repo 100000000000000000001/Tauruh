@@ -1,27 +1,3 @@
-// Vibrations > Controls: a tap for what a finger does to playback, in the full screen player and the
-// now playing bar (SGFeedback.m holds which tap each gets).
-//
-// Buttons: every control's action passes -[UIControl sendAction:to:forEvent:] (target and action) or
-// -[UIControl sendAction:] (a UIAction), so the controls are told apart there by accessibility
-// identifier, after they have acted. Tree (trees/clean/player/01.txt): id=SPTNowPlayingPlayButton is the
-// PlayButtonView (:266, and the sticky header's :492) around the UIButton that acts (CondensedButton, :272),
-// in the bar too (trees/clean/home/01.txt:1281); id=SPTNowPlayingPreviousTrackButton and ...NextTrackButton
-// are Encore buttons (:257, :282); id=Components.UI.ShuffleButton and Nowplaying-RepeatButton are
-// EncoreButtons, UIButtons (:247, :290); id=Components.UI.AddToButton is a UIButton (:205, :425 on a card,
-// home/01.txt:1296 in the bar).
-// Play or pause is read off the player's state before the button acts, since the tap turns it.
-//
-// Scrubbing: the position slider is NowPlaying_ECMKit.ProgressBar.Slider, a UISlider
-// (id=SPTNowPlayingSliderV2, :216) that overrides UIControl's begin, continue and endTracking
-// (objc-methods.txt:83559); a tap when it is taken, a tick at every tenth of the song it passes, a firmer one at
-// either end, a soft one when it lets go.
-//
-// Cover swipes: the player's covers are a list of pages scrolled sideways (AccessibleCollectionView,
-// :28) and so are the bar's titles (NowPlaying_BarImpl.InformationCollectionView, home/01.txt:1104);
-// a tick when a drag or its fling carries the list past halfway to the next page, where letting go skips.
-//
-// Gestures (Shared/Gestures) tell of each action a double tap performs; the lyrics page's tap to seek
-// plays its tap in Redesigned/Lyrics/SGRKaraokeView.m.
 #import "Core/SGCore.h"
 #import "Shared/Gestures/Gestures.h"
 #import "Shared/Player/PlayerState.h"

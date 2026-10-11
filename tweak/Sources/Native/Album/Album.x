@@ -1,14 +1,3 @@
-// Album: hides parts of the album page, one switch each in Mod Settings > Home & Library > Album,
-// and puts the blurred cover behind its header.
-//
-// Trees (trees/continuous/*.txt): the page is a CreativeWorkTemplateView with that identifier (the
-// artist page is TemplateKit's TemplateView instead). Its first child is the header's background,
-// a HeaderView holding Spotify's GradientView; the header itself scrolls with the list, its buttons
-// one UIStackView of element views, each holding a button with an accessibility identifier.
-//
-// Below the tracks every row is an Element_List cell, sectioned the way Artist/Artist.x describes: a
-// heading cell (SectionHeadingHome), the carousel or card, a 16pt spacer. The copyright closes the
-// page right after the last section, so it counts as a heading of its own and stays.
 #import "Core/SGCore.h"
 #import "Album.h"
 
@@ -95,8 +84,6 @@ static void applyBackdrop(UIView *page) {
 }
 %end
 
-// The cover loads after the page is laid out, and a new image lays nothing out. Only the 248pt
-// cover is wide enough to be worth walking up from.
 %hook UIImageView
 - (void)setImage:(UIImage *)image {
     %orig;

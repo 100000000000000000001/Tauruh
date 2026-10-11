@@ -1,37 +1,7 @@
-// Artist redesign: the header the playlist and album pages have. The photo runs full bleed across the top
-// of the page and dissolves into the page's colour; the name and the monthly listeners are centred on the
-// bottom of that dissolve; and under them one row -- shuffle, a white Play capsule, and Follow.
-//
-// Tree (trees/clean/artist/01.txt:37-170). The header is TemplateKit's HeaderContainer, 568pt, the first view
-// of the page's stack, holding an element view that holds the ImageHeaderView:
-//
-//     UIView 402x424 clips                    the photo (Components.Header.UI.ArtworkImage) and a gradient
-//     UIView {16, 334}                        the name, Encore.AdaptiveTitle, 45pt
-//     ImageHeaderView.VerifiedBadge           "Verified by Spotify"
-//     Components.Header.UI.Metadata           "58,4M monthly listeners"
-//     UIStackView {4, 456} 394x48             explore, Follow (Curation.FollowButtonElementKit.FollowButton,
-//                                             a text button), more, Components.UI.ShuffleButton, and
-//                                             header-play-button
-//     UIStackView {0, 504} 402x64             Components.UI.ArtistHeadline, "Pre-save the upcoming album"
-//     HeaderForegroundView                    the 100pt navigation bar with the name, shown collapsed
-//
-// Scrolled (02.txt:26-30), the container keeps its 568pt and scrolls away with the page, while the element
-// view slides down inside it and the ImageHeaderView shrinks to the 100pt bar, pinned at the top of the
-// screen. So the photo and the redesign's text are the container's, not the ImageHeaderView's: in the header
-// view they would be pinned at the top with it. The bar stays Spotify's, drawing the name once the page is
-// scrolled, with its gradient masked out as the album's is.
-//
-// Everything else of the ImageHeaderView is drawn by nothing (an empty mask) and takes no touches: the badge,
-// Explore, and the headline go with it -- the headline's pre-save is also the list's own Release Countdown
-// section. The Kit's SGRHeaderInfo reads the name and the listeners off Spotify's concealed labels and draws
-// and fires Spotify's shuffle, play and Follow, Follow as a glyph from the collection (ArtistFollow.x). More stays in Spotify's row, where the row needs it (ArtistField.x), and the Kit's pinned ⋯
-// (SGRPinnedMore) draws and fires it from the top trailing corner of the page, level with the back button.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Artist.h"
 
-// How much of the photo's height the dissolve into the field covers, and the scrim over the top of it that
-// keeps the status bar and the back button legible on a bright picture. The playlist's and the album's.
 static const CGFloat kDissolve = 0.46, kTopScrim = 140, kTopScrimAlpha = 0.28;
 // A photo view narrower than this is a placeholder glyph, and a picture shorter than this one mid load.
 static const CGFloat kMinCover = 80, kMinHero = 120;
@@ -43,9 +13,6 @@ static char kTitleKey, kMetaKey, kShuffleKey, kPlayKey, kFollowKey, kArtworkKey,
 
 #pragma mark - Spotify's views
 
-// Drawn by nothing and out of the way of touches, whatever Spotify does to it: an empty mask. Not hidden --
-// the header's OverflowStackView traps when a view in it hides, and a hidden view is one the redesign still
-// has to read and fire.
 static void blank(UIView *view) {
     if (!view) return;
     if (!view.layer.mask) view.layer.mask = [CALayer layer];
@@ -81,14 +48,9 @@ static UIView *containerOf(UIView *header) {
 
 #pragma mark - the photo, full bleed
 
-// The picture across the top of the page with the field showing through the bottom of it: a scrim over the
-// top for the status bar, and under it a fade to the very colour the page's field is drawing.
 @interface SGRArtistHero : UIView
 @property (nonatomic, readonly) UIImageView *picture;
 @property (nonatomic, copy) UIColor *fieldColor;
-// The photo in Spotify's artwork view, and every photo it puts there afterwards: the hero keeps itself
-// right, rather than being handed a picture on each of the header's passes and staying empty between them.
-// The same view again only re-reads it.
 - (void)followArtwork:(UIImageView *)source;
 @end
 
@@ -165,9 +127,6 @@ static UIView *containerOf(UIView *header) {
     SGRObserveImage(source, ^(UIImageView *view) { [weakSelf takeArtwork:view late:YES]; });
 }
 
-// `late` is a photo that arrived after the header had laid out -- the artist opened for the first time,
-// whose picture is still being fetched while the page is already on screen (issue #52). The log line says
-// once that the watch, and not one of the header's passes, is what filled the hero.
 - (void)takeArtwork:(UIImageView *)source late:(BOOL)late {
     UIImage *image = source.image;
     if (!image || _picture.image == image) return;
@@ -184,9 +143,6 @@ static UIView *containerOf(UIView *header) {
 
 @end
 
-// The image view of Spotify's artwork: the one with the photo in it, or, before the photo has been fetched,
-// the empty one it will land in, so it can be watched from the first pass. Either way one the size of the
-// picture, never a small placeholder glyph beside it.
 static UIImageView *photoIn(UIView *artwork) {
     __block UIImageView *found = nil, *empty = nil;
     SGForEachView(artwork, ^(UIView *v) {
@@ -199,8 +155,6 @@ static UIImageView *photoIn(UIView *artwork) {
     return found ?: empty;
 }
 
-// The picture from the top of the container down to `bottom`, which comes from the container at rest and only
-// ever grows, so it does not change size while the page loads or scrolls.
 static void applyHero(UIView *container, UIView *artwork, CGFloat bottom) {
     SGRArtistHero *hero = objc_getAssociatedObject(container, &kHeroKey);
     if (!hero) {
@@ -226,9 +180,6 @@ static void applyHero(UIView *container, UIView *artwork, CGFloat bottom) {
 
 static void applyHeader(UIView *header);
 
-// Spotify's navigation bar, the one part of the header kept: collapsed, it is where the name is. Its gradient
-// is a flat dark band over the field, as the album's was (Album/AlbumHeader.x); the soft top edge every
-// redesigned page has keeps the name legible instead.
 static UIView *keepBar(UIView *header) {
     UIView *foreground = nil;
     for (UIView *sub in header.subviews) {
@@ -286,27 +237,17 @@ static void applyHeader(UIView *header) {
     // The listeners are waited for with the name and Play: arriving late they pushed the name up by a line.
     if (name && play && listening) SGRRevealMark(page, SGRRevealHeader);
 
-    // More, in the top trailing corner of the page itself rather than of the container, which scrolls away
-    // with the photo: pinned there it is the same button in the same place on the album and the playlist,
-    // and the page keeps it however far down the list one is (issue #57).
     UIView *more = SGRFindByIdentifier(header, @"Components.UI.ContextMenuButton*", &kMoreKey);
     SGRPinnedMore(page, &kMoreButtonKey, more);
 
-    // Collapsing, the text would pass over Spotify's bar with the name in it: it goes over the last kFade of
-    // the collapse, from the header's own height, which this pass runs on every step of. More stays: it is
-    // outside the header and has nothing to pass over.
     CGFloat alpha = MAX(0, MIN(1, (header.bounds.size.height - kBar) / kFade));
     if (fabs(info.alpha - alpha) > 0.01) info.alpha = alpha;
 
-    // The picture reaches to where the content's top is at rest, plus the name. The container keeps its
-    // height as the header collapses, and only ever grows as the page loads.
     CGFloat rest = MAX([objc_getAssociatedObject(container, &kContainerHeightKey) doubleValue], container.bounds.size.height);
     objc_setAssociatedObject(container, &kContainerHeightKey, @(rest), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     CGFloat bottom = rest - SGRHeaderInfoBottom - [info contentHeightForWidth:container.bounds.size.width] + SGRHeaderInfoTitleRise;
     applyHero(container, artwork, bottom);
 
-    // The buttons arrive after the header has laid out, in a row that keeps its size and so lays nothing out
-    // again (Native/Artist/Artist.x): the row's own pass is watched, a plain UIStackView.
     UIView *row = shuffle ?: play ?: follow;
     while (row && row.superview != header) row = row.superview;
     if (row && [row class] == UIStackView.class && !objc_getAssociatedObject(row, &kRowWatchedKey)) {

@@ -1,18 +1,3 @@
-// Player redesign: nothing is kept under the player. Every card (about the artist, videos, SongDNA,
-// events, explore, credits, merch, the lyrics card, anything Spotify adds later) reports no height, so
-// the list closes up around it and the player is one screen; PlayerScroll.x closes off the gaps the
-// list leaves between them, and the lyrics come to the player itself (PlayerLyrics.x) instead of
-// waiting on a card below it.
-//
-// A block on everything rather than a list of what to drop: the server decides which cards a track
-// gets, and a new kind should not turn up under a redesigned player. The collapse is the one
-// Native/Player/PlayerDeclutter.x has shipped.
-//
-// Tree (trees/clean/player/01.txt:385, lyrics/01.txt:996-999): every card is an Element_List.CollectionViewCell
-// whose first subview is an ElementContentView naming NowPlaying_ScrollAPI, then an ElementView, then
-// the card's own root: CreatorBiographyCardLayout, song-dna-npv-card, Lyrics_CardElementImpl.CardView
-// id=lyrics-card-view and so on (all ten player snapshots). The cells of lists inside a card
-// (WatchFeed's) name WatchFeed_ComponentAPI instead, so they are left to their card.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Player.h"

@@ -1,6 +1,3 @@
-// The AirPods gestures page: the switch, what a double nod and a shake of the head do, and what the
-// listening is doing at the moment. The actions are the double tap zones' list, so a gesture is set to
-// any of them and the names cannot drift apart.
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "HeadGestures.h"

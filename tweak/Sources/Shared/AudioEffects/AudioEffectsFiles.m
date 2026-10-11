@@ -1,8 +1,3 @@
-// The audio effects' file libraries: Documents/spoti.pw/Audio effects/<Convolver|DDC|Liveprog>, where the
-// file effects find their files by name. Documents, which the app's backups keep. Every file in them is
-// one the user imported.
-//
-// Threading: any thread (the engine's queue reads the paths too); a library is made once.
 #import <os/lock.h>
 #import "Core/SGCore.h"
 #import "AudioEffects.h"
@@ -106,8 +101,6 @@ static NSError *fileError(NSString *message) {
     return [NSError errorWithDomain:SGDSPFileErrorDomain code:1 userInfo:@{NSLocalizedDescriptionKey: message}];
 }
 
-// Whether the bytes look like a file of the kind, before it goes into the library: a WAV (RIFF, RF64) or
-// FLAC stream, a DDC file's two rates, a Liveprog script's @sample section.
 static BOOL looksLike(SGDSPFileKind kind, NSData *data) {
     if (kind == SGDSPFileImpulseResponse) {
         if (data.length < 12) return NO;
