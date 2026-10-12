@@ -58,8 +58,6 @@ static void pruneInjectedPacketsLocked(CFTimeInterval now) {
     if (!sg_injectedPackets.count) atomic_store(&sg_injectedExpiryMs, 0);
 }
 
-// Called while sg_discoveryLock is held and before the send, so the receive hook's lock-free
-// expiry check already sees it when the reply lands.
 static NSDictionary *rememberInjectedPacketLocked(int fd, const void *bytes, size_t length,
                                                   const struct sockaddr *source, socklen_t sourceLength) {
     NSDictionary *packet = @{
@@ -315,8 +313,6 @@ static void injectResponse(SGBridgeRound *round, const void *bytes, size_t lengt
     SGLog(@"Connect discovery: sent %lu-byte loopback response from %@", (unsigned long)length, name);
 }
 
-// Each round fans out through one nonblocking socket per family and collects replies in parallel.
-// It also watches for targets that finish Bonjour resolution shortly after the failed send.
 static void runBridgeRound(SGBridgeRound *round) {
     int ipv4FD = -1, ipv6FD = -1;
     NSMutableSet<NSData *> *attemptedTargets = [NSMutableSet set];

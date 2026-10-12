@@ -1,19 +1,3 @@
-// Music Haptics' ear: the samples Spotify sends to the speaker turned into what the Taptic Engine plays,
-// a tap where a drum hits and a level for the rumble under the bass.
-//
-// Two bands are listened to, the bass under 110 Hz (kicks) and the top over 2 kHz (snares, claps). A band
-// hits when its energy over the last few ms (25 for the bass, a cycle of its lowest notes) rises well
-// above its own average of the last second, and may hit again once it has fallen back under that
-// average; the top also needs the middle of the sound (250 Hz to 2 kHz) to lift with it, which a snare
-// or a clap does and a hi-hat does not. A tap's intensity is how far over the average the hit went,
-// scaled by how loud the band is against its recent peak, and its sharpness is how bright the sound is.
-// The level follows the bass envelope against the same peak, so quiet passages rumble less.
-//
-// Tuned on the Mac against librosa's onsets for a 172 BPM track (precision 0.88, recall 0.82, 3.3 taps a
-// second) and a synthetic 124 BPM beat over a held bass (57 of 58 kicks and all 29 snares, no hi-hats).
-//
-// Plain C over a struct the caller owns: it runs on Core Audio's render thread, so nothing here
-// allocates, locks, logs or sends a message. Compiles on the Mac as is, for tuning against a file.
 #import <Foundation/Foundation.h>
 
 // A hit says which band it came from, so what Music Haptics follows (Haptics.h) can leave some out.

@@ -1,5 +1,3 @@
-// The Gestures page: the grid over a player-shaped preview, a cell tapped to say what a double tap
-// there does, under it the split, the seek step and a reset.
 #import "Core/SGCore.h"
 #import "Settings/SGPage.h"
 #import "Settings/SGPageStyle.h"
@@ -17,8 +15,6 @@ static NSString *cellLabel(SGGestureAction action) {
 
 #pragma mark - the preview
 
-// The grid the player is read against, drawn at the size of a phone and read the same way, so what
-// the page shows and what the double tap does cannot drift apart.
 @interface SGZoneGridView : UIView
 @property (nonatomic, copy) void (^picked)(NSInteger cell);
 - (void)reload;
@@ -116,8 +112,6 @@ static NSString *cellLabel(SGGestureAction action) {
     _grid = [[SGZoneGridView alloc] initWithFrame:CGRectMake(0, 12, 0, kPreviewHeight)];
     __weak typeof(self) weakSelf = self;
     _grid.picked = ^(NSInteger cell) { [weakSelf pickActionFor:cell]; };
-    // The table sets its header's width itself, and the grid follows it, so the header never has to
-    // be handed back during layout: doing that lays the table out again and never settles.
     _grid.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, kPreviewHeight + 24)];
     _header.autoresizingMask = UIViewAutoresizingFlexibleWidth;

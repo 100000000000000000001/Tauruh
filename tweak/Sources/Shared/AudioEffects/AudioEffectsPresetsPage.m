@@ -15,7 +15,7 @@ static void showAlert(UIViewController *owner, NSString *title, NSString *messag
 static void tick(UITableViewCell *cell, BOOL on) {
     if (on) {
         UIImageView *tick = SGSymbolView(@"checkmark", 13, UIImageSymbolWeightSemibold, 16);
-        tick.tintColor = SGAccentMark();
+        tick.tintColor = [UIColor systemGreenColor];
         cell.accessoryView = tick;
     }
     cell.accessibilityTraits = on ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
@@ -95,7 +95,7 @@ static NSArray<NSString *> *userPresetNames(void) {
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return section == 2 ? SGSectionGap : SGSectionHeaderHeight();
+    return section == 2 ? SGSectionGap : UITableViewAutomaticDimension;
 }
 
 - (UIView *)tableView:(UITableView *)table viewForFooterInSection:(NSInteger)section {
@@ -338,7 +338,7 @@ typedef NS_ENUM(NSInteger, SGDSPHeadphoneSection) {
 
 // Whether a headphone's correction is what the Graphic EQ plays, rather than nothing or the user's own curve.
 static BOOL headphoneInUse(void) {
-    return SGDSPSwitch(SGKeyDSPGraphicEq) && SGDSPString(SGKeyDSPGraphicEqHeadphone).length;
+    return NO;
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table {
@@ -364,7 +364,7 @@ static BOOL headphoneInUse(void) {
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
     if (section == SGDSPHeadphoneSearch) return kSearchTop + 44 + 4;
     if ([self tableView:table numberOfRowsInSection:section] == 0) return CGFLOAT_MIN;
-    return section == SGDSPHeadphoneRemembered ? SGSectionHeaderHeight() : SGSectionGap;
+    return section == SGDSPHeadphoneRemembered ? UITableViewAutomaticDimension : SGSectionGap;
 }
 
 - (NSString *)outputFooter {
@@ -392,7 +392,7 @@ static NSString *correctionName(NSString *path) {
     if (path.section == SGDSPHeadphoneOutput) {
         NSString *uid = SGAutoEqOutputUID();
         BOOL remembered = SGAutoEqOutputRemembered(uid);
-        NSString *current = correctionName(headphoneInUse() ? SGDSPString(SGKeyDSPGraphicEqHeadphone) : nil);
+        NSString *current = correctionName(headphoneInUse() ? nil : nil);
         SGFillCell(cell, [NSString stringWithFormat:@"Use for %@", SGAutoEqOutputName()],
                    remembered ? [NSString stringWithFormat:@"%@ while it plays", current] : [NSString stringWithFormat:@"Remember %@ for this output", current], nil, nil);
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
@@ -444,7 +444,7 @@ static NSString *correctionName(NSString *path) {
         cell.accessibilityValue = @"Applying";
         return cell;
     }
-    tick(cell, headphoneInUse() && [headphone.path isEqualToString:SGDSPString(SGKeyDSPGraphicEqHeadphone)]);
+    tick(cell, headphoneInUse() && NO);
     return cell;
 }
 
@@ -501,6 +501,6 @@ UIViewController *SGDSPHeadphonesPage(void) {
 }
 
 NSString *SGDSPHeadphoneSummary(void) {
-    NSString *path = SGDSPString(SGKeyDSPGraphicEqHeadphone);
+    NSString *path = nil;
     return path.length && SGDSPSwitch(SGKeyDSPGraphicEq) ? SGAutoEqNameOf(path) : @"None";
 }

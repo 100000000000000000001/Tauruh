@@ -1,9 +1,3 @@
-// The device button of the now playing bar, hidden on request. The redesign keeps Spotify's own buttons
-// on its glass card, so the button and the way to hide it are the native look's, copied over.
-//
-// Tree (trees/test6.txt): the button row is a UIStackView holding Connect_EntryPointsImpl.ConnectStateView
-// (the connected device) and .ConnectButtonView, each wrapped; hiding the wrapper closes the gap.
-// The ConnectStateView under the title ("playing on ...") sits in InformationContainer and stays.
 #import "Core/SGCore.h"
 #import "NowPlayingBar.h"
 

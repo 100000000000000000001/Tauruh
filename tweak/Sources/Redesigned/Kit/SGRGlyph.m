@@ -57,9 +57,6 @@ static const CGFloat kMinTouch = 44, kPressAlpha = 0.5, kPressScale = 0.9, kDisa
     button.largeContentTitle = accessibilityTitle;
     button.largeContentImage = button->_glyph.image;
     [button addInteraction:[UILargeContentViewerInteraction new]];
-    // Touch up inside, not the primary action: UIKit sends the primary action from UIButton and the
-    // controls built on it, never from a UIControl of one's own, so a handler registered for it is never
-    // called and the button is dead to every tap (device, 2026-09-17, and the player harness).
     [button addTarget:button action:@selector(tapped) forControlEvents:UIControlEventTouchUpInside];
     return button;
 }

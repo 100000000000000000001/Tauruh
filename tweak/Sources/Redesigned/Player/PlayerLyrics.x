@@ -505,7 +505,7 @@ static void restartRest(void) {
 // Sing's mic and its slider stay while the lines are alone, and a touch on them is theirs alone.
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)recognizer shouldReceiveTouch:(UITouch *)touch {
     for (UIView *v = touch.view; v; v = v.superview) {
-        if ([v isKindOfClass:SGRSingControl.class]) return NO;
+        if ([v isKindOfClass:NSClassFromString(@"SGRSingControl")]) return NO;
     }
     return YES;
 }
@@ -767,7 +767,7 @@ static void replace(void) {
     if (!(self = [super init])) return nil;
     // An edit of a local file's names gives it a new lyrics key, and the sources search again under it.
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(editsChanged:) name:SGLocalFileEditsDidChangeNotification object:nil];
-    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(linesKept:) name:SGKaraokeLinesKeptNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(linesKept:) name:SGKaraokeLinesDidChangeNotification object:nil];
     return self;
 }
 

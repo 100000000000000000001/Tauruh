@@ -43,8 +43,6 @@ void SGDSPCompanderSet(SGDSPCompander *compander, double timeConstant, const dou
     for (int b = 0; b < kBands; b++) compander->amount[b] = 0.6 * gains[b];
 }
 
-// Each channel into seven bands: a Linkwitz-Riley low pass off what is left at each crossover, the rest
-// passing on. A band then goes through the allpasses of the crossovers above it, so the sum is flat.
 static void split(SGDSPCompander *compander, int channel, const float *input, uint32_t frames) {
     float *rest = compander->bands[kBands - 1][channel];
     memcpy(rest, input, frames * sizeof(float));
@@ -104,8 +102,6 @@ void SGDSPCompanderRun(void *state, float *left, float *right, uint32_t frames) 
 enum { kTaps = 64, kHistory = kTaps - 1, kPhaseHistory = kTaps / 2 - 1 };
 static const float kBias = 0.25f;
 
-// The filter of both the doubling and the halving: a low pass at a quarter of the doubled rate, minimum
-// phase, so it delays by a few samples rather than half its length. Made once, the same at every rate.
 static float sg_halfband[kTaps];
 
 static double besselI0(double x) {
@@ -157,8 +153,6 @@ SGDSPTube *SGDSPTubeCreate(double rate, double driveDB) {
     return tube;
 }
 
-// A full scale sound at 0 dB of drive reaches half way up the curve; the output is scaled back by the
-// curve's slope at rest, so quiet sounds keep their level.
 void SGDSPTubeSet(SGDSPTube *tube, double driveDB) {
     double drive = 0.5 * pow(10, driveDB / 20), slope = 1 - tanh(kBias) * tanh(kBias);
     tube->drive = (float)drive;

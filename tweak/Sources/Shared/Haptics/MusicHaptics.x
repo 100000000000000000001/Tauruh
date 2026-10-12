@@ -128,7 +128,7 @@ static inline float sampleAt(const void *data, UInt32 index, UInt32 bytes, BOOL 
 static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
                          UInt32 frames, AudioBufferList *data) {
     if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
-    if (!atomic_load_explicit(&sg_listening, memory_order_relaxed) || refCon != SGPlayerMusicOutput()) return noErr;
+    if (!atomic_load_explicit(&sg_listening, memory_order_relaxed) || refCon != NULL) return noErr;
     if (*flags & kAudioUnitRenderAction_OutputIsSilence) return noErr;
 
     uint64_t layout = atomic_load_explicit(&sg_layout, memory_order_relaxed);
@@ -225,7 +225,7 @@ static void readFormat(AudioUnit unit) {
 
 // The music's output started, changed or changed format (Shared/Player): its format read, the notify on it,
 // and the analyzer started over, since what it held came from before.
-static void listenTo(AudioUnit unit) {
+__attribute__((unused)) static void listenTo(AudioUnit unit) {
     if (!unit) return;
     AudioUnitRemoveRenderNotify(unit, rendered, unit);
     readFormat(unit);
@@ -575,7 +575,7 @@ void SGMusicHapticsWatchTaps(void (^watcher)(float intensity)) {
     mach_timebase_info_data_t timebase;
     mach_timebase_info(&timebase);
     sg_secondsPerTick = (double)timebase.numer / timebase.denom / 1e9;
-    if (!SGPlayerWatchMusicOutput(listenTo)) {
+    if (!NO) {
         SGLog(@"music haptics: Spotify's output cannot be reached, Music Haptics is inactive");
         return;
     }

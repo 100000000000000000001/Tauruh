@@ -16,8 +16,6 @@ static const struct mach_header_64 *mainExecutable(intptr_t *slide) {
     return NULL;
 }
 
-// Writes one pointer, making its page writable first; a page dyld made read only after binding
-// (__DATA_CONST, __AUTH_CONST) is copied and made read only again.
 static BOOL writeSlot(void **slot, void *value, BOOL readOnly) {
     vm_size_t page = vm_page_size;
     vm_address_t start = (vm_address_t)slot & ~(page - 1);

@@ -1,5 +1,3 @@
-// The object the player's own controls drive: the seek amounts are named in seconds by the
-// selectors themselves, so a gesture needs no unit of its own.
 #import <Foundation/Foundation.h>
 
 @interface SPTNowPlayingPlaybackControllerImplementation : NSObject

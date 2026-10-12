@@ -1,7 +1,3 @@
-// The STFT around Sing's model, the one PyTorch took when the model was trained: centred, the ends
-// reflected, a periodic Hann window, an unscaled forward transform and the inverse divided by N once,
-// overlap-added with the window's own weight taken out. The plans and the scratch are made once and reused
-// window after window; the separator's actor is the only one to use them.
 import Accelerate
 import Foundation
 

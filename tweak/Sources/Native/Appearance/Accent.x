@@ -1,15 +1,7 @@
-// Accent colour: Spotify's green, #1ED760, is one token. Its three components occur once in the
-// whole binary, and every green the app draws, from the play button to the "Zobrazit vše" links
-// and the progress bar, is that token or a state blended from it. So it is swapped where it is
-// born, in the UIColor initialiser, and the blends follow. Lottie animations carry their own green
-// and are caught at the layer, below. Image assets with green baked in, the logo above all, are
-// out of reach.
 #import "Core/SGCore.h"
 #import "Appearance.h"
 #import "Settings/SGPageStyle.h"
 
-// The greens the app is known to build from literals: the token, and the older brand green the
-// upsell backend still names.
 static const uint32_t kGreens[] = {0x1ED760, 0x1DB954};
 
 static NSInteger sg_accent = -1;   // 0xRRGGBB once chosen, read at launch
@@ -66,8 +58,6 @@ void SGPickAccent(void) {
     [SGTopController() presentViewController:picker animated:YES completion:nil];
 }
 
-// A darker green than the token comes out as the accent darkened by the same amount, so the two
-// keep their relation.
 static BOOL swap(CGFloat *r, CGFloat *g, CGFloat *b) {
     for (size_t i = 0; i < sizeof(kGreens) / sizeof(kGreens[0]); i++) {
         CGFloat gr, gg, gb;
@@ -95,10 +85,6 @@ static BOOL swap(CGFloat *r, CGFloat *g, CGFloat *b) {
 }
 %end
 
-// Lottie draws its animations, the play indicator and the checkmarks among them, from colours
-// in the animation file straight onto shape layers, or into colour keyframes, never through
-// UIColor. The same swap goes on the CGColor. Layers get set off the main thread too, so the
-// copy is made with CoreGraphics alone; NULL when the colour is not one of the greens.
 static CGColorRef swappedCopy(CGColorRef color) {
     if (!color || CFGetTypeID(color) != CGColorGetTypeID() || CGColorGetNumberOfComponents(color) != 4) return NULL;
     const CGFloat *c = CGColorGetComponents(color);

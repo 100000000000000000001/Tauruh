@@ -1,50 +1,3 @@
-// Player redesign: the ⋯ opens a menu drawn the way the Music app draws its own (SGRPlayerMenu.h) in place
-// of Spotify's sheet of rows -- while what is in it, and what each row does, stay Spotify's.
-//
-// **Why Spotify's sheet still opens.** The rows come from Swift item factories with no way in, and which
-// there are depends on the track, where it plays from (Remove from this playlist only in one's own), the
-// account, the market and the flags, and on what is playing at all (an episode has rows of its own); each
-// is in the app's language and does something only Spotify's own code knows how to. A menu of hand-written
-// actions would be the trap Redesigned/Playlist/PlaylistMenu.x describes. So the ⋯ opens Spotify's sheet as
-// it always did and the sheet is the menu's source: it is kept out of sight from the moment its presentation
-// begins -- its presented view and its dimming hidden, the sheet taking no touches -- its rows are read off its table, and the card is put over it
-// in the presentation's container, grown out of the ⋯.
-//
-// **Spotify's rows** (trees/continuous/1.txt:648): each cell of ContextMenuTableView holds an Encore ListRow,
-// a UIControl (ListRow < Layout < Box < PassthroughControl) whose accessibility identifier is the item's
-// number -- 9 Share, 11 Add to Queue, 19 Add to playlist, 27 Remove from this playlist, 28 Lyrics, 34 Go to
-// Queue, 59 Exclude track from your taste profile -- with its glyph and its words in it. The number is what
-// places a row on the card (kKnown); a number the table does not know goes under More, in Spotify's order,
-// so nothing Spotify offers is lost and nothing added later has to be known here first. Every number seen
-// is logged once, with its words, for the table to grow from. The table's binder
-// (ContextMenuItem.TableBinder, 9.1.78) answers the data source and willDisplayCell: only -- there is no
-// didSelectRowAtIndexPath: -- so a row is fired through its ListRow (SGRActivate), as a tap would. Only the
-// cells on screen exist, and the hidden table is as short as the sheet would have been, so it is made tall
-// enough for all of them for the moment they are read or a row is fired, and put back.
-//
-// **What Spotify then does** is what it always does: it dismisses the sheet and acts (the card goes with the
-// sheet), or pushes a page of its own onto the sheet (Share's destinations, a list of artists) -- the sheet
-// is then shown the way Spotify drew it and the card goes -- or changes the row in place (Lyrics • Off to
-// On), which the card reads again. A tap outside the card dismisses the sheet, as a tap on Spotify's dimming
-// did.
-//
-// **Where it falls back** to Spotify's sheet as it was: no table in it, rows in the table the card cannot
-// read, a row tapped before Spotify's rows are in that they are still not in kRowsWait later, and a row that
-// cannot be found again to fire. Spotify's rows take as long as its slowest item factory, up to
-// ios-feature-contextmenu-platform.timeout (10 s unless the server says otherwise), so the card waits for them
-// for as long as it is open: when it gave up at kRowsWait whatever was happening, a slow menu turned into
-// Spotify's sheet in the hand of someone moving Speed and pitch's sliders (device, 2026-09-25).
-//
-// **Opening at once.** Spotify's rows come in only once its item factories have answered, a moment after the
-// sheet is up, and a card that waited for them opened on a spinner (device, 2026-09-24). So the card opens
-// on the rows the last menu had (kept across launches, kLastRowsKey), which are nearly always the rows this
-// one gets, and moves to Spotify's as they come in where they differ; a tap on a row before then is held and
-// fired once they are in. The table is looked at every kRowsPoll until they are, since a hidden sheet's
-// table can fill without the menu laying out.
-//
-// Which sheet is the player's: one that appears within kMenuAfterTap of a tap on the player's ⋯, which
-// PlayerHeader.x hands over. Speed and pitch (Shared/Player) still puts its block into the hidden sheet; the
-// card has a row of its own for them that opens onto the same sliders (SGSpeedPitchPanelMake).
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
@@ -54,8 +7,6 @@
 
 // A sheet this soon after the ⋯'s tap is the player's.
 static const NSTimeInterval kMenuAfterTap = 3;
-// A row tapped before Spotify's rows are in and still not fired by then, and Spotify's own sheet is shown
-// instead, with whatever it is showing; rows in the table the card still cannot read by then, likewise.
 static const NSTimeInterval kRowsWait = 4;
 // The black behind the card; Spotify's dimming is 0.7, which is a sheet's and not a menu's.
 static const CGFloat kDimming = 0.2;
@@ -88,8 +39,6 @@ typedef struct {
     const char *symbol;
 } SGRPlayerMenuKnownRow;
 
-// Numbers read off the ListRows of 9.1.78 (trees/continuous/1.txt:650-716). The glyphs are the Music app's
-// for the same thing where it has one.
 static const SGRPlayerMenuKnownRow kKnown[] = {
     {"19", SGRPlaceTile, "text.badge.plus"},                              // Add to playlist
     {"11", SGRPlaceTile, "text.line.last.and.arrowtriangle.forward"},     // Add to Queue
@@ -133,8 +82,6 @@ void SGRPlayerMenuWatchMoreButton(UIView *button) {
     static SGRPlayerMoreTapWatcher *watcher;
     if (!watcher) watcher = [SGRPlayerMoreTapWatcher new];
     objc_setAssociatedObject(button, &kWatchedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    // An Encore button may read its touches through a gesture recognizer rather than as a control, so both
-    // are watched, as Speed and pitch watches it.
     if ([button isKindOfClass:UIControl.class]) {
         [(UIControl *)button addTarget:watcher action:@selector(tapped:) forControlEvents:UIControlEventTouchUpInside | UIControlEventPrimaryActionTriggered];
     }
@@ -220,11 +167,6 @@ static SGRPlayerMenuSpotifyRow *readRow(UITableViewCell *cell, NSIndexPath *inde
     return row;
 }
 
-// Runs `block` with every row of the table laid out: the hidden table is as short as the sheet would be,
-// and only its cells on screen exist, so for the moment of the block it is as tall as its content. A table
-// that has just taken its rows has not measured them yet -- its content size is the old one until it lays
-// out, and reading it then got 9 of 15 rows (harness, 2026-09-24) -- so it is laid out first, and grown
-// again for as long as the rows it then measures run past it.
 static void withEveryCell(UITableView *table, void (^block)(void)) {
     CGRect saved = table.bounds;
     [table layoutIfNeeded];
@@ -247,8 +189,6 @@ static void withEveryCell(UITableView *table, void (^block)(void)) {
     }
 }
 
-// `complete` says whether every row of the table had a cell to read (a cell that is not one of Spotify's
-// item rows is passed over, and does not make the read incomplete).
 static NSArray<SGRPlayerMenuSpotifyRow *> *readRows(UITableView *table, BOOL *complete) {
     NSInteger count = rowCount(table);
     *complete = NO;
@@ -389,19 +329,6 @@ static UIView *dimmingIn(UIView *container) {
     return SGRFindByIdentifier(container, @"Components.UI.SheetPresentation.Dimming", &kDimmingKey);
 }
 
-// The sheet and Spotify's dimming out of sight, by `hidden` and, on the sheet, a mask that lets nothing
-// through; never by alpha or colour. The sheet's presentation sets its presented view's alpha back to 1
-// whenever the container lays out (the harness saw it after every change of the card's height), the
-// dimming's colour and alpha are what Spotify's transition animates, and iOS 26 draws a sheet's glass
-// through a mask of no size at all, so the mask is a point of nothing rather than empty. The sheet's own
-// mask, if it had one, is kept to put back. The catcher draws a lighter dimming of its own.
-//
-// UIKit's own dimming goes too, wherever the system sheet put it: in the sheet's container, where Spotify
-// hides it once the sheet is up (trees/continuous/1.txt: "UIDimmingView ... hidden"), and over the view the
-// sheet came up over, which UIKit wraps in a drop shadow view of its own with a UIDimmingView in it, black
-// at 0.48 (harness, 2026-09-24). Under Spotify's 0.7 neither showed; with Spotify's hidden, the screen went
-// dark for a moment as the ⋯ was tapped (device, 2026-09-24). They sit within three levels of the window.
-// Those outside the container are put back with the sheet; the container's stays hidden, as Spotify keeps it.
 static void hideSystemDimming(UIView *container) {
     static Class dimmingClass;
     if (!dimmingClass) dimmingClass = NSClassFromString(@"UIDimmingView");
@@ -472,8 +399,6 @@ static void hideSheet(SGRPlayerMenuTakeover *t, UIView *container) {
     hidePresentation(sheetViewOf(t.sheet), container);
 }
 
-// The card's frame: its top trailing corner at the ⋯'s, so it grows out of the button as the Music app's
-// menus do, and no taller than the room under it.
 static void placeCard(SGRPlayerMenuTakeover *t, UIView *container) {
     if (!t.revealed) hideSheet(t, container);
     UIView *button = t.button;
@@ -523,8 +448,6 @@ static void reveal(SGRPlayerMenuTakeover *t, NSString *why) {
     t.closing = NO;
 }
 
-// A row tapped before Spotify's rows are in waits for them, and past kRowsWait it is Spotify's sheet that
-// is waited on instead, where the row can be tapped again once it is there.
 static void hold(SGRPlayerMenuTakeover *t, SGRPlayerMenuSpotifyRow *row) {
     NSTimeInterval at = CACurrentMediaTime();
     t.pendingIdentifier = row.identifier;
@@ -693,8 +616,6 @@ static void pass(SGRPlayerMenuTakeover *t) {
                   [signature isEqualToString:t.signature] ? @"the last menu's" : t.signature ? @"not the last menu's" : @"none shown before",
                   complete ? @"" : @" (not all of them read yet)");
         }
-        // Only a whole menu is kept for the next one to open on, and a held tap waits for the whole menu
-        // before it is given up.
         if (complete) {
             [t.poll invalidate];
             keepRows(rows, signature);
@@ -720,6 +641,7 @@ static void pass(SGRPlayerMenuTakeover *t) {
         [UIView animateWithDuration:0.2 animations:^{ t.catcher.alpha = 1; }];
         [t.card growFrom:anchorInCard(t)];
     } else if (changed) {
+        [t.card layoutIfNeeded];
         SGRAnimate(SGRMotionLayout, ^{
             placeCard(t, container);
             [t.card layoutIfNeeded];
@@ -777,8 +699,6 @@ static SGRPlayerMenuTakeover *takeoverFor(UIViewController *menu) {
         if (table && rowCount(table) > 0) pass(strong);
     }];
     [NSRunLoop.mainRunLoop addTimer:t.poll forMode:NSRunLoopCommonModes];
-    // Spotify's rows are waited on for as long as the card is open, the table looked at until they are all in.
-    // What is worth saying by kRowsWait is whether they are late, and whether they are there and unreadable.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kRowsWait * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         SGRPlayerMenuTakeover *strong = weak;
         if (!strong || strong.hasRows || strong.closing || strong.revealed) return;
@@ -796,10 +716,6 @@ static SGRPlayerMenuTakeover *takeoverFor(UIViewController *menu) {
 
 #pragma mark - what darkens the screen as the menu opens
 
-// A dark picture across the screen flashed as the menu opened on the phone, with the sheet and its dimming
-// out of sight from the presentation's first frame (device, 2026-09-24). So the first menus of a launch say
-// what they find at a few moments after the ⋯'s tap: every view drawn dark over most of the window, and the
-// windows themselves.
 static NSString *darkness(UIColor *color) {
     CGFloat white = 1, alpha = 0;
     if (!color || ![color getWhite:&white alpha:&alpha]) {
@@ -844,10 +760,6 @@ static void logDarkness(UIView *anyView) {
     }
 }
 
-// The sheet and its dimming go out of sight as the presentation begins, before its first frame: the menu's
-// own appearance comes later than that, and hiding them only from there let the dimming's black and the sheet
-// show for a frame or two as the ⋯ was tapped (device, 2026-09-24). A presentation taken this way is claimed,
-// and the menu inside it is taken over whatever the timing of the tap.
 %hook _TtC22NavigationUI_SheetImpl27SheetPresentationController
 
 - (void)presentationTransitionWillBegin {

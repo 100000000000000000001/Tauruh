@@ -1,24 +1,3 @@
-// Audio effects on Spotify's sound (AudioEffects.h): every buffer Spotify's output unit finishes runs
-// through SGDSPEngine before it reaches the speaker.
-//
-// Spotify plays through Core Audio units of its own (AudioUnitDriver2 in the binary: converter, EQ, mixer
-// and a RemoteIO output unit, started with AudioOutputUnitStart), with no Objective-C method between it and
-// the unit. Shared/Audio/SGAudioPipeline owns that connection and invokes this output processor
-// after speed/pitch and before music haptics. The processor reads the speaker-bound buffer into float
-// lanes, runs the engine and writes it back in place. Graph/format changes use the same pipeline gate.
-//
-// The engine is made the first time the output starts with the master switch on, at the output's rate,
-// and lives as long as Spotify: the render thread may be holding it at any time. With the switch off the
-// notify returns straight away, and Spotify's sound is untouched. Silence goes through the engine too, so a
-// reverb or a convolver rings out after a track stops.
-//
-// Settings apply as they change: SGDSPApply marks the effect, and a serial queue reads its keys a moment
-// later and sets them, so a slider dragged across comes down to the last few values. The queue also makes
-// the engine, follows the output to a new sample rate, and once a second frees what the effects replaced.
-//
-// Threading: the notify runs on the render thread and touches only atomics, its scratch lanes and the
-// engine's render side. Spotify starts its output on a thread of its own. The effects are set on the queue;
-// SGDSPApply and the curves are main thread; SGDSPStatus and SGDSPError any thread.
 #import <AudioToolbox/AudioToolbox.h>
 #import <os/lock.h>
 #import <stdatomic.h>
@@ -48,8 +27,6 @@ typedef enum { SGOutputUnseen, SGOutputPCM, SGOutputUnsupported } SGOutputState;
 static _Atomic(SGDSPEngine *) sg_engine;       // made once on the queue, never freed
 static atomic_bool sg_running;                 // the switch on and the engine set up for the output
 static atomic_int sg_outputState;
-// The format of the buffers the notify gets: the rate, and the layout packed into one word so the render
-// thread never reads half of a change (flags in the low 32 bits, then channels, then bytes per sample).
 static atomic_uint_fast64_t sg_rateBits;
 static atomic_uint_fast64_t sg_layout;
 static atomic_uint_fast64_t sg_skipped;        // renders whose buffers were not laid out as the format says
@@ -102,9 +79,6 @@ static BOOL anySound(const float *samples, UInt32 count) {
     return NO;
 }
 
-// The buffer through the engine in place, whatever its format: the buffers themselves as the engine's lanes
-// when they are float, one per channel (the hardware's usual), otherwise read into the scratch lanes and
-// written back. The first two channels are the engine's; a mono output is fed to both and gets their mean.
 static void processBuffer(SGDSPEngine *engine, AudioUnitRenderActionFlags *flags, UInt32 frames, AudioBufferList *data) {
     uint64_t layout = atomic_load_explicit(&sg_layout, memory_order_relaxed);
     UInt32 formatFlags = (UInt32)layout, channels = (UInt32)(layout >> 32) & 0xffff, bytes = (UInt32)(layout >> 48);
@@ -112,8 +86,6 @@ static void processBuffer(SGDSPEngine *engine, AudioUnitRenderActionFlags *flags
     BOOL split = (formatFlags & kAudioFormatFlagIsNonInterleaved) != 0;
     UInt32 fraction = (formatFlags & kLinearPCMFormatFlagsSampleFractionMask) >> kLinearPCMFormatFlagsSampleFractionShift;
     if ((bytes != 2 && bytes != 4) || channels < 1) return;
-    // Buffers not laid out as the format says are left alone rather than read as noise: the format read at
-    // the start can be a moment old.
     BOOL fits = split ? data->mNumberBuffers == channels : data->mNumberBuffers == 1 && data->mBuffers[0].mNumberChannels == channels;
     for (UInt32 b = 0; fits && b < data->mNumberBuffers; b++) {
         fits = data->mBuffers[b].mData && data->mBuffers[b].mDataByteSize == frames * bytes * (split ? 1 : channels);
@@ -187,10 +159,6 @@ static NSString *formatText(AudioStreamBasicDescription format) {
             (format.mFormatFlags & kAudioFormatFlagIsNonInterleaved) ? @", a buffer per channel" : @", interleaved"];
 }
 
-// The format the notify's buffers are in, which is the RemoteIO unit's output side (element 0, output scope):
-// the hardware's, not the one Spotify hands the unit (the input scope). In the simulator a 44.1 kHz client
-// comes out at 48 kHz, and a 16-bit interleaved one as float, a buffer per channel (harness/audio-effects/sim).
-// Answers whether the engine can take it.
 static BOOL readFormat(AudioUnit unit) {
     AudioStreamBasicDescription format = {0}, client = {0};
     UInt32 size = sizeof format;
@@ -200,8 +168,6 @@ static BOOL readFormat(AudioUnit unit) {
     UInt32 bytes = format.mBitsPerChannel / 8;
     BOOL takes = status == noErr && format.mFormatID == kAudioFormatLinearPCM && format.mSampleRate > 0 && format.mChannelsPerFrame >= 1
                  && (bytes == 2 || bytes == 4) && ((format.mFormatFlags & kAudioFormatFlagIsFloat) || (format.mFormatFlags & kAudioFormatFlagIsSignedInteger));
-    // Spotify starts its output again after every pause; the format is logged when it is not the last one.
-    // Spotify's thread and a format change's may both be here.
     static os_unfair_lock lock = OS_UNFAIR_LOCK_INIT;
     static NSString *logged;
     NSString *text = [NSString stringWithFormat:@"dsp: Spotify's output renders %@, from %@ Spotify hands it%@", formatText(format),
@@ -406,8 +372,6 @@ static void applyAll(SGDSPEngine *engine) {
     for (NSString *effect in effectSwitches()) applyEffect(engine, effect);
 }
 
-// Once a second while the engine lives: what the effects replaced freed, an engine gone non-finite started
-// over, and now and then a summary.
 static void tend(void) {
     SGDSPEngine *engine = atomic_load(&sg_engine);
     SGDSPEngineCollect(engine);
@@ -435,10 +399,6 @@ static void tend(void) {
     }
 }
 
-// The engine is read out once a second while it runs. With the switch off there is nothing in it to
-// read, so the source is suspended rather than left ticking for the rest of the app's life: the engine
-// is never freed, and a timer tied to its making would outlive every use of it. Only ever touched from
-// applyMaster, which is to say on applyQueue().
 static dispatch_source_t sg_tendTimer;
 static BOOL sg_tending;
 
@@ -449,8 +409,6 @@ static void setTending(BOOL on) {
     else dispatch_suspend(sg_tendTimer);
 }
 
-// The switch and the output's format: the engine made or moved to the output's rate, everything set when
-// it was, and the notify let in or kept out. Answers whether every effect was set.
 static BOOL applyMaster(void) {
     if (!SGDSPSwitch(SGKeyDSP)) {
         setTending(NO);

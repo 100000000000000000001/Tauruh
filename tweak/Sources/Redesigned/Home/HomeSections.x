@@ -1,29 +1,3 @@
-// Home redesign: of the sections the feed sends, only the music ones stay: the grid of shortcuts, the
-// DJ and the shelves of cards (Recents, Jump back in, Your playlists, New releases, the mixes, For fans
-// of...). Every other section reports no height, so the list closes up around it: the medium density
-// previews (a video or an episode playing muted under Unmute and Watch full episode, or a playlist to
-// Preview), a heading over one of those (Fitness for you, Videos from your top artists), the episode
-// cards, and any kind the server adds later.
-//
-// An allow list, as for the cards under the player (Redesigned/Player/PlayerCards.x): the feed is the
-// server's, and a new kind should not turn up on a redesigned Home.
-//
-// Tree (trees/clean/home/10.txt): a section is an Element_List.CollectionViewCell of the page's list whose
-// first subview is an ElementContentView over Home_EvoPageImpl.HomeStructure, then an
-// ElementView<HomeStructure>, then the section's own root, which names its kind:
-//   Home_CarouselKit.TouchCancellingCollectionView     a shelf of SimpleCards under a heading (:2274)
-//   UICollectionView with no identifier                 the shortcuts grid, Home_AnchorsAndShortcutsKit cells (01.txt:33)
-//   UICollectionView id=ActionCardCarouselElement        episode cards (:696)
-//   UIStackView                                         a heading over the DJ card's LazyElementView (01.txt:460),
-//                                                       or over a medium density card (:973, :1443)
-//   Discovery_MediumDensityCardKit.MediumCardAnimatingLayout   a preview card (:1300, :1746, :1882)
-//
-// The DJ stays without its heading ("Your own personal DJ" over a card that says DJ): the stack is a plain
-// UIStackView, so the heading's LazyElementView is hidden before the cell is measured and the stack closes up.
-//
-// A dropped section still leaves the list's 24pt gap on either side of it (the shortcuts end at 216, the
-// next section starts at 240, 01.txt:30, :325): the spacing is the list layout's, which a cell's height
-// does not reach. Taking the sections out of the casita feed itself is what would close it.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"
@@ -106,10 +80,6 @@ static SGRHomeKind kindOf(UIView *content, NSString **rootName) {
     return SGRHomeKindDrop;
 }
 
-// A dropped section's cell is 0 tall, but what it holds keeps the height it measured at, hidden and cut off
-// by the cell. Spotify's content squeezed to 0 with the cell (trees/continuous/1.txt:375-381, every stack,
-// heading and card at {402, 0}) breaks its required constraints on every layout pass of the cell, which
-// held the main thread for up to 1.5 s at a time where dropped sections scrolled in (home perf, 2026-09-17).
 static void collapse(UICollectionViewCell *cell, CGFloat natural) {
     UIView *content = cell.contentView;
     objc_setAssociatedObject(cell, &kCollapsedKey, @(natural), OBJC_ASSOCIATION_RETAIN_NONATOMIC);

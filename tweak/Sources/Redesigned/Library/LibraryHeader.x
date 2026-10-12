@@ -1,56 +1,9 @@
-// Library redesign: the header of Your Library and of a folder inside it, the way Home and Search have theirs
-// (Redesigned/Home/HomeHeader.x, Redesigned/Search/SearchPage.x). A large title at the leading edge, the avatar
-// that opens the side drawer at the trailing edge, and the scrim Spotify lays behind the header gone, the soft
-// scroll edge (Kit/SGREdgeEffect.x) being what keeps the header clear of the list scrolling under it.
-//
-// The filter chips under the row stay Spotify's, untouched. They were taken out when the redesign was first
-// built and the header closed up by the 49pt they left, and sorting a library turned out to be something the
-// page cannot do without (issue #20). Spotify already draws them on the system's own glass
-// (Reprise_LiquidGlassKit.LiquidGlass.ChipGlassView, trees/clean/library/03.txt:1210), so they belong here as
-// they are; with them back the header keeps the height Spotify gives it and the list keeps Spotify's own inset,
-// and there is nothing here to resize or to hold.
-//
-// Tree (trees/clean/library/03.txt:1159-1247): YourLibraryView holds YourLibraryContentView, the size of the
-// page, and after it -- so over it -- YourLibraryHeaderView 402x159.33: LiquidGlass.GradientView (the scrim), a
-// 402x48 row at {0, 62} holding an AutoLayoutStackView {8, 0} 390x48 of
-// ListeningActivity_ElementsKit.AdaptiveFaceContainer (the avatar, id=Components.UI.SideDrawerButton),
-// id=YourLibraryHeader.title ("Your Library", 21pt), a spacer, a hidden id=YourLibraryHeader.recents,
-// id=YourLibraryHeader.search and id=YourLibraryHeader.plus; and under the row
-// YourLibraryHeaderContentFiltersView {0, 110} 402x49.33, the chips. Recents is hidden on the account the tree
-// is of; the header's model shows it where it says isRecentsAvailable, a clock between the spacer and Search
-// (issue #21), and it goes to the trailing edge with the others. A folder (trees/continuous/1.txt:325-344)
-// is the same header under YourLibrary_FolderImpl, with id=YourLibraryFolderHeader.back at the leading edge,
-// its title, then contextMenu, plus and play or pause, and the chips at {0, 118}.
-//
-// The header neither moves nor shrinks as the list scrolls -- 03.txt, 05.txt and 06.txt hold it at
-// {0, 0} 402x159.33 at three scroll positions -- so there is nothing here to follow: the row is laid out once a
-// pass and stays where it is put.
-//
-// Each control moves by a transform rather than by a frame. Spotify's stack lays them out from constraints of
-// its own on every pass, and Auto Layout sets a view's centre and bounds and leaves its transform alone, so the
-// move outlives the pass that made it (Search moves the Browse cells the same way). Nothing leaves the stack:
-// an arranged view of Spotify's that hides traps its stack in updateConstraints (Kit/SGRRestyle.h), so what
-// goes is alpha, touches and accessibility, and the title Spotify draws goes that way while ours is a subview
-// of the header the stack does not arrange.
-//
-// A move is worked out from where the stack put the control, so it holds only until the stack puts it somewhere
-// else, and the stack does that on passes of its own that reach neither the header nor the page: the header's
-// model arriving after the page first laid out shows or hides a button, the title gets its text, the avatar
-// its size. A button just shown stands where it stood hidden, at the row's leading edge (Recents in 03.txt),
-// until the stack's next pass places it. Moves worked out on the page's pass alone were then off by however
-// far each control went since -- over the title, off the screen -- until the page laid out again on the way
-// back from a playlist (issue #21). So the row the controls stand in is watched too, and every pass of its own
-// places them again.
-
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Library.h"
 
 NSString *const SGRLibraryListIdentifier = @"YourLibraryContent.collectionView";
 
-// Spotify's own inset for the header's controls: a 48pt button flush against the header's trailing edge has its
-// 24pt glyph 20pt from the screen, and the 32pt avatar inside its own 48pt box 16pt from it, which is the
-// margin Home gives the avatar.
 static const CGFloat kRowInset = 8;
 static char kTitleKey, kRowWatchedKey;
 static char kRecentsKey, kSearchKey, kPlusKey, kHeaderTitleKey;
@@ -76,8 +29,6 @@ void SGRLibraryClearScrim(UIView *header) {
 
 #pragma mark - the controls
 
-// The header's controls, in the order they are to read from the leading edge, leaving out what this build does
-// not have, what Spotify has hidden (a folder shows play or pause, never both) and what has not been laid out.
 static NSMutableArray<UIView *> *controlsIn(UIView *header, NSArray<NSString *> *identifiers, const void **keys) {
     NSMutableArray<UIView *> *found = [NSMutableArray array];
     for (NSUInteger i = 0; i < identifiers.count; i++) {
@@ -87,8 +38,6 @@ static NSMutableArray<UIView *> *controlsIn(UIView *header, NSArray<NSString *> 
     return found;
 }
 
-// Puts the controls at the header's trailing edge, the last of them flush against it and each keeping the width
-// it has, and answers where the leading edge of the first of them fell.
 static CGFloat placeTrailing(UIView *header, NSArray<UIView *> *controls) {
     CGFloat right = header.bounds.size.width - kRowInset;
     for (UIView *control in controls.reverseObjectEnumerator) {
@@ -102,9 +51,6 @@ static CGFloat placeTrailing(UIView *header, NSArray<UIView *> *controls) {
     return right;
 }
 
-// `place` again after every pass of the row the controls stand in (see the top of the file), for as long as it
-// is in the header. The row is the stack's container, a plain UIView the Kit can watch; what `place` does not
-// touch -- the header's height, the list under it -- stays the page's pass's.
 static void watchRow(UIView *row, UIView *header, NSArray<UIView *> *(*place)(UIView *header)) {
     if (!row || objc_getAssociatedObject(row, &kRowWatchedKey)) return;
     objc_setAssociatedObject(row, &kRowWatchedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -177,8 +123,6 @@ static BOOL isFace(UIView *view) {
     return faceClass && [view isKindOfClass:faceClass];
 }
 
-// The root header's controls at its trailing edge, the avatar last, and the title before them. Answers what it
-// placed in the order it reads, nothing while the header has no control laid out.
 static NSArray<UIView *> *placeRoot(UIView *header) {
     UIView *spotifyTitle = SGRFindByIdentifier(header, @"YourLibraryHeader.title", &kHeaderTitleKey);
     vanish(spotifyTitle);
@@ -193,15 +137,11 @@ static NSArray<UIView *> *placeRoot(UIView *header) {
     if (face) [trailing addObject:face];
     if (!trailing.count) return trailing;
 
-    CGFloat leading = placeTrailing(header, trailing);
-    CGRect row = SGFrameIn(trailing.firstObject, header);
-    layoutTitle(header, spotifyTitle, SGRSideMargin, leading, CGRectGetMidY(row));
+    placeTrailing(header, trailing);
     for (UIView *control in trailing) watchRow(control.superview, header, placeRoot);
     return trailing;
 }
 
-// The folder header's controls at its trailing edge and the title between them and the back button, which stays
-// where Spotify has it. Answers what it placed in the order it reads, the back button first.
 static NSArray<UIView *> *placeFolder(UIView *header) {
     UIView *spotifyTitle = SGRFindByIdentifier(header, @"YourLibraryFolderHeader.title", &kFolderTitleKey);
     vanish(spotifyTitle);
@@ -231,8 +171,6 @@ static void layoutRoot(UIView *page) {
     NSArray<UIView *> *trailing = placeRoot(header);
     if (!trailing.count) return;
 
-    // The first pass that laid the header out, not the first pass at all: a page appearing lays out before
-    // its controls have a size, and a line off that pass would say the header was left as Spotify's.
     UIView *face = isFace(trailing.lastObject) ? trailing.lastObject : nil;
     static BOOL logged;
     if (!logged && header.window && face) {

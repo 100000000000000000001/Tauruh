@@ -1,5 +1,3 @@
-// What the hook, the harness and the settings share: the order of the sources, which key this iOS
-// takes a clip under, and putting one there.
 #import <MediaPlayer/MediaPlayer.h>
 #import "LockScreenArtwork.h"
 

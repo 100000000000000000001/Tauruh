@@ -1,21 +1,6 @@
-// The redesign's search page: the white search field becomes a glass capsule with white text.
-//
-// Tree (trees/search.txt): SearchHeaderFind.SearchBar, a 370x48 Encore tertiary button painted
-// white, r=6, holding SearchHeaderFind.SearchBarIcon and the placeholder label. The button class is
-// shared app-wide, so the identifier names the one instance the page owns, with a wide light button
-// as the fallback for a build that stops setting it.
-//
-// Two things about the colours. The glyph is an SPTEncoreIconView, which bakes its colour into what
-// it draws, so tintColor never reaches it and setForegroundColor: is the way in. And coming back
-// from the full screen search (trees/search opened.txt, a page of its own that this leaves alone)
-// Spotify configures the field for a white background again, black glyph and black text, after the
-// layout pass that styled it: both are then invisible on the glass until the next pass, a second or
-// so later. So the two setters are refused for as long as the field is a capsule.
 #import "Core/SGCore.h"
 #import "Diagnostics/Diagnostics.h"
 
-// Spotify's glyph view, resolved at runtime; declared on UIView so the call and the hook below
-// share one declaration.
 @interface UIView (SGEncoreIcon)
 - (void)setForegroundColor:(UIColor *)color;
 @end
@@ -37,9 +22,6 @@ static void whiten(UIView *view) {
     }
 }
 
-// Debug builds only. The second the field stays invisible after the full screen search closes is
-// too short to catch in a tree, so every pass over the field says what it looked like, and the
-// silence before the first line says the field did not exist yet.
 static void traceField(UIView *button, NSString *when) {
     if (!SGIsDebugBuild()) return;
     UIView *pane = nil, *dim = nil;
@@ -54,11 +36,6 @@ static void traceField(UIView *button, NSString *when) {
           dim ? NSStringFromClass(dim.class) : @"nothing");
 }
 
-// traceField only says what the field looked like at a layout pass, and the second it is invisible
-// for holds no layout pass at all: coming back from the full screen search the last pass before it
-// lands is 1077ms earlier (a log of three trips in and out). So the field is put on a clock of its
-// own as well, sampled every 50ms for the two seconds after it comes back into a window, which is
-// the window the glitch lives in. Debug builds only, like the rest of the tracing.
 static void sampleField(__weak UIView *weakButton, int step) {
     UIView *button = weakButton;
     if (!button || step > 40) return;
@@ -106,8 +83,6 @@ static void styleSearchField(UIView *button) {
     button.layer.cornerCurve = kCACornerCurveContinuous;
 
     UIVisualEffectView *glass = SGGlassAt(button, 0);
-    // Dark like every glass of the redesign's, rather than by grace of the navigation stack Spotify hosts
-    // the page in (TabBar.x).
     if (glass.overrideUserInterfaceStyle != UIUserInterfaceStyleDark) glass.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     glass.frame = button.bounds;
     SGShapeGlass(glass, size.height / 2, YES);
@@ -130,8 +105,6 @@ static void styleSearchField(UIView *button) {
     }
     styleSearchField((UIView *)self);
 }
-// Spotify builds the field's content again when the page comes back, which can take the pane out
-// with it; waiting for the next layout pass to put it back would leave the capsule blank.
 - (void)didAddSubview:(UIView *)subview {
     %orig;
     if (![subview isKindOfClass:UIVisualEffectView.class]) styleSearchField((UIView *)self);

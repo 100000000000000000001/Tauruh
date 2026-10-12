@@ -1,7 +1,3 @@
-// The Premium prompts Spotify presents as Encore pop-ups, dropped when their words sell Premium
-// (EeveeSpotify's UpsellPopupBlocker). The words are read where the dialog model is made, since
-// the dialog handed to the presenter does not expose them on every build; the presenter reads
-// them itself as a fallback.
 #import "Core/SGCore.h"
 #import "AdBlock.h"
 

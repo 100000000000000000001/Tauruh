@@ -1,13 +1,3 @@
-// The curtain a redesigned page comes in behind. Laid over the page as its front subview, and drawn over
-// whatever Spotify adds to the page afterwards by its zPosition, so no pass of Spotify's can put anything in
-// front of it before the page's next pass brings it forward again.
-//
-// Lifting it fades the page in rather than fading a black sheet off it: the curtain goes at once, and in the
-// same frame the page's own views start from nothing -- the field brightening out of the black into the
-// page's colour, and over it the picture, the header and the list fading in where they are. Nothing moves:
-// a rise into place read as the page scrolling on its own. The fades are additive and on the presentation
-// layers only, so nothing Spotify sets on those views is fought over or changed, and a view Spotify fades
-// meanwhile still ends where Spotify put it.
 #import "Core/SGCore.h"
 #import "SGRReveal.h"
 #import "SGRField.h"
@@ -86,8 +76,6 @@ static NSString *pageName(UIView *page) {
     return NSStringFromClass([owner isKindOfClass:UIViewController.class] ? owner.class : page.class);
 }
 
-// From nothing to what the layer's model says, added on top of it. An ease out: the page comes up fast and
-// settles, rather than creeping in.
 static void fadeIn(CALayer *layer, NSTimeInterval duration, NSTimeInterval delay) {
     CABasicAnimation *fade = [CABasicAnimation animationWithKeyPath:@"opacity"];
     fade.additive = YES;
@@ -100,8 +88,6 @@ static void fadeIn(CALayer *layer, NSTimeInterval duration, NSTimeInterval delay
     [layer addAnimation:fade forKey:@"spotifyglass.reveal.fade"];
 }
 
-// Every view of the page but the curtain, from nothing, in the frame the curtain goes: the first frame drawn
-// without it already has them all at their start.
 static void fadeInPage(UIView *page, UIView *curtain) {
     for (UIView *view in page.subviews) {
         if (view == curtain || view.hidden || view.layer.hidden || CGRectIsEmpty(view.bounds)) continue;

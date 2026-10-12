@@ -91,8 +91,6 @@ void SGCheckForUpdate(void) {
         dispatch_async(dispatch_get_main_queue(), ^{
             sg_running = NO;
             if (!release) {
-                // Unauthenticated GitHub allows sixty requests an hour per address; a phone behind a
-                // carrier NAT can be told to wait, and that is worth reading apart from a dead network.
                 SGLog(@"update check failed: HTTP %ld, %@", (long)status,
                       error.localizedDescription ?: @"no release in the reply");
             } else {

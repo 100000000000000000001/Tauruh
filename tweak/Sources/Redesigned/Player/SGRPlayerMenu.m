@@ -2,10 +2,6 @@
 #import "Redesigned/Kit/SGRKit.h"
 #import "SGRPlayerMenu.h"
 
-// The Music app's menu, measured off a screenshot of it on iOS 26 (a 402pt wide phone): 250pt wide, rows
-// 36pt apart inside a group with a few points above and below it, the glyph centred about 30pt in and the
-// words from about 56pt, groups split by a hairline inset from both edges. The card is a little wider,
-// since Spotify's words run longer than the Music app's and Speed and pitch has sliders to fit.
 const CGFloat SGRPlayerMenuWidth = 272;
 
 static const CGFloat kCorner = 26;
@@ -304,8 +300,6 @@ static void placeGlyph(UIImageView *glyph, CGRect box) {
 @implementation SGRPlayerMenuCard {
     UIView *_backdrop;
     UIScrollView *_scroll;
-    // What the scroll view holds, top to bottom: tiles rows, rows, their expansions and the hairlines
-    // between groups; NSNull marks a group's padding.
     NSMutableArray *_plan;
     NSMutableSet<NSString *> *_expanded;
     UIActivityIndicatorView *_spinner;

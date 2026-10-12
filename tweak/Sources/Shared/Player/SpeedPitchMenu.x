@@ -1,33 +1,3 @@
-// The player's more menu gets Speed, pitch and reverb, under either look: one row in Spotify's own context menu
-// sheet that opens, right there in the sheet, onto sliders for playback speed, pitch and reverb amount
-// (SpeedPitch.x applies them).
-//
-// The sheet is Spotify's ContextMenu_InternalImpl.ContextMenuViewController, a table of its rows
-// (ContextMenuTableView, sized to its content). Its rows come from Swift item factories with no way in,
-// so the block is the table's header view, or its footer when Spotify already uses the header, and is
-// laid out by hand at the table's width. Opening and closing it resizes the header inside a table update,
-// so the rows under it move with it, and the table's intrinsic size is invalidated for the sheet to
-// follow.
-//
-// Only the menu the player's more button opens gets it: the button (id=Context menu,
-// trees/lyrics.txt:183, an Encore Tertiary button) is watched from the redesign's PlayerHeader.x, and a
-// menu shown within a few seconds of its tap, or presented from a now playing controller, is the
-// player's. Under the native look nothing hands the button over, so the block rides on the second test
-// alone, the presenter being Spotify's own now playing controller. The first time, the menu's structure
-// is logged, since no recorded tree shows it yet.
-//
-// The block is drawn from its own measures and type (below), not from the redesign's Kit, so it sits on
-// Spotify's sheet under either look.
-//
-// The block keeps whether it was open for the rest of the session; speed and pitch last until Spotify
-// quits.
-//
-// The redesign's player menu draws a row of its own and takes the controls alone
-// (SGSpeedPitchPanelMake): the same view with its row left out and its panel always open.
-//
-// Pitch can follow speed (issue plus#5), so its slider folds away while speed and reverb stay. The sheet's
-// block resizes itself in its table; the redesign's menu reads SGSpeedPitchPanelHeight() through
-// SGSpeedPitchChangedNotification.
 #import <CoreText/SFNTLayoutTypes.h>
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
@@ -39,9 +9,6 @@
 // A menu this soon after the more button's tap is the player's.
 static const NSTimeInterval kMenuAfterTap = 3;
 static const CGFloat kRowHeight = 56, kSliderBlockHeight = 72, kFollowHeight = 44, kPanelBottom = 12;
-// The block's own measures and type, so it stands on Spotify's sheet under either look rather than on
-// the redesign's Kit: the sheet's side margin, the gap everything else is a multiple of, and a spring
-// that settles without overshooting.
 static const CGFloat kSideMargin = 16, kGrid = 8;
 static const NSTimeInterval kOpenDuration = 0.45;
 
@@ -154,8 +121,6 @@ static UIImage *endImage(NSString *name, CGFloat size) {
     }];
 }
 
-// Both sliders have their normal in the middle of the range rather than at one end, so neither track
-// fills: a tick marks where normal is, under the thumb until it moves away.
 - (UISlider *)slider:(float)min max:(float)max normal:(float)normal minImage:(NSString *)minImage maxImage:(NSString *)maxImage {
     UISlider *slider = [UISlider new];
     slider.minimumValue = min;
@@ -191,10 +156,6 @@ static void placeTick(UISlider *slider) {
     if (!(self = [super initWithFrame:frame])) return nil;
     self.clipsToBounds = YES;
     self.backgroundColor = UIColor.clearColor;
-    // Nothing here draws in the tint: every colour is set on the view that draws it, and the glyphs have
-    // theirs painted in rather than tinted. The row came up in the system blue for a moment as the sheet
-    // appeared on the phone (issue #68), which is the tint a view inherits when nothing up the sheet sets
-    // one. The block's own tint is white as well, for whatever UIKit draws in it (the sliders' parts).
     self.tintColor = primary();
 
     _row = [UIControl new];
@@ -397,8 +358,6 @@ static NSString *summaryText(float speed, BOOL speedShown, float pitch, BOOL fol
     [UIView animateWithDuration:0.2 animations:^{ _row.backgroundColor = UIColor.clearColor; }];
 }
 
-// To its height for sg_open and the switch, in the sheet's table, the rows under it moving with it; the
-// redesign's menu sizes the panel itself, on the notification showValues posts.
 - (void)resize {
     UITableView *table = self.table;
     CGRect frame = self.frame;
@@ -551,8 +510,6 @@ void SGPlayerMenuWatchMoreButton(UIView *button) {
     static SGMoreTapWatcher *watcher;
     if (!watcher) watcher = [SGMoreTapWatcher new];
     objc_setAssociatedObject(button, &kWatchedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    // An Encore button may read its touches through a gesture recognizer rather than as a control, so
-    // both are watched.
     if ([button isKindOfClass:UIControl.class]) {
         [(UIControl *)button addTarget:watcher action:@selector(tapped) forControlEvents:UIControlEventTouchUpInside | UIControlEventPrimaryActionTriggered];
     }
@@ -565,8 +522,6 @@ void SGPlayerMenuWatchMoreButton(UIView *button) {
 
 #pragma mark - the menu
 
-// The presenter or one of its parents is a now playing controller. Only the chain up is looked at: the
-// root's children include the now playing bar's, which every menu would match.
 static BOOL presentedFromPlayer(UIViewController *menu) {
     UIViewController *presenter = menu.navigationController.presentingViewController ?: menu.presentingViewController;
     for (UIViewController *vc = presenter; vc; vc = vc.parentViewController) {
@@ -613,13 +568,6 @@ static BOOL isPlayerMenu(UIViewController *menu) {
 
 #pragma mark - Spotify's rows
 
-// The sheet keeps its spinner up until Spotify's rows are in, and they are in when every item factory
-// has answered or run out of time: ContextMenuItemFactory holds a timer, and the timeout is the remote
-// config's ios-feature-contextmenu-platform.timeout (SPTContextMenu_InternalImplProperties reads it
-// between 1 and 60 s, 10 when the server says nothing). The block takes no part in that: it goes into
-// the table's header once and stays, and a sheet that gets its rows seconds later shows them under it
-// (harness/menu `loading`). So a menu that waits is timed from here, to tell a wait on Spotify's
-// factories from a main thread kept busy: each check says how late it ran.
 static NSInteger rowCount(UITableView *table) {
     NSInteger rows = 0;
     for (NSInteger section = 0; section < table.numberOfSections; section++) rows += [table numberOfRowsInSection:section];

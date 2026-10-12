@@ -1,5 +1,3 @@
-// Preallocated single-producer/single-consumer PCM packets. Creation/destruction require both
-// endpoints to be stopped. Never reset indices across threads; invalidate by generation instead.
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>

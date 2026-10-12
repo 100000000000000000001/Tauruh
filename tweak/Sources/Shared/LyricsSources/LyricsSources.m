@@ -228,7 +228,7 @@ void SGLyricsSetOrder(NSArray<NSString *> *keys) {
 // With EeveeSpotify injected, its own lyrics answer Spotify's requests and the mod's stand aside: two
 // tweaks holding and answering the same request froze Spotify after launch.
 BOOL SGLyricsEnabled(void) {
-    return SGLyricsOrder().count > 0 && !SGLyricsStandAsideForEevee();
+    return SGLyricsOrder().count > 0;
 }
 
 #pragma mark - what is known about the track
@@ -619,15 +619,4 @@ void SGLyricsMigrateLegacyKeys(void) {
     SGLyricsSetOrder(order);
     SGSetEnabled(SGKeyLyricsAllTracks, SGFlag(kLegacyAllTracks, NO));
     SGLog(@"lyrics: carried the Musixmatch switches over as %@", [order componentsJoinedByString:@", "]);
-}
-
-UIViewController *SGLyricsSourcesPage(void) {
-    NSMutableArray<SGSource *> *all = [NSMutableArray array];
-    for (SGLyricsProvider *provider in SGLyricsAllProviders()) {
-        // The page is made on every open, so a key refused since the last one says so here.
-        NSString *detail = [provider.key isEqualToString:SGSpicyLyricsKey] ? SGSpicyLyricsStatus() ?: provider.detail : provider.detail;
-        [all addObject:[SGSource sourceWithKey:provider.key name:provider.name detail:detail]];
-    }
-    return SGSourcesPageMake(@"Lyrics sources", @"Asked top to bottom until one has word timing. Sources get only the track, never your account.",
-                             all, ^NSArray<NSString *> * { return SGLyricsOrder(); }, ^(NSArray<NSString *> *keys) { SGLyricsSetOrder(keys); });
 }

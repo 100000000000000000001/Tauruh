@@ -41,8 +41,6 @@ SGAudioSourcePrefix SGAudioSourceQueuePrefix(AURenderCallbackStruct callback, UI
     uintptr_t context = (uintptr_t)callback.inputProcRefCon;
     uint64_t instruction, sink, table, function, delegate;
     uint64_t contextWords[5], sinkWords[5];
-    // Adjacent metadata fields share one checked copy. Do not repeat kernel reads for
-    // each word of the same source context, sink or queue node on every audio callback.
     if (!context || context > UINTPTR_MAX - 0x90 ||
         !readWord((uintptr_t)callback.inputProc, &instruction) || instruction != UINT64_C(0xa9bc5ff8350005a3) ||
         !readMetadata(context + 0x68, contextWords, sizeof contextWords)) return empty;
@@ -76,9 +74,6 @@ SGAudioSourcePrefix SGAudioSourceQueuePrefix(AURenderCallbackStruct callback, UI
         uint64_t block = node[0], next = node[4];
         if (next != tail) for (unsigned i = 0; i < count; i++) if (visited[i] == next) return empty;
         if (!block) {
-            // 0x1454b4–0x1454fc pops a null block and continues unless byte a1 is 1
-            // and byte a2 is 0 (the stop/wait path at 0x1456ac). Never read PCM directly
-            // or invoke that private reader: the original AudioUnit remains the consumer.
             if (!continuous || boundary != UINT64_MAX) break;
             if (!readWord(sg_sourceImage + 0x1454b4, &instruction) || instruction != UINT64_C(0x95ece96591006296) ||
                 !readWord(owner + 0xa0, &flags)) return empty;
@@ -89,9 +84,6 @@ SGAudioSourcePrefix SGAudioSourceQueuePrefix(AURenderCallbackStruct callback, UI
         }
         if (block > UINTPTR_MAX - 0x28 || !readWord(block + 0x20, &remaining) ||
             remaining > 882000 || (remaining & 1)) return empty;
-        // An exact-sized pull leaves the exhausted block at the head. The verified
-        // reader (0x145550–0x1455c8) pops it on the next pull and continues with the
-        // following block. Only a null block is an event fence; zero samples are not.
         samples += remaining;
         if (samples / 2 >= maximumFrames) break;
         cursor = next;
@@ -104,8 +96,6 @@ SGAudioSourcePrefix SGAudioSourceQueuePrefix(AURenderCallbackStruct callback, UI
         uint64_t after;
         if (!readWord(owner + 0xa0, &after) || after != flags) return empty;
     }
-    // Unvisited nodes cannot affect this prefix. Pending commands and an unstable queue
-    // still invalidate the snapshot even when enough frames were found in its first node.
     UInt32 frames = (UInt32)MIN(samples / 2, maximumFrames);
     return (SGAudioSourcePrefix){frames, boundary < frames ? (UInt32)boundary : UINT32_MAX};
 }

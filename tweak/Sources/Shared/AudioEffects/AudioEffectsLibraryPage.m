@@ -1,6 +1,3 @@
-// The pages a file effect's row and the Graphic EQ's row push: a library of files with the chosen one
-// ticked, and the GraphicEQ text to paste or edit. Each shows the effect's error, if its last change did
-// not take, in a red card at the top, looked at again once a second while the page is open.
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import "Core/SGCore.h"
 #import "Settings/SGPage.h"
@@ -63,8 +60,6 @@ static UITableViewCell *tiledCell(UITableView *table, NSString *title, NSString 
 
 #pragma mark - the error card
 
-// A page of this file whose section 0 is the effect's error: one red row while there is one, nothing
-// otherwise, the row coming and going without the page reloading.
 @interface SGDSPErrorPage : SGPage
 @property (nonatomic, copy) NSString *errorKey;
 @end
@@ -134,8 +129,6 @@ static UITableViewCell *tiledCell(UITableView *table, NSString *title, NSString 
 
 #pragma mark - a library
 
-// The files of one kind, the chosen one ticked: a tap chooses a file and uses it straight away, and the
-// page stays, so one after another can be heard. A swipe deletes one; Import file… copies one in from Files.
 @interface SGDSPFilesPage : SGDSPErrorPage <UIDocumentPickerDelegate>
 - (instancetype)initWithKind:(SGDSPFileKind)kind;
 @end
@@ -244,8 +237,6 @@ static UITableViewCell *tiledCell(UITableView *table, NSString *title, NSString 
     else [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:1] withRowAnimation:UITableViewRowAnimationFade];
 }
 
-// .eel, .vdc and .irs are nobody's registered types, so the picker offers any file and the name is
-// checked after.
 - (void)pickFile {
     UIDocumentPickerViewController *picker = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeData] asCopy:YES];
     picker.delegate = self;

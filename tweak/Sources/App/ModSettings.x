@@ -1,22 +1,8 @@
-// Settings: a Mod Settings row at the end of Spotify's settings list opens the mod's own page: the
-// Appearance card with Redesigned UI, Karaoke in the redesign (Sing, Redesigned/Lyrics/SingSettings.m), then a
-// page per part of Spotify, each holding what that part offers in the stored look (App/Pages.m: Navbar,
-// Player, Lyrics, Home & Library for the native look, Albums for the redesign), Audio effects
-// (Shared/AudioEffects, in either look and applying straight away), Premium, ads & privacy, Labs,
-// All flags, a searchable list of every flag with an override per flag, and Mod, the
-// build, its updates and links. The same row leads the side drawer's list (trees/test6.txt), above
-// Your plan, so the page is a tap from Home, and holding Home on the tab bar opens it too. The tweaks read the switches when they run, so a change
-// shows after Spotify restarts; the tab editor on the Navbar page applies as soon as the bar lays
-// out again.
-//
-// Tree (trees/settings.txt): SettingsListViewController.view > SettingsListCollectionView of
-//   Element_List cells 402x56: 24pt icon at x 12, 13pt white title and 11pt grey subtitle at
-//   x 48, 12pt chevron on the right. A pushed page (trees/settings notifications opened.txt) is a
-//   UITableView bg #121212: header with an 11pt grey description at (16, 24), 53pt cells with the
 #import "Core/SGCore.h"
 #import "Settings/SGPage.h"
 #import "Settings/SGPageStyle.h"
 #import "Settings/SGModPage.h"
+#import "Settings/SGGlowSwitch.h"
 #import "Native/Home/Home.h"
 #import "Shared/AdBlock/AdBlock.h"
 #import "Redesigned/Album/Album.h"
@@ -26,6 +12,7 @@
 #import "Shared/AudioEffects/AudioEffectsPage.h"
 #import "Shared/LiveActivity/LiveActivity.h"
 #import "Shared/HeadGestures/HeadGestures.h"
+#import "Shared/Haptics/Haptics.h"
 #import "Shared/ListeningStats/ListeningStats.h"
 #import "App/About/About.h"
 #import "Pages.h"
@@ -33,8 +20,38 @@
 static const CGFloat kRowHeight = 56;
 static char kRowKey, kInsetKey;
 
+// The Misc page's switch that hides the Discord banner row in modSettingsPage below.
+#define SGKeyHideDiscordBanner @"spotifyglass.hide.discordBanner"
+
 static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^page)(void)) {
     return SGWithSymbol(SGPageRow(title, page), symbol);
+}
+
+// How long the wordmark takes to carry its spectrum all the way round, matching the glow switch's turn.
+static const double kRainbowSpinSeconds = 4;
+
+static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) {
+    width = MAX(1, width);
+    height = MAX(1, height);
+    NSArray<UIColor *> *stops = SGGlowRainbowColors();
+    NSUInteger count = stops.count;
+    if (count < 2) return UIColor.whiteColor;
+    NSMutableArray *colors = [NSMutableArray arrayWithCapacity:count];
+    for (UIColor *stop in stops) [colors addObject:(id)stop.CGColor];
+    CGFloat *locations = malloc(sizeof(CGFloat) * count);
+    for (NSUInteger i = 0; i < count; i++) locations[i] = (CGFloat)i / (CGFloat)(count - 1);
+    CGFloat offset = (CGFloat)phase * width;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(width, height)];
+    UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+        CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+        CGGradientRef gradient = CGGradientCreateWithColors(space, (__bridge CFArrayRef)colors, locations);
+        CGContextDrawLinearGradient(context.CGContext, gradient, CGPointMake(-offset, 0), CGPointMake(width - offset, 0), 0);
+        CGContextDrawLinearGradient(context.CGContext, gradient, CGPointMake(width - offset, 0), CGPointMake(2 * width - offset, 0), 0);
+        CGGradientRelease(gradient);
+        CGColorSpaceRelease(space);
+    }];
+    free(locations);
+    return [UIColor colorWithPatternImage:image];
 }
 
 @interface SGTaurusSettingsPage : SGModPage
@@ -45,10 +62,13 @@ static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^
     UIView *_masthead;
     UILabel *_mastheadTitle, *_mastheadByline, *_compactTitle;
     BOOL _compactTitleVisible;
+    CADisplayLink *_rainbowLink;
+    CFTimeInterval _rainbowLast;
+    double _rainbowPhase;
 }
 
 - (instancetype)initWithSections:(NSArray<SGModSection *> *)sections {
-    return [super initWithTitle:@"taurus" intro:nil sections:sections footer:nil];
+    return [super initWithTitle:@"Taurus" intro:nil sections:sections footer:nil];
 }
 
 - (void)viewDidLoad {
@@ -57,12 +77,13 @@ static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^
     _masthead.backgroundColor = SGPageBackground();
     _masthead.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     _mastheadTitle = [UILabel new];
-    _mastheadTitle.text = @"taurus";
+    _mastheadTitle.text = @"Taurus";
     _mastheadTitle.font = [UIFont systemFontOfSize:36 weight:UIFontWeightBold];
-    _mastheadTitle.textColor = UIColor.whiteColor;
     _mastheadTitle.textAlignment = NSTextAlignmentRight;
+    [_mastheadTitle sizeToFit];
+    _mastheadTitle.textColor = SGRainbowTextColor(_mastheadTitle.bounds.size.width, _mastheadTitle.bounds.size.height, 0);
     _mastheadByline = [UILabel new];
-    _mastheadByline.text = @"by samj.";
+    _mastheadByline.text = @"by Samj & Natasha";
     _mastheadByline.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
     _mastheadByline.textColor = [UIColor colorWithWhite:1 alpha:0.72];
     _mastheadByline.textAlignment = NSTextAlignmentRight;
@@ -71,14 +92,57 @@ static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^
     self.tableView.tableHeaderView = _masthead;
 
     _compactTitle = [UILabel new];
-    _compactTitle.text = @"taurus";
+    _compactTitle.text = @"Taurus";
     _compactTitle.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
-    _compactTitle.textColor = UIColor.whiteColor;
     [_compactTitle sizeToFit];
+    _compactTitle.textColor = SGRainbowTextColor(_compactTitle.bounds.size.width, _compactTitle.bounds.size.height, 0);
     _compactTitle.alpha = 0;
     _compactTitle.isAccessibilityElement = YES;
     _compactTitle.accessibilityElementsHidden = YES;
     self.navigationItem.titleView = _compactTitle;
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self startRainbow];
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    [self stopRainbow];
+}
+
+- (void)startRainbow {
+    if (_rainbowLink) return;
+    _rainbowLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(rainbowTick:)];
+    _rainbowLink.preferredFrameRateRange = CAFrameRateRangeMake(24, 30, 30);
+    [_rainbowLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
+}
+
+- (void)stopRainbow {
+    [_rainbowLink invalidate];
+    _rainbowLink = nil;
+    _rainbowLast = 0;
+}
+
+- (void)rainbowTick:(CADisplayLink *)link {
+    CFTimeInterval step = _rainbowLast > 0 ? MIN(link.timestamp - _rainbowLast, 0.1) : 0;
+    _rainbowLast = link.timestamp;
+    _rainbowPhase += step / kRainbowSpinSeconds;
+    _rainbowPhase -= floor(_rainbowPhase);
+    [self applyRainbow];
+}
+
+- (void)applyRainbow {
+    CGSize compact = _compactTitle.bounds.size;
+    if (_compactTitleVisible) {
+        if (compact.width >= 1)
+            _compactTitle.textColor = SGRainbowTextColor(compact.width, compact.height, _rainbowPhase);
+        return;
+    }
+    CGSize title = _mastheadTitle.bounds.size;
+    if (title.width >= 1)
+        _mastheadTitle.textColor = SGRainbowTextColor(title.width, title.height, _rainbowPhase);
 }
 
 - (void)viewDidLayoutSubviews {
@@ -89,9 +153,9 @@ static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^
         _masthead.frame = CGRectMake(0, 0, width, 132);
         if (sizeChanged || self.tableView.tableHeaderView != _masthead) self.tableView.tableHeaderView = _masthead;
         _masthead.backgroundColor = UIColor.blackColor;
-        _mastheadTitle.textColor = UIColor.whiteColor;
         _mastheadByline.textColor = UIColor.whiteColor;
-        _mastheadTitle.frame = CGRectMake(16, 24, MAX(0, width - 32), 48);
+        CGSize title = _mastheadTitle.bounds.size;
+        _mastheadTitle.frame = CGRectMake(MAX(16, width - 16 - title.width), 24 + (48 - title.height) / 2, title.width, title.height);
         _mastheadByline.frame = CGRectMake(16, 72, MAX(0, width - 32), 24);
     }
     [self updateCompactTitleForScrollView:self.tableView];
@@ -117,13 +181,22 @@ static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^
 
 @end
 
+static UIViewController *miscSettingsPage(void) {
+    SGModRow *hideSigning = SGHideRow(@"Hide the lock screen alert", @"Hide the notice that this build cannot be opened from the lock screen", SGKeyHideSigningWarning);
+    SGModRow *hideDiscord = SGHideRow(@"Hide the Discord banner", @"Hide the row here that advertises the Discord server", SGKeyHideDiscordBanner);
+    SGModSection *banners = SGSection(nil, @[
+        SGWithSymbol(hideSigning, @"lock.slash"),
+        SGWithSymbol(hideDiscord, @"bubble.left.and.bubble.right"),
+    ]);
+    return [[SGModPage alloc] initWithTitle:@"Misc" intro:SGRestartNote sections:@[banners] footer:nil];
+}
+
 static UIViewController *modSettingsPage(void) {
     // Opening the page is the only thing that asks; the cache keeps it to once every six hours.
     SGCheckForUpdate();
     NSMutableArray<SGModSection *> *sections = [NSMutableArray array];
-    // A build the lock screen cannot open leads the page, above the tweaks: it is the one thing here
-    // that no switch can put right, and it is worth reading before anything else.
     SGModRow *signing = SGSigningWarningRow();
+    if (signing) signing.visible = ^BOOL { return !SGFlag(SGKeyHideSigningWarning, NO); };
     NSMutableArray<SGModRow *> *topRows = [NSMutableArray array];
     SGModRow *update = SGActionRow(@"Taurus update available", @"Tap to view the latest release", ^{
         NSString *url = SGUpdateNewestRelease().url;
@@ -134,6 +207,11 @@ static UIViewController *modSettingsPage(void) {
     update.visible = ^BOOL { return SGUpdateVersion() != nil; };
     update.refreshOn = SGUpdateCheckedNotification;
     [topRows addObject:update];
+    SGModRow *discord = SGLinkRow(@"Join the Discord", @"Release pings, help and previews", SGDiscordURL);
+    discord.image = SGDiscordIcon();
+    discord.color = SGDiscordColor();
+    discord.visible = ^BOOL { return !SGFlag(SGKeyHideDiscordBanner, NO); };
+    [topRows addObject:discord];
     if (signing) [topRows addObject:signing];
     [sections addObject:SGSection(nil, topRows)];
     SGModRow *mod = pageRow(@"Mod", @"info.circle", ^UIViewController *{ return SGAboutPage(); });
@@ -141,8 +219,6 @@ static UIViewController *modSettingsPage(void) {
     // The audio effects work on the sound, so both looks have them, with what they are doing beside the chevron.
     SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", ^UIViewController *{ return SGDSPSettingsPage(); });
     audioEffects.value = ^NSString *{ return SGDSPSummary(); };
-    // Home & Library holds only the native look's switches, and Albums only the redesign's; the Live
-    // Activity works under both, and only where ActivityKit's card does.
     NSMutableArray<SGModRow *> *parts = [NSMutableArray arrayWithArray:@[
         pageRow(@"Navbar", @"dock.rectangle", ^UIViewController *{ return SGNavbarPage(); }),
         pageRow(@"Player", @"play.circle", ^UIViewController *{ return SGPlayerSettingsPage(); }),
@@ -161,11 +237,12 @@ static UIViewController *modSettingsPage(void) {
     ]];
     if (SGRedesignedUIStored()) [parts addObject:pageRow(@"Albums", @"square.stack", ^UIViewController *{ return SGRAlbumSettingsPage(); })];
     else [parts addObject:pageRow(@"Home & Library", @"house", ^UIViewController *{ return SGHomeSettingsPage(); })];
+    [parts addObject:pageRow(@"Misc", @"ellipsis.circle", ^UIViewController *{ return miscSettingsPage(); })];
     [sections addObject:SGAppearanceSection()];
     // Sing's microphone is the redesigned player's, so Karaoke is the redesign's; its row follows a download.
     if (SGRedesignedUIStored()) {
-        SGModRow *karaoke = pageRow(@"Karaoke", @"music.mic", ^UIViewController *{ return SGRKaraokeSettingsPage(); });
-        karaoke.value = ^NSString *{ return SGRKaraokeSummary(); };
+        SGModRow *karaoke = pageRow(@"Karaoke", @"music.mic", ^UIViewController *{ return nil; });
+        karaoke.value = ^NSString *{ return @"Karaoke"; };
         karaoke.refreshOn = SGSingModelDidChangeNotification;
         [sections addObject:SGSection(nil, @[karaoke])];
     }
@@ -185,8 +262,6 @@ static UIViewController *modSettingsPage(void) {
 
 #pragma mark - row in the settings list and the side drawer
 
-// The last row of Spotify's settings list, chevron and all, or the first of the side drawer's,
-// drawn like the drawer's own rows: no chevron, icon and title 4pt further in.
 @interface SGModSettingsRow : UIControl
 @property (nonatomic) BOOL drawer;
 @end
@@ -201,7 +276,7 @@ static UIViewController *modSettingsPage(void) {
     if (!(self = [super initWithFrame:frame])) return nil;
     _icon = SGSymbolView(@"slider.horizontal.3", 20, UIImageSymbolWeightRegular, 24);
     _title = [UILabel new];
-    _title.text = @"Mod Settings";
+    _title.text = @"Taurus Settings";
     _title.textColor = UIColor.whiteColor;
     _chevron = SGSymbolView(@"chevron.right", 11, UIImageSymbolWeightSemibold, 12);
     for (UIView *v in @[_icon, _title, _chevron]) [self addSubview:v];
@@ -233,8 +308,6 @@ static UINavigationController *navigationIn(UIViewController *page) {
     return nil;
 }
 
-// The drawer is presented over the app, so its row closes it first and pushes onto the stack it
-// was covering, the way the drawer's own rows open their pages.
 - (void)open {
     UIViewController *owner = nil;
     for (UIResponder *r = self; r && !owner; r = r.nextResponder) {
@@ -263,8 +336,6 @@ void SGOpenModSettings(UIView *source) {
     SGShowPage(nav.topViewController ?: SGTopController(), modSettingsPage());
 }
 
-// At the end of the settings list, or above the first row of the drawer's, with the inset for it
-// added again whenever Spotify resets the inset.
 static void placeRow(UICollectionView *list, SGModSettingsRow *row) {
     SGAdoptFonts(list, row);
     CGFloat bottom = list.contentSize.height;
@@ -280,14 +351,6 @@ static void placeRow(UICollectionView *list, SGModSettingsRow *row) {
     list.contentInset = inset;
 }
 
-// Media quality, Playback, Account and most of the rest of settings are the same controller class
-// as the list they were opened from, which is why the row turned up at the end of all of them.
-// What is on the navigation stack is not that controller though: every page in the app is wrapped
-// in a MusicAppPageHostingViewController (trees/settings notifications opened.txt), and Spotify
-// pushes a settings sub page as a page of its own, leaving the list it came from on the stack
-// underneath. So the settings list inside the lowest wrapper that holds one is the list the row
-// belongs at the end of, and a controller with no stack to be found on keeps the row rather than
-// losing it.
 static UIViewController *settingsListIn(UIViewController *page, Class kind) {
     if ([page isKindOfClass:kind]) return page;
     for (UIViewController *child in page.childViewControllers) {
@@ -312,8 +375,6 @@ static BOOL isSettingsRoot(UIViewController *list) {
     for (UIView *sub in ((UIViewController *)self).view.subviews) {
         if (![sub isKindOfClass:UICollectionView.class]) continue;
         SGModSettingsRow *row = objc_getAssociatedObject(sub, &kRowKey);
-        // A page that laid itself out before it was on the stack looked like the list for as long
-        // as that took; the row goes again as soon as it can be seen for what it is.
         if (!root) {
             [row removeFromSuperview];
             objc_setAssociatedObject(sub, &kRowKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -327,8 +388,6 @@ static BOOL isSettingsRoot(UIViewController *list) {
 }
 %end
 
-// The drawer's list (trees/test6.txt: SideDrawerListCollectionView under the profile header, Your
-// plan its first cell) is one of several collection views on the page, so it is found by name.
 static SGModSettingsRow *ensureDrawerRow(UICollectionView *list) {
     SGModSettingsRow *row = objc_getAssociatedObject(list, &kRowKey);
     if (!row) {

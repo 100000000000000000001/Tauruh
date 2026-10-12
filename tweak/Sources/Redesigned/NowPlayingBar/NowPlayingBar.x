@@ -1,16 +1,3 @@
-// The redesign's now playing bar: the album-coloured card becomes a glass card with round artwork and the
-// progress line under the text. Spotify's own labels, buttons and gestures stay in place.
-//
-// The full screen player morphs the bar's own card and artwork into the cover art. The bar was
-// written to hand itself back to Spotify for that animation, from NowPlaying_ViewPageImpl's
-// Show/CloseFullscreenAnimatedTransitioning, but Spotify 9.1.78 never runs the player through those,
-// so the handback never happened and is gone; if the morph ever reads as a cut, the place to start is
-// Shared/Player/PlayerEvents.h, which does fire. What does move with the player is a stand-in of the
-// bar, which BarTransition.x keeps glass behind.
-//
-// Tree (trees/home.txt): NowPlayingBarContainerViewController.view 402x56 > NowPlayingBarViewController.view
-//   at {8,0} 386x56 > UIView 386x56 (the painted card) > artwork 40x40 r=4, title stack,
-//   progress line 370x2 at the bottom. The glass pane goes on the container's view.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRRepaint.h"
 #import "NowPlayingBar.h"
@@ -114,8 +101,6 @@ static void styleNowPlayingBar(UIViewController *container) {
     }
 
     UIVisualEffectView *glass = SGGlassFor(container.view, &kGlassKey);
-    // Dark whatever the system is set to: the bar is outside the navigation stacks Spotify makes dark, and
-    // took the system's light glass on a phone in light mode (TabBar.x).
     if (glass.overrideUserInterfaceStyle != UIUserInterfaceStyleDark) glass.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     sg_cardGlass = glass;
     glass.frame = frame;

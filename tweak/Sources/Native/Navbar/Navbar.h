@@ -1,6 +1,3 @@
-// The native look's navbar: Spotify's own tab bar composed (Navbar.x, hooked from TabBarHooks.x): an
-// ordered list of entries, each a dictionary. An entry with a URI is a tab of the mod's own; one without names
-// one of Spotify's, by the label under its icon. No list at all is Spotify's order, all shown.
 #import <UIKit/UIKit.h>
 
 #define SGKeyNavbar @"spotifyglass.navbar"

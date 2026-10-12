@@ -7,8 +7,6 @@
 
 NSNotificationName const SGSingModelDidChangeNotification = @"spotifyglass.singModelChanged";
 
-// The model host: a Hugging Face repository holding the compiled model's files at the paths below. A test
-// build serves them itself and keeps them somewhere of its own (harness/sing/model_test.m).
 #ifndef SGSingModelBase
 #define SGSingModelBase @"https://huggingface.co/Darkkos/spoti-sing/resolve/main/"
 #endif
@@ -16,8 +14,6 @@ NSNotificationName const SGSingModelDidChangeNotification = @"spotifyglass.singM
 #define SGSingModelRoot nil
 #endif
 
-// The compiled model, file by file, as harness/sing/stage_model.py prints it for an export. Only these
-// files, at these sizes and with these hashes, ever become the model; the largest comes first.
 static const struct { const char *path; int64_t size; const char *sha256; } kFiles[] = {
     {"weights/weight.bin", 488986336, "970a99fb4b15724bf76d2918ceb177df592c69265d3e2fabaab6e5ba72738e62"},
     {"model.mil", 669061, "966560ed5125174a98f19b94f5de04450a7112ade0e731f2236c202c0280a623"},
@@ -31,9 +27,6 @@ static NSString *const kSessionIdentifier = @"spotifyglass.sing.model";
 static const int64_t kHeadroom = 64ll << 20;               // free space left over once the model is in
 static const NSTimeInterval kProgressInterval = 0.25;      // between two progress notifications
 
-// Main thread. A file is done once it is checked and in the staging folder under its own name, and
-// checking while it waits for its hash; bytes are what arrived of one still coming, or a stopped
-// download kept for its resume. The epoch goes up on removal, so work begun before it is let go.
 static BOOL sg_loaded, sg_installed, sg_want, sg_metered;
 static NSString *sg_failure;
 static BOOL sg_done[kFileCount], sg_checking[kFileCount], sg_restarted[kFileCount], sg_fromResume[kFileCount];
@@ -108,8 +101,6 @@ static BOOL makeFolders(NSError **error) {
     return YES;
 }
 
-// What is on the disk, read once: the installed model when every file has its size, else the staged files
-// (named only once checked) and what each resume kept.
 static void load(void) {
     if (sg_loaded) return;
     sg_loaded = YES;
@@ -182,8 +173,6 @@ static void startFile(int i) {
     NSDictionary *resume = [NSDictionary dictionaryWithContentsOfURL:resumeFile(i)];
     [NSFileManager.defaultManager removeItemAtURL:resumeFile(i) error:nil];
     NSURLSessionDownloadTask *task = nil;
-    // A resume carries its request, and with it the networks it may use: one made for others than the
-    // ones allowed now starts over, and so does one that has already failed once.
     if ([resume[@"data"] isKindOfClass:NSData.class] && [resume[@"metered"] boolValue] == sg_metered && !sg_restarted[i]) {
         task = [session() downloadTaskWithResumeData:resume[@"data"]];
         sg_bytes[i] = [resume[@"bytes"] longLongValue];
@@ -237,8 +226,6 @@ static void installIfComplete(void) {
     });
 }
 
-// A file that arrived is hashed off the main thread and named in the staging folder only if it is the
-// pinned one; anything else is deleted and stops the download.
 static void check(int i) {
     sg_checking[i] = YES;
     NSUInteger epoch = sg_epoch;
@@ -330,8 +317,6 @@ static int indexOf(NSURLSessionTask *task) {
     if (error) {
         keepResume(i, error.userInfo[NSURLSessionDownloadTaskResumeData]);
         BOOL cancelled = [error.domain isEqualToString:NSURLErrorDomain] && error.code == NSURLErrorCancelled;
-        // Cancelled without being asked (Spotify was quit while it ran): go on from what it kept. A resume
-        // that failed some other way starts that file over, once.
         if (cancelled || (sg_fromResume[i] && !sg_restarted[i])) {
             if (!cancelled) sg_restarted[i] = YES;
             SGLog(@"Sing voice model: %s starting again after %@", kFiles[i].path, error.localizedDescription);
@@ -472,8 +457,6 @@ BOOL SGSingModelHandlesSession(NSString *identifier, void (^completion)(void)) {
     return YES;
 }
 
-// A download that was running when Spotify last quit: the session is made again, which hands back its
-// tasks, and whatever is neither there nor already in is started again.
 void SGSingModelReconnect(void) {
     load();
     NSInteger mode = SGInt(SGKeySingModelDownload, 0);

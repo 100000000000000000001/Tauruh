@@ -3,8 +3,6 @@
 #import "Settings/SGPageStyle.h"
 #import "About.h"
 
-// Every key under the prefix travels, the way the reset sweeps them, so a new switch needs nothing
-// here. What is left out belongs to this install rather than to its user's choices.
 static BOOL isSetting(NSString *key) {
     if (![key hasPrefix:@"spotifyglass."]) return NO;
     for (NSString *local in @[@"spotifyglass.adblock.counts", @"spotifyglass.privacy.counts", @"spotifyglass.update.",
@@ -53,8 +51,6 @@ static Class kindOf(id value) {
     return Nil;
 }
 
-// A key already stored keeps its type: the hooks send boolValue to whatever they find at launch, and
-// an array there would crash Spotify before the reset row could be reached.
 static void importSettings(NSDictionary *settings) {
     NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
     NSDictionary *stored = storedDefaults();

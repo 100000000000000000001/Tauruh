@@ -1,5 +1,3 @@
-// Keeps the areas the redesign stripped transparent when Spotify repaints them, and learns which view
-// is the now playing bar's card from the album-colour paint.
 #import "Core/SGCore.h"
 #import "SGRRepaint.h"
 

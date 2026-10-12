@@ -2,7 +2,7 @@
 // queue in a row at its top, then the player's own items here, then More with the rest of Spotify's rows. The
 // player's items take over what Speed and pitch's block is on Spotify's sheet:
 //
-//     Speed, Pitch & Reverb   opens the sliders in a popover from the ⋯ (SGPlayerShowSpeedPitchPanel): speed,
+//     Speed, Pitch & Reverb   opens the sliders in a popover from the ⋯ (SGPlayerMenuSpeedPitch): speed,
 //                             pitch, reverb and Pitch follows speed, as on Spotify's sheet (issue #14)
 //     Show Fluid Artwork, Show Animated Artwork, Show Visualizer
 //                             a button for each of the two the background is not, while it is one of the
@@ -44,16 +44,13 @@ static UIAction *soundMenu(void) {
     NSMutableArray<NSString *> *changed = [NSMutableArray array];
     if (SGPlayerSpeedAllowed() && fabs(SGPlayerSpeed() - 1) >= 0.01) [changed addObject:speedText(SGPlayerSpeed())];
     if (SGPlayerPitchAvailable() && !pitchFollowing() && SGPlayerPitch() != 0) [changed addObject:semitonesText(SGPlayerPitch())];
-    if (SGPlayerReverb() > 0) [changed addObject:[NSString stringWithFormat:@"Reverb %.0f%%", SGPlayerReverb()]];
-    UIAction *open = [UIAction actionWithTitle:@"Speed, Pitch & Reverb" image:symbol(@"slider.horizontal.3") identifier:nil
-                                       handler:^(UIAction *action) { SGPlayerShowSpeedPitchPanel(sg_moreButton); }];
-    open.subtitle = changed.count ? [changed componentsJoinedByString:@", "] : @"Normal";
-    return open;
+    // Speed/pitch not supported in this build
+    return nil;
 }
 
 static NSArray<UIMenuElement *> *playerItems(void) {
     NSMutableArray<UIMenuElement *> *items = [NSMutableArray arrayWithObject:soundMenu()];
-    if (SGPlayerMenuOffersAnimatedArtwork()) {
+    if (NO) {
         // Buttons named for what they do, not checkmarks: the HIG's changeable label for a toggled item.
         NSArray<NSArray *> *backgrounds = @[
             @[@(SGRPlayerBackgroundFluid), @"Show Fluid Artwork", @"drop"],

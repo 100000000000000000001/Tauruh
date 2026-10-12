@@ -1,14 +1,5 @@
-// Sing's voice model on this iPhone. It is not in the IPA: the app downloads its five files from the model
-// host once, each checked against the size and the SHA-256 pinned in SGSingModel.m (nothing the server says
-// is trusted), into a staging folder, and moves them into place only when every one of them is right:
-// Library/Application Support/spoti.pw/Sing/separator.mlmodelc in Spotify's container, kept out of the
-// iCloud backup. The download runs in a background URL session, so it goes on while Spotify is away; a
-// launch picks up one left running (SingModel.x), and a stopped one resumes from what already came in.
-// Threading: main thread only; SGSingModelDidChangeNotification is posted on it.
 #import <Foundation/Foundation.h>
 
-// Set while a download should be running, to 1 when it keeps off metered networks and 2 when it may use
-// them: a launch that finds it picks the download up.
 #define SGKeySingModelDownload @"spotifyglass.sing.modelDownload"
 
 typedef NS_ENUM(NSInteger, SGSingModelState) {
@@ -39,13 +30,9 @@ typedef NS_ENUM(NSInteger, SGSingModelNetwork) {
 // The network the phone is on now, asked once; `done` runs on the main queue.
 void SGSingModelCheckNetwork(void (^done)(SGSingModelNetwork network));
 
-// Starts the download, or resumes a stopped one. Without `metered` it keeps off cellular and Low Data Mode
-// networks and waits for Wi-Fi when that is all there is.
 void SGSingModelDownload(BOOL metered);
 void SGSingModelCancel(void);   // keeps what came in, for the next Download
 void SGSingModelRemove(void);   // the model and anything half downloaded
 
-// SingModel.x: the app delegate hands over the background session's events, and a launch reconnects to a
-// download that was running.
 BOOL SGSingModelHandlesSession(NSString *identifier, void (^completion)(void));
 void SGSingModelReconnect(void);

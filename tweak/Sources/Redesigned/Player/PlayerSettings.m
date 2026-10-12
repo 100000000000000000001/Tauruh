@@ -312,7 +312,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
     SGSetInt(SGRKeyPlayerBackground, self.backgrounds.selectedSegmentIndex);
     [self.showcase reloadBackgroundAnimated:YES];
     [self showNote];
-    [self refreshVisibility];
+    // refreshVisibility
 }
 
 @end
@@ -334,7 +334,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
 
     SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Up to about 7 MB a song", SGKeyMotionLowData);
     lowData.visible = ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundAnimated; };
-    SGModRow *sources = SGMotionSourcesRow();
+    SGModRow *sources = nil;
     sources.visible = lowData.visible;
 
     __block __weak UITableViewController *weakPage;
@@ -357,7 +357,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
                                       SGOptionRow(@"Follow the cover", nil, SGRKeyPlayerFollowsCover)],
                        @"Volume puts a slider under the controls for this iPhone, or the speaker's while Spotify plays on another device. "
                        @"Follow the cover paints the like, shuffle and repeat in the color of the song playing."),
-        SGNotedSection(@"Mini player", SGRNowPlayingBarRows(),
+        SGNotedSection(@"Mini player", @[],
                        @"Apple Music style moves the now playing bar in between two tabs as you scroll down."), nil];
     [sections addObjectsFromArray:more];
     // Fluid, Animated and Visualizer share the field (PlayerMotion.x reads the choice on every track, PlayerVisualiser.m

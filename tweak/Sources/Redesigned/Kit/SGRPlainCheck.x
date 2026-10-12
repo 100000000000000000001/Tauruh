@@ -8,6 +8,8 @@
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
 #import "SGRKit.h"
+#define SGRKeyPlainCheck @"spotifyglass.redesign.plaincheck"
+
 
 static const CGFloat kCheckSize = 19;
 static char kCheckKey, kAnimationKey;

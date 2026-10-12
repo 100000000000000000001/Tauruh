@@ -1,14 +1,7 @@
-// Mod > App icon: the icon on the home screen, picked from the ones scripts/app-icons.sh put into the IPA
-// (icons/*.icon, listed under CFBundleAlternateIcons as SGAppIcon<Name>). iOS keeps the choice itself, so
-// nothing is stored here and Reset all settings leaves it, and iOS says that it changed in an alert of its
-// own. The icons are Liquid Glass stacks only, which nothing before iOS 26 draws, so below 26 the row says
-// so. The name under the icon is the signature's to set, not the app's.
 #import "Core/SGCore.h"
 #import "Settings/SGPageStyle.h"
 #import "About.h"
 
-// In the order the list shows them: the file in icons/, and the name the list gives it. Spotify is the
-// IPA's own icon, iOS's primary one.
 static NSArray<NSString *> *iconFiles(void) {
     return @[@"Spotify", @"Glass", @"Green", @"White", @"Pink", @"Blue", @"Purple", @"Orange", @"Lime"];
 }
@@ -49,8 +42,6 @@ static UIImage *preview(NSString *file) {
     return image ? [UIImage imageWithCGImage:image.CGImage scale:3 orientation:UIImageOrientationUp] : nil;
 }
 
-// The list stays up after a pick, so one icon after another can be tried; the tick follows what iOS
-// reports once it has switched.
 @interface SGAppIconPage : SGPage
 @end
 

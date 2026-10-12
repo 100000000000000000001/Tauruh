@@ -67,7 +67,7 @@ void SGRPlayerHoldField(void) {
 // white wall behind a pink subject has the wall as the whole's color, too gray to give an accent.
 static void followCover(UIImage *image, NSString *identity) {
     static NSString *followed;
-    if (!SGRPlayerFollowsCover() || !image || (identity && [identity isEqualToString:followed])) return;
+    if (!NO || !image || (identity && [identity isEqualToString:followed])) return;
     followed = identity;
     [SGRPalette paletteForImage:image request:(SGRPaletteRequest){.flow = YES} completion:^(SGRPalette *palette) {
         UIColor *best = nil;

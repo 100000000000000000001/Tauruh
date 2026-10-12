@@ -1,8 +1,3 @@
-// Polls the player and sends the activity a new state only when what its view shows changes: the
-// lyrics' line, what is up next, the control menu's tab, track, shuffle, repeat or sleep timer, or a
-// pause. The view is read on every tick, so picking another one shows within a tick. Spotify keeps
-// playing in the background, so the timer keeps running there too, and with it the sleep timer.
-// The activity is started only while the app is in front, the one place ActivityKit allows it.
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
@@ -28,16 +23,11 @@ typedef NS_ENUM(NSInteger, SGLiveActivityTab) {
 };
 
 static const NSTimeInterval kTick = 0.25;
-// Paused, the only thing on the card that still moves is the sleep timer, and a slower tick catches
-// its end well within the second the card shows. Four ticks a second for a still card is a wake up
-// eighty times a minute for a picture that does not change.
 static const NSTimeInterval kPausedTick = 1;
 // Past a line's sung end by this much, with the next line at least this far off, the line gives way to a note.
 static const NSInteger kBreakMs = 4000;
 // Seconds between attempts to start one, so a refused request (activities turned off) is not retried every tick.
 static const NSTimeInterval kStartRetry = 10;
-// Tracks up next: the queue view shows four on the lock screen (three in the Dynamic Island), the
-// control menu's queue tab three.
 static const NSUInteger kUpNextQueue = 4;
 static const NSUInteger kUpNextPanel = 3;
 // The end of track timer pauses this close to the end, so the next track never starts.
@@ -63,8 +53,6 @@ static void startTimer(NSTimeInterval every) API_AVAILABLE(ios(17.0)) {
     [NSRunLoop.mainRunLoop addTimer:sg_timer forMode:NSRunLoopCommonModes];
 }
 
-// Sends `shown`, what the activity is to show as one string, unless it is showing that already; starts
-// the activity when there is none and the app is in front.
 static void send(NSString *shown, void (^show)(void)) API_AVAILABLE(ios(17.0)) {
     if (SGLiveActivityBridge.isShowing) {
         if ([shown isEqualToString:sg_shown]) return;
@@ -101,8 +89,6 @@ static NSInteger repeatModeOf(SPTPlayerOptions *options) {
     return options.repeatingTrack ? 2 : options.repeatingContext ? 1 : 0;
 }
 
-// The line being sung and the one after it; before the first line, between lines and without lyrics
-// at all, a note holds the place.
 static NSString *lyricsLine(NSString *trackID, NSString **next) {
     NSArray<SGKaraokeLine *> *lines = SGKaraokeLinesForTrack(trackID);
     if (!lines) {
@@ -129,8 +115,6 @@ static void clearSleepTimer(void) {
     sg_sleepTrack = nil;
 }
 
-// Pauses once the sleep timer is up: at its end, or just before the end of the track it was set on
-// (on the next track, should the length not be known).
 static void checkSleepTimer(id<SPTPlayer> player, SPTPlayerState *state, NSString *trackID) {
     BOOL up = NO;
     if (sg_sleepEnd) {
@@ -192,8 +176,6 @@ static void tick(void) API_AVAILABLE(ios(17.0)) {
     });
 }
 
-// A tap on a track up next: skips ahead to it, found again by its URI in case the queue moved since
-// the card was drawn.
 static void playQueued(NSString *uri) {
     id<SPTPlayer> player = SGKaraokePlayer();
     SPTPlayerTrack *target = nil;

@@ -185,7 +185,7 @@ static char kHoldKey, kBadgeGlassKey;
 }
 
 // "2×" and a forward glyph on the Kit's glass capsule at the top of the cover while it is held. What fades
-// is the glass's effect (SGRShowGlass), never an alpha over it; the capsule grows in from 0.9 with the Kit's
+// is the glass's effect (SGShapeGlass), never an alpha over it; the capsule grows in from 0.9 with the Kit's
 // press spring and goes with its exit, quicker than it came: the finger is already off the cover.
 - (void)showBadge:(BOOL)shown on:(UIView *)cover {
     if (shown && !_badge) {

@@ -12,6 +12,8 @@ reads. `.claude/skills/` links each one back here, so Claude Code and the agents
                            momentum projection, rubber-banding, interruptible transitions, materials
     review-animations/     a strict review of motion code, `/review-animations`; STANDARDS.md holds the values
     animation-vocabulary/  the name of a motion effect you can describe but not name
+    spotipw-code-notes/    this mod's own explanations, moved out of the code comments and organised
+                           by layer and file; written for this repo, not copied from upstream
 
 The motion skills write their examples in CSS and JavaScript. The rules carry over to UIKit as they
 are: a spring is `-[UISpringTimingParameters initWithDampingRatio:initialVelocity:]` on a
@@ -21,6 +23,8 @@ is `UIAccessibilityIsReduceMotionEnabled()`.
 ## Where they come from
 
 Copied unchanged unless noted. To update one, copy the upstream directory over it and redo the note.
+`spotipw-code-notes/` has no upstream: it is written for this repo from the tweak's own former code
+comments.
 
 | Skill | Upstream | Commit | License |
 | --- | --- | --- | --- |

@@ -378,6 +378,10 @@ static void orientationChanged(void) {
     }
 }
 
+void SGRPlayerLyricsOrientationChanged(void) {
+    orientationChanged();
+}
+
 %ctor {
     if (!SGRedesignedUI()) return;
     dispatch_async(dispatch_get_main_queue(), ^{

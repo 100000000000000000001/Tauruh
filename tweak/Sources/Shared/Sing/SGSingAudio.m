@@ -41,15 +41,11 @@ static OSStatus process(void *context, UInt32 frames, AudioBufferList *data, con
         if (!data->mBuffers[c].mData || data->mBuffers[c].mNumberChannels != 1 || data->mBuffers[c].mDataByteSize < frames*sizeof(float))
             return kAudio_ParamError;
     if (a->epoch != atomic_load(&epoch)) {
-        // A seek/skip has invalidated the old stems but main has not detached us yet. Follow
-        // Spotify's current source during that interval, rather than muting its new audio.
         return SGAudioPipelinePullOriginal(frames, data, time);
     }
     a->time = time;
     for (UInt32 done = 0; done < frames;) {
         UInt32 count = MIN(frames - done, SGSingStreamMaximumRenderFrames);
-        // The stream pulls at most two quanta and leaves 120 ms in Spotify's queue.
-        // Counting any further ahead adds kernel reads to every audio callback for no gain.
         uint64_t captured = SGSingStreamCaptured(a->stream);
         uint64_t expected = atomic_load(&a->expectedTrack), prefetched = atomic_load(&a->prefetchedTrack);
         bool continuous = expected && (!prefetched || captured <= atomic_load(&a->prefetchedFrame));
@@ -80,8 +76,6 @@ static OSStatus process(void *context, UInt32 frames, AudioBufferList *data, con
         }
         double position = a->position + (SGSingStreamPresented(a->stream) - a->origin) / (double)SGSingSampleRate;
         position = fmax(a->position, position - valueOf(atomic_load(&a->latencyBits)));
-        // A natural transition keeps its audio epoch. Publish track and position as one
-        // snapshot so a concurrent lyrics/lock-screen read cannot mix the two songs.
         atomic_fetch_add(&clockSequence, 1);
         atomic_store(&clockBits, bitsOf(position));
         atomic_store(&clockTrack, a->track);

@@ -1,5 +1,3 @@
-// The control's full travel represents 20–100% vocals. Shared by UI, controller and mixer so
-// touch, accessibility and programmatic changes all use the same range.
 #pragma once
 #include <math.h>
 

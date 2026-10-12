@@ -1,8 +1,3 @@
-// The services behind every ad surface and Premium prompt, each an SPTService Spotify starts by
-// sending it -load. Hooked to do nothing, the surface is never built: the brand ad on Home, the card
-// under the player, the sponsored playlist header, the sponsorship on the now playing bar, the
-// in-stream ad, and the sheets and cards that sell Premium. The two views are a fallback for a
-// header or banner already on screen before its service was silenced.
 #import "Core/SGCore.h"
 #import "AdBlock.h"
 
@@ -41,8 +36,6 @@ static void takeDown(UIView *view) {
 %hook _TtC20NativeAds_LoggerImpl26NativeAdsLoggerServiceImpl
 - (void)load { SGAdBlockCountOne(@"Ad services"); }
 %end
-// The leavebehind card among the player's scroll cards. It has no -load; its card is added the way
-// lyrics and credits add theirs, so it is kept off the list instead.
 %hook _TtC32AdsEmbedded_EmbeddedCTACardsImpl23EmbeddedCTACardsService
 - (void)registerScrollProviderIn:(id)registry { SGAdBlockCountOne(@"Ad services"); }
 %end

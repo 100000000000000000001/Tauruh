@@ -32,6 +32,7 @@
 #import "SGRHeaderInfo.h"
 #import "SGRRestyle.h"
 #import "SGRBridges.h"
+#import "SGRReveal.h"
 #import "SGRRepaint.h"
 #import "SGRAccent.h"
 #import "Settings/SGMarquee.h"

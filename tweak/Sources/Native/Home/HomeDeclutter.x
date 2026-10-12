@@ -1,9 +1,3 @@
-// Home declutter: sections of Home collapsed and the filter pills hidden, one switch each on the Home &
-// Library page. A section is an Element_List cell; a hidden one reports zero height when the list sizes
-// it, so the list closes up around it.
-//
-// Trees (trees/home*.txt): every section is a CollectionViewCell whose content view names the page
-// (Home_EvoPageImpl) and whose subtree names the section.
 #import "Core/SGCore.h"
 #import "Home.h"
 
@@ -14,8 +8,6 @@ static const struct { __unsafe_unretained NSString *marker, *key; } sections[] =
     {@"Discovery_DJElement", SGHideHomeDJ},
 };
 
-// Class names of everything in the cell. Lists nested in the cell are laid out first so the
-// cells that name the section (shortcut tiles) exist.
 static NSString *classNamesIn(UIView *cell) {
     NSMutableString *names = [NSMutableString string];
     SGForEachView(cell, ^(UIView *v) {

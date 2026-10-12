@@ -1,6 +1,3 @@
-// Sing's worker (SGStemWorker.h): a task per playback generation that reads source packets from the C
-// stream, runs whole windows through the separator, and hands each finished hop of vocals back. The loaded
-// model outlives the task that loaded it by a minute, so a seek or the next song does not load it again.
 import Foundation
 
 public typealias StemRead = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutablePointer<Float>?, UnsafeMutablePointer<UInt64>?) -> Int32
@@ -13,8 +10,6 @@ private let packetFrames = 1024
 private let warmSeconds = 60                    // how long the model outlives the last worker using it
 private let idlePoll = Duration.milliseconds(25) // how soon a worker with nothing to read looks again
 
-// One warm model, shared by the workers that follow each other and kept for a while after the last
-// one ends. A load in flight is shared too, and one made stale by a purge never becomes the warm model.
 @available(iOS 18.0, macOS 27.0, *)
 private actor SGStemModels {
     static let shared = SGStemModels()
@@ -68,8 +63,6 @@ private actor SGStemModels {
     }
 }
 
-// The C owner retains context until the final callback. Only this task invokes the endpoints;
-// the render endpoint and the worker exchange PCM through the production SPSC queues.
 @available(iOS 18.0, macOS 27.0, *)
 private final class SGStemJob: @unchecked Sendable {
     let context: UnsafeMutableRawPointer?

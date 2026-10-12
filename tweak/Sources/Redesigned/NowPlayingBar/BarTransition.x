@@ -1,22 +1,3 @@
-// The now playing bar and the tab bar keep their glass while the player opens and closes.
-//
-// Spotify does not move the real bars with the player: it hides them and moves stand-ins, made once at
-// the start. -[SPTBarOverlayPresentationTransition setupTransitioningContext:] takes the bar's with
-// -snapshotViewAfterScreenUpdates: when the player opens, but with -[CALayer renderInContext:] into a
-// UIImageView when it closes, and the tab bar's that way too when it closes over a compact tab bar.
-// renderInContext: cannot draw glass (UIVisualEffectView, UIKit's tab bar platters), so every close
-// showed the bar's artwork and title and the tab bar's glyphs floating on nothing, and the glass
-// popped back in when the real bars returned. Checked in the simulator: a snapshot view keeps the glass,
-// a rendered image loses all of it.
-//
-// A stand-in that is an image gets live glass behind it, copied pane by pane from the view it was
-// taken of, with the image moved into a child on top, so it moves and fades with Spotify's own frame
-// and alpha changes. Live glass at half alpha still renders (simulator). The tab bar's selection bubble
-// is not copied.
-//
-// MainUI_TabBarUIImpl.CompactOverlayTransition is a Swift animator with the same stand-ins
-// (npbSnapshotView, tabBarSnapshotView); which of the two 9.1.78 runs is not known, so both are hooked
-// and the log says which fired.
 #import "Core/SGCore.h"
 
 @interface SPTBarOverlayPresentationTransition : NSObject
@@ -24,9 +5,6 @@
 - (UIView *)tabBarView;
 @end
 
-// The panes to copy: glass views and UIKit's tab bar platters, whose glass is not a UIVisualEffectView.
-// The source itself may be hidden: Spotify renders the closed bar and hides it again before handing
-// the image over.
 static void collectPanes(UIView *view, NSMutableArray<UIView *> *panes) {
     for (UIView *sub in view.subviews) {
         if (sub.hidden || sub.alpha < 0.01) continue;
@@ -43,8 +21,6 @@ static UIVisualEffectView *copyPane(UIView *pane) {
     UIVisualEffect *effect = platter ? SGGlassEffect() : ((UIVisualEffectView *)pane).effect;
     UIVisualEffectView *glass = [[UIVisualEffectView alloc] initWithEffect:effect];
     glass.userInteractionEnabled = NO;
-    // The effect does not carry the appearance the pane was drawn in, dark for both bars, and the stand-in
-    // would give the copy the system's.
     glass.overrideUserInterfaceStyle = pane.traitCollection.userInterfaceStyle;
     if (platter) {
         SGShapeGlass(glass, pane.bounds.size.height / 2, YES);

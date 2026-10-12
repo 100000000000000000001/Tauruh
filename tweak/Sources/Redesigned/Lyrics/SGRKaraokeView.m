@@ -8,9 +8,11 @@
 // its estimated words to be swept; lyrics with no timing at all are shown as plain text, every line
 // lit, nothing following the clock.
 #import "Core/SGCore.h"
+#import "Settings/SGPageStyle.h"
 #import "SGRKaraokeView.h"
 #import "LyricsText.h"
 #import "MeaningSheet.h"
+#import "SGRSingControl.h"
 #import "Shared/LyricsSources/LyricsSources.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
 #import "Shared/Player/PlayerEvents.h"
@@ -1086,11 +1088,14 @@ typedef struct {
     CFTimeInterval _clockTime;
     BOOL _sweepsEstimates;   // the Lyrics page's "Simulate word-by-word timing", read once like the credit
     BOOL _plain;             // the song has no timing at all: every line lit, nothing follows the clock
+    BOOL _compact;   // the small preview under the player's cover: no credit, no extras, no scrolling
     NSDictionary<NSNumber *, NSArray<SGLyricsMeaning *> *> *_meanings;   // Genius's, by line
     NSUInteger _meaningsAsked;
     // The room the lines have (lineInsets), and the fade's edges on their way to it from _bandFrom.
     UIEdgeInsets _band, _bandFrom;
     CFTimeInterval _bandSince, _bandFor;
+    BOOL _keepsSing, _extrasHidden;
+    void (^_browsingBegan)(void);
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -1204,6 +1209,7 @@ typedef struct {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(followSong) object:nil];
     _browsing = YES;
     for (SGRKaraokeLineView *view in _shown.allValues) view.blur = 0;
+    if (_browsingBegan) _browsingBegan();
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
@@ -1585,7 +1591,7 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
         }
     }
     _extras.menu = [UIMenu menuWithChildren:items];
-    _extras.hidden = NO;
+    _extras.hidden = _extrasHidden;
     [self setNeedsLayout];
 }
 
@@ -1633,7 +1639,7 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
     [lines enumerateObjectsUsingBlock:^(SGKaraokeLine *line, NSUInteger index, BOOL *stop) {
         if (index < translations.count && translations[index].length && !line.translation.length) {
             line.translation = translations[index];
-            line.translationMade = YES;
+            
             took = YES;
         }
     }];
@@ -1813,8 +1819,18 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
 
 - (void)syncSiblings {
     for (UIView *sibling in self.superview.subviews) {
-        if (sibling != self && _showing) sibling.alpha = 0;
+        if (sibling == self) continue;
+        if (_keepsSing && [sibling isKindOfClass:NSClassFromString(@"SGRSingControl")]) continue;
+        if (_showing) sibling.alpha = 0;
     }
+}
+
+- (void)setExtrasHidden:(BOOL)hidden {
+    if (_extrasHidden == hidden) return;
+    _extrasHidden = hidden;
+    if (hidden) _extras.hidden = YES;
+    else [self offerExtras];
+    [self setNeedsLayout];
 }
 
 - (void)setShowing:(BOOL)showing {
@@ -1823,7 +1839,9 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
     self.hidden = !showing;
     _credit.hidden = !showing || !_credit.text.length;
     for (UIView *sibling in self.superview.subviews) {
-        if (sibling != self) sibling.alpha = showing ? 0 : 1;
+        if (sibling == self) continue;
+        if (_keepsSing && [sibling isKindOfClass:NSClassFromString(@"SGRSingControl")]) continue;
+        sibling.alpha = showing ? 0 : 1;
     }
 }
 
@@ -1931,6 +1949,32 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
     }
     *focus = breakLine >= 0 ? breakLine : found ? sung[0] : last;
     return found;
+}
+
+- (instancetype)initWithSampleLines:(NSArray<SGKaraokeLine *> *)lines length:(NSTimeInterval)length {
+    if (!(self = [super initWithFrame:CGRectZero])) return nil;
+        _lines = lines;
+    // length not needed;
+    [self setNeedsDisplay];
+    return self;
+}
+- (void)useCompactFontSize:(CGFloat)size {
+    if (!_compact) {
+        _compact = YES;
+        _crediting = NO;
+        _margin = 24;
+        _lineGap = 6;
+        _blurPerLine = 0;
+        _maxBlur = 0;
+        _scroll.scrollEnabled = NO;
+        _scroll.alwaysBounceVertical = NO;
+        self.userInteractionEnabled = NO;
+        for (UIGestureRecognizer *gesture in self.gestureRecognizers) gesture.enabled = NO;
+    }
+    if (fabs(size - _fontSize) < 0.5) return;
+    _fontSize = size;
+    _font = [UIFont systemFontOfSize:_fontSize weight:UIFontWeightBold];
+    if (_lines && _tops) [self restyle];
 }
 
 @end

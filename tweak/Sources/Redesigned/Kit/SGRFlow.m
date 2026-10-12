@@ -2,10 +2,6 @@
 
 enum { kDiscs = 5 };
 
-// Each disc: where it rests, as shares of the layer (top left, top right, bottom left, bottom right,
-// middle), its diameter as a share of the layer's longer side, the loop it drifts on (radii as shares of
-// width and height), how long one loop takes and which way it runs, and how long a breath takes.
-// The periods share no factor, so the picture they make together does not come round again for hours.
 typedef struct {
     CGFloat x, y, diameter, driftX, driftY;
     CFTimeInterval loop;

@@ -1,5 +1,3 @@
-// Crossfade under Spoof Premium (EeveeSpotify's): the fade engine reads the stored crossfade switch,
-// but the duration slider only writes the duration, so the fade stayed off at any length.
 #import "Core/SGCore.h"
 #import "AdBlock.h"
 

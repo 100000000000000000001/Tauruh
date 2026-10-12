@@ -119,11 +119,16 @@ static void translate(NSString *track) {
     });
 }
 
-NSNotificationName const SGKaraokeLinesKeptNotification = @"spotifyglass.karaoke.linesKept";
+NSNotificationName const SGKaraokeLinesDidChangeNotification = @"spotifyglass.karaoke.linesDidChange";
+
+// The signed-in app's authorization, for a caller that needs to make its own spclient request.
+NSString *SGKaraokeSpotifyAuthorization(void) {
+    return sg_spclientHeaders[@"authorization"];
+}
 
 // Main queue only.
 static void announce(NSString *track) {
-    [NSNotificationCenter.defaultCenter postNotificationName:SGKaraokeLinesKeptNotification object:track];
+    [NSNotificationCenter.defaultCenter postNotificationName:SGKaraokeLinesDidChangeNotification object:track];
 }
 
 BOOL SGKaraokeLooking(NSString *trackID) {
@@ -145,7 +150,7 @@ static void keep(NSString *track, NSArray<SGKaraokeLine *> *lines) {
             [sg_requested removeObject:kept];
         }
     }
-    sg_lyrics[track] = SGKaraokeInTimeOrder(lines);
+    sg_lyrics[track] = lines;
     if (lines.count) translate(track);
     announce(track);
 }
@@ -241,7 +246,7 @@ static BOOL eeveeLyricsOn(void) {
 }
 
 BOOL SGLyricsStandAsideForEevee(void) {
-    return SGEeveeSpotifyInjected() && eeveeLyricsOn() && !SGHidden(SGKeyLyricsBesideEevee);
+    return SGEeveeSpotifyInjected() && eeveeLyricsOn() && !NO;
 }
 
 BOOL SGEeveeLyricsOn(void) {
@@ -401,7 +406,7 @@ NSInteger SGKaraokePositionMs(void) {
 }
 
 NSInteger SGKaraokeDelayMs(void) {
-    return SGInt(SGKeyLyricsDelay, 0);
+    return SGInt(SGKeyLyricsSimulateWords, 0);
 }
 
 void SGKaraokeSeek(NSInteger ms) {

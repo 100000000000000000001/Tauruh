@@ -14,8 +14,6 @@ public final class SGLiveActivityBridge: NSObject {
 
     @objc public static var isShowing: Bool { current != nil }
 
-    // Updates and ends go out one at a time in the order asked for, since ActivityKit applies
-    // concurrent ones in whatever order they finish. An update still waiting gives way to a newer one.
     private enum Change: Sendable {
         case update(String, ActivityContent<SGLyricsAttributes.ContentState>)
         case end([String])
@@ -61,9 +59,6 @@ public final class SGLiveActivityBridge: NSObject {
         }
     }
 
-    // A new activity can only be requested while the app is in the foreground; an update works from the background.
-    // One call per new state. View and tab are SGLiveActivityView's and SGLiveActivityTab's values;
-    // titles, artists and URIs pair up by index, the tracks up next; timerEnd is nil without a timer.
     @objc public static func show(view: Int, paused: Bool, line: String, nextLine: String,
                                   titles: [String], artists: [String], uris: [String],
                                   tab: Int, title: String, artist: String, shuffle: Bool, repeatMode: Int,

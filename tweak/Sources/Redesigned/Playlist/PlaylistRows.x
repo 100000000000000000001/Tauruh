@@ -1,26 +1,3 @@
-// Playlist redesign: the track rows on the field, the way the Music app has them -- no surface of their own,
-// artwork with rounded corners, and a hairline from the text's edge between one row and the next.
-//
-// Tree (trees/clean/playlist/02.txt:164-247): a cell id=Playlist.ItemCell holds an Encore.ListRow painted the
-// base surface, and in it Encore.ImageView 48x48 (the artwork), Track.Row.Content.Title,
-// Track.Row.Content.Subtitle and, at the trailing edge, Components.UI.ContextMenuButton. The row's own paint
-// is cleared here rather than left to the Kit's repaint hook, which only hears about a colour when Spotify
-// sets it and not when a reused cell already carries one.
-//
-// Spotify's type and its spacing are left alone: the row is 64pt for a title of 18pt, and a larger font of
-// the Kit's would be cut off by the box the element framework measured for it.
-//
-// The pills over the first row (own-playlist/01.txt:33) are a cell of the list: Add, Mix, Notes, Video,
-// Edit, Sort and Name & details. The row is closed up -- ListUXPlatform_LayoutKit.ListLayout gives every
-// item its height, so the cell can only close up where the layout asks it how tall it wants to be -- and
-// Sort and Mix are put on the ⋯ sheet instead (PlaylistMenu.x), where the rest of the row already is. The
-// cell is handed over as it lays out, so the sheet has Spotify's own buttons to fire.
-//
-// Not every cell of the list is a track row. Under the tracks Spotify puts the extender -- Recommended
-// songs, its rows and Refresh (ListUXPlatformConsumers_PlaylistExtenderImpl) -- and its heading and its
-// Refresh cell paint the base surface over the field, where the black made bands of them (device,
-// trees/continuous/2.txt 2026-09-20). So the paint comes off every cell of the page, the Kit's way, and
-// only the row below is a row.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Playlist.h"
@@ -64,9 +41,6 @@ static void applyRow(UIView *cell) {
     if (!row) return;
     clearSurface(row);
 
-    // The first track with its title in is the list the page waits for (Kit/SGRReveal.h). A row still loading
-    // is Components.UI.RetrievalRowLoadingElementUI rather than Encore.ListRow, grey bars with no text in them
-    // (trees/continuous/1.txt).
     UIView *page = SGRPlaylistPageOf(cell);
     if (SGRRevealWaitsFor(page, SGRRevealList) && SGRRevealShowsText(row)) SGRRevealMark(page, SGRRevealList);
 

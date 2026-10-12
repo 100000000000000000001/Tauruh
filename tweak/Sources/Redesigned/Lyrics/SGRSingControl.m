@@ -1,20 +1,3 @@
-// Sing's microphone in the player's lyrics (SGRSingControl.h), the way the Music app has its Sing button: a
-// round glass button with a microphone on it, and a capsule of glass growing up out of it that holds the
-// vocal volume, filled from the bottom to the level. What Sing is doing shows on the button itself, never in
-// words beside it:
-//
-//   off           glass and a white microphone
-//   preparing     a ring turning round the microphone over a faint fill, up to the level it gets ready for
-//   on            the fill solid white up to the level and the microphone dark on it; closed, a white disc
-//   recovering    on, with the ring turning again, dark on the white, while the original covers a gap
-//   turning off   off at once; the original audio still queued plays out behind it
-//   stopped       off with the microphone dimmed; a tap says why and offers to try again
-//
-// A tap turns Sing on and opens the capsule. Open, a tap turns Sing off; closed while Sing is on, a tap
-// opens it again. A drag anywhere on it sets the level, opening it first. The capsule closes by itself
-// three seconds after the last touch while Sing is on. Sizes move on the Kit's layout spring and colours
-// on its crossfade, so Reduce Motion keeps the fades and drops the movement, and the ring pulses in place
-// instead of turning. VoiceOver reads the button and the slider out in full.
 #import "Core/SGCore.h"
 #import "SGRSingControl.h"
 #import "Shared/Sing/SGSingController.h"
@@ -51,8 +34,6 @@ static UIImage *singGlyph(void) {
     dispatch_once(&once, ^{
         UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(28, 28)];
         glyph = [[renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
-            // A handheld microphone, drawn as a template so both the glass and white states
-            // use the same crisp silhouette. The three sparkles keep distinct sizes at 28 pt.
             [UIColor.blackColor setFill]; [UIColor.blackColor setStroke];
             CGContextRef cg = context.CGContext;
             CGContextSaveGState(cg);
@@ -91,8 +72,6 @@ static SGRSingLook lookOf(SGSingState state) {
     };
 }
 
-// A vertical, thumb-free slider inside the glass capsule. Direct touch and VoiceOver both send
-// the same value-changed event; UISlider's horizontal gesture recognizer is not involved.
 @interface SGRVocalSlider : UIControl
 @property (nonatomic) float value;
 @end
@@ -128,16 +107,12 @@ static SGRSingLook lookOf(SGSingState state) {
 - (void)endTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event { if (touch) [self moveToTouch:touch]; }
 @end
 
-// Spotify's player also pans to dismiss. A drag starting inside this control belongs to vocal
-// volume, including a drag starting on the microphone, rather than to the enclosing player.
 @interface SGRVocalPan : UIPanGestureRecognizer
 @end
 @implementation SGRVocalPan
 - (BOOL)canBePreventedByGestureRecognizer:(UIGestureRecognizer *)other { return NO; }
 @end
 
-// The ring round the microphone while Sing gets ready: an arc turning once a second, or with Reduce Motion a
-// whole ring pulsing where it is, a fade not being motion. It takes its colour from its tint.
 @interface SGRSingRing : UIView
 @property (nonatomic) BOOL turning;
 @end
@@ -413,8 +388,6 @@ static SGRSingLook lookOf(SGSingState state) {
     [NSRunLoop.mainRunLoop addTimer:_collapseTimer forMode:NSRunLoopCommonModes];
 }
 
-// Closes three seconds after the last touch while Sing is on, but never under a finger, while Sing prepares,
-// or for VoiceOver, which has no other way back to the slider.
 - (void)collapseIfIdle {
     _collapseTimer = nil;
     if (!_expanded || !self.window) return;
@@ -432,8 +405,6 @@ static SGRSingLook lookOf(SGSingState state) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    // The value uses stationary page coordinates; stretching the glass must never move the
-    // slider's numeric endpoints. A bounded response follows the finger in either direction.
     CGFloat stretch = _expanded && !SGRReduceMotion() ? _stretch : 0;
     CGFloat extension = fabs(stretch) * 16, width = kSide + fabs(stretch) * 2;
     _panel.frame = CGRectMake((kSide - width) / 2, -extension / 2 + stretch * 6, width, CGRectGetHeight(self.bounds) + extension);
@@ -454,8 +425,6 @@ static SGRSingLook lookOf(SGSingState state) {
     content.clipsToBounds = YES;
     content.layer.cornerRadius = width / 2;
     for (UIView *view in @[_fill, _button]) if (view.superview != content) [content addSubview:view];
-    // Interactive glass exposes its content as an accessibility container. Remove the folded
-    // slider from that container instead of leaving a zero-height adjustable element in it.
     if (_expanded) { if (_slider.superview != content) [content insertSubview:_slider belowSubview:_button]; }
     else [_slider removeFromSuperview];
     CGFloat height = CGRectGetHeight(_panel.bounds);
@@ -519,8 +488,6 @@ static SGRSingLook lookOf(SGSingState state) {
         [self expand];
     }
     if (gesture.state == UIGestureRecognizerStateBegan || gesture.state == UIGestureRecognizerStateChanged || gesture.state == UIGestureRecognizerStateEnded) {
-        // Measure from touch-down, including the travel before UIPan recognizes the gesture.
-        // Stationary page coordinates also keep capsule expansion from changing the value.
         CGFloat travel = [gesture locationInView:self.superview].y - _dragStart.y;
         _stretch = travel / (kSide + fabs(travel));
         _slider.value = _dragLevel - travel * (1 - SGSingMinimumVocalLevel) / 100;
@@ -611,8 +578,6 @@ UIView *SGRSingControlForPage(UIView *page, CGRect lyrics, BOOL immersive, void 
         control.outside.cancelsTouchesInView = NO;
         control.outside.delegate = control;
     }
-    // The embedded lyrics overlay passes header/transport touches through to its siblings.
-    // Observe their shared player surface too, so those touches can collapse the capsule.
     UIView *surface = page.superview ?: page;
     if (control.outside.view != surface) [surface addGestureRecognizer:control.outside];
     control.hold = hold;

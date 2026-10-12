@@ -1,6 +1,3 @@
-// Ad sections taken out of the feeds Home, Search and the page under the player are built from
-// (EeveeSpotify's BrowsitaSectionStripper). A feed is one container field of sections, each a
-// field 1 message; a section goes when its bytes name an ad, or a promotion and a surface for it.
 #import "Core/SGCore.h"
 #import "AdBlock.h"
 #import "Protobuf.h"

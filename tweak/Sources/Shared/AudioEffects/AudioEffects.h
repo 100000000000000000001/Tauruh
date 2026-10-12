@@ -1,17 +1,3 @@
-// Audio effects on Spotify's sound: the mod's own engine (SGDSPEngine), run on every buffer Spotify's output
-// unit finishes, before the speaker. Either look: it draws nothing on Spotify's screens. Mod Settings >
-// Audio effects is its page.
-//
-// What it offers: output gain and limiter, a multiband compander, dynamic bass boost, a 15 band equalizer,
-// the Graphic EQ (any curve, as AutoEq writes them), the convolver (impulse responses), ViPER DDC files,
-// Liveprog (EEL2 scripts), reverb, stereo widening, crossfeed and analog modelling. Each effect has a switch
-// and its own values, kept under its own keys.
-//
-// Unlike the mod's other switches these apply as they change, not at launch: every setter below stores the
-// value and hands the effect it belongs to to the engine, which re-reads that effect's keys off the main
-// thread. The engine is made the first time Spotify starts its output with the master switch on.
-//
-// Threading: everything here is main thread, except SGDSPStatus and SGDSPError, which any thread may call.
 #import <Foundation/Foundation.h>
 
 #pragma mark - keys
@@ -26,8 +12,6 @@
 
 #define SGKeyDSPCompander               @"spotifyglass.dsp.compander"
 #define SGKeyDSPCompanderTime           @"spotifyglass.dsp.compander.time"      // s, the release
-// Seven amounts, "a;a;a;a;a;a;a", one per band at SGDSPCompanderFrequencies, each within SGDSPCompanderGainLimit:
-// over 0 evens the band's loud and quiet moments out, under 0 pulls them apart.
 #define SGKeyDSPCompanderGains          @"spotifyglass.dsp.compander.gains"
 
 #define SGKeyDSPBass                    @"spotifyglass.dsp.bass"
@@ -41,8 +25,6 @@
 #define SGKeyDSPGraphicEq               @"spotifyglass.dsp.geq"
 #define SGKeyDSPGraphicEqNodes          @"spotifyglass.dsp.geq.nodes"
 
-// File effects name a file in their library (SGDSPLibraryFiles), by its name alone: the app's container
-// moves on every reinstall, the name does not.
 #define SGKeyDSPConvolver               @"spotifyglass.dsp.convolver"
 #define SGKeyDSPConvolverFile           @"spotifyglass.dsp.convolver.file"
 #define SGKeyDSPConvolverMode           @"spotifyglass.dsp.convolver.mode"      // SGDSPConvolverModeNames index
@@ -117,8 +99,6 @@ typedef NS_ENUM(NSInteger, SGDSPFileKind) {
 NSString *SGDSPLibraryDirectory(SGDSPFileKind kind);
 NSArray<NSString *> *SGDSPLibraryFiles(SGDSPFileKind kind);   // names, sorted
 NSArray<NSString *> *SGDSPFileExtensions(SGDSPFileKind kind); // lowercase, without the dot
-// Copies a picked file into the library, replacing one of the same name; answers its name, nil and an
-// error when it is not a file of that kind.
 NSString *SGDSPImportFile(SGDSPFileKind kind, NSURL *url, NSError **error);
 BOOL SGDSPDeleteFile(SGDSPFileKind kind, NSString *name);
 
@@ -126,13 +106,8 @@ BOOL SGDSPDeleteFile(SGDSPFileKind kind, NSString *name);
 
 // One line for the page: off, waiting for Spotify to play, or running (sample rate, load).
 NSString *SGDSPStatus(void);
-// Why an effect's last change did not take, nil when it did: a script that did not compile (with the
-// line), an impulse response that could not be read, a DDC file that was not one. Keyed by the effect's
-// switch key (SGKeyDSPLiveprog, SGKeyDSPConvolver, SGKeyDSPDDC, SGKeyDSPGraphicEq).
 NSString *SGDSPError(NSString *switchKey);
 
-// The equalizer's magnitude response for the given gains, for drawing the curve: `count` points
-// log-spaced from 20 Hz to 20 kHz into `frequencies` and `decibels`.
 void SGDSPEqualizerResponse(NSArray<NSNumber *> *gains, NSInteger count, double *frequencies, double *decibels);
 // The compander's amounts drawn as a smooth curve, the same way.
 void SGDSPCompanderResponse(NSArray<NSNumber *> *gains, NSInteger count, double *frequencies, double *values);

@@ -4,6 +4,7 @@
 #import "Pages.h"
 #import "Shared/ArtistBlock/ArtistBlock.h"
 #import "Shared/Gestures/Gestures.h"
+#import "Shared/HeadGestures/HeadGestures.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/LyricsMeanings/Meanings.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
@@ -31,8 +32,6 @@ void SGSetRedesignedUI(BOOL on) {
     SGSetEnabled(SGKeyRedesign, on);
 }
 
-// The whole look changes hands at launch, so the switch asks for the restart straight away rather than
-// leaving Spotify half in the old look.
 static void offerRestart(BOOL on) {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Restart Spotify"
         message:on ? @"The redesign takes over when Spotify starts again. Spotify closes now; open it again to see it." : @"Spotify's own look comes back when Spotify starts again. Spotify closes now; open it again to see it."
@@ -42,8 +41,6 @@ static void offerRestart(BOOL on) {
     [SGTopController() presentViewController:alert animated:YES completion:nil];
 }
 
-// Below iOS 26 the row is not a switch: Liquid Glass is the redesign, and the system draws it from
-// that version on, so the row reads out what is missing and the card carries the native look's rows alone.
 static SGModRow *unavailableRow(void) {
     SGModRow *row = SGStatActionRow(@"Redesigned UI", nil, ^NSString *{ return @"Needs iOS 26"; }, ^{
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Redesigned UI"
@@ -92,7 +89,7 @@ UIViewController *SGLyricsSettingsPage(void) {
     if (redesigned) {
         SGModRow *landscape = SGSwitchRow(@"Landscape lyrics", @"Show lyrics beside the player controls", SGRKeyLandscapeLyrics);
         landscape.changed = ^(BOOL on) { SGRPlayerLyricsOrientationChanged(); };
-        [sections addObject:SGSection(@"Display", @[landscape, SGLyricsWordTimingRow(), SGRLyricsRomanisedRow(),
+        [sections addObject:SGSection(@"Display", @[landscape, SGLyricsWordTimingRow(), 
             SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow()])];
         [sections addObject:SGSection(@"Translation", @[SGTranslateEverySongRow(), SGGeminiKeyRow(), SGSavedTranslationsRow()])];
     }
@@ -105,10 +102,13 @@ UIViewController *SGPlayerSettingsPage(void) {
     blocked.value = ^NSString *{
         return SGFlag(SGKeyArtistBlock, NO) ? @(SGBlockedArtists().count).stringValue : @"Off";
     };
+    SGModRow *head = SGPageRow(@"AirPods gestures", ^UIViewController *{ return SGHeadGesturesSettingsPage(); });
+    head.value = ^NSString *{ return SGHeadGestureStatus(); };
     BOOL native = !SGRedesignedUIStored();
 
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObject:SGSection(nil, @[
         SGWithSymbol(SGPageRow(@"Gestures", ^UIViewController *{ return SGGesturesSettingsPage(); }), @"hand.tap"),
+        SGWithSymbol(head, @"airpods"),
         SGWithSymbol(blocked, @"person.crop.circle.badge.xmark"),
     ])];
     NSMutableArray<SGModRow *> *pages = [NSMutableArray array];

@@ -1,14 +1,3 @@
-// Artist: hides parts of the artist page, one switch each in Mod Settings > Home & Library > Artist.
-//
-// Trees (trees/continuous/*.txt): the page is a CreativeWorkPlatform TemplateView with the
-// identifier creator-page. Its header is an ImageHeaderView whose badge, listeners and buttons carry
-// accessibility identifiers. Below the Music/Video tabs every row is an Element_List cell: a titled
-// section is one cell for its heading (SectionHeadingHome), then its tracks, carousel or card, then
-// a 16pt spacer, each a cell of its own.
-//
-// Only the heading names the section, so the list remembers the heading above every cell it sizes
-// and a hidden section's cells all answer height 0, down to the next heading. The headings are
-// told apart by their English titles.
 #import <objc/runtime.h>
 #import <CoreImage/CoreImage.h>
 #import "Core/SGCore.h"
@@ -59,8 +48,6 @@ static void applyHeader(UIView *header) {
         if (!SGHidden(buttons[i].key)) continue;
         UIView *action = actionHolding(identNamed(header, buttons[i].ident), header);
         if (!action) continue;
-        // OverflowStackView traps in updateConstraints once its views go hidden (crash 2026-09-15),
-        // so those only turn invisible and keep their place.
         if ([NSStringFromClass(action.superview.class) containsString:@"OverflowStackView"]) {
             action.alpha = 0;
             action.userInteractionEnabled = NO;
@@ -81,9 +68,6 @@ static UIView *childOfHeader(UIView *view, UIView *header) {
     return nil;
 }
 
-// The header keeps Spotify's height, so the room the hidden badge and listeners leave is given to
-// the photo: the title block slides down to sit where the lowest of them sat. Transforms, because
-// the header's stack views crash on anything that changes their layout.
 static void closeUpTitle(UIView *header) {
     UIView *title = childOfHeader(identNamed(header, @"Encore.AdaptiveTitle"), header);
     UIView *badge = identNamed(header, @"ImageHeaderView.VerifiedBadge");
@@ -91,8 +75,6 @@ static void closeUpTitle(UIView *header) {
     UIView *metadata = childOfHeader(listeners, header);
     if (!title || !badge || !metadata || badge.superview != header) return;
 
-    // Walks up from the listeners' line: each shown line lands on the bottom edge the line under it
-    // left free, keeping its own gap to the line above.
     CGFloat edge = listeners.alpha > 0 ? bottomOf(badge) : bottomOf(metadata);
     CGFloat move = 0;
     if (!badge.hidden) {
@@ -105,10 +87,6 @@ static void closeUpTitle(UIView *header) {
 
 #pragma mark - photo fade
 
-// The photo sits in a clipping view shorter than the header, and Spotify's gradient over it is cut by
-// the same clip, so the picture ends in a straight line well above the buttons. With the switch on,
-// the photo's lower part dissolves into a blurred copy of itself that reaches the header's bottom
-// and fades out there.
 static UIImage *blurred(UIImage *image) {
     static CIContext *context;
     if (!context) context = [CIContext contextWithOptions:nil];
@@ -186,8 +164,6 @@ static void applyPhotoFade(UIView *header) {
 }
 %end
 
-// The buttons arrive after the header has laid out, and a row that keeps its size never lays the
-// header out again.
 %hook UIStackView
 - (void)layoutSubviews {
     %orig;
@@ -200,10 +176,6 @@ static void applyPhotoFade(UIView *header) {
 
 #pragma mark - tab bar
 
-// Trees (trees/continuous/1.txt): the strip (Components.UI.TabsSectionHeading) sits above a paging
-// scroll view holding one list per tab. The strip lives in a LegacyUI AutoLayoutStackView, so it
-// goes invisible rather than hidden; the pages move up into its place and stop swiping, which
-// leaves the Music list.
 static void hideTabBar(UIView *strip) {
     strip.alpha = 0;
     strip.userInteractionEnabled = NO;
@@ -282,8 +254,6 @@ static NSMutableDictionary<NSIndexPath *, NSString *> *headingsOf(UICollectionVi
     return headings;
 }
 
-// The title of the section the cell falls under; nil above the first heading, or where a cell
-// between it and its heading has not been sized yet.
 static NSString *sectionOf(NSIndexPath *path, NSDictionary<NSIndexPath *, NSString *> *headings) {
     for (NSInteger item = path.item; item >= 0; item--) {
         NSString *title = headings[[NSIndexPath indexPathForItem:item inSection:path.section]];

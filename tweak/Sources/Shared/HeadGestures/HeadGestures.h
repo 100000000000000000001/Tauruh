@@ -86,6 +86,8 @@ double SGHeadGesturesSampleThreshold(NSData *motion, SGHeadAxis axis);
 double SGHeadGesturesLearnFrom(NSArray<NSData *> *motions, SGHeadAxis axis);
 
 UIViewController *SGHeadGesturesSettingsPage(void);
+// What the Status row reads out: why it is or is not listening.
+NSString *SGHeadGestureStatus(void);
 // The teaching sheet over `owner`; `closed` runs once it is gone, whatever it stored.
 void SGPresentHeadGesturesTeaching(UIViewController *owner, void (^closed)(void));
 

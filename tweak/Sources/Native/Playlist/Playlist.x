@@ -1,18 +1,3 @@
-// Playlist: hides parts of a playlist page, one switch each in Mod Settings > Home & Library. Album and
-// artist pages are built by another framework and are left alone.
-//
-// The header parts are hidden from the layout pass that places them, not from the view
-// controller's: the elements arrive after the page does, and a controller whose own view is not
-// dirty never hears about it, so anything hidden a level up flashes first.
-//
-// Tree (trees/test-playlist.txt): HeaderContentLayout holds the cover over a block of title,
-// description, the creator row, the length and HeaderActionsRow, a stack of the video deck, add,
-// download, share and more. The header names every one of them with an accessibility identifier,
-// so the switches go by those; the description and the find bar have none and go by class.
-//
-// The header's height is not measured from what it shows: -[SPTFreeTierPlaylistEncoreHeaderViewController
-// update] adds three numbers into a stored fullHeaderHeight and pins headerViewHeightConstraint to
-// it, so a hidden cover leaves the room it was counted for. collapseCover() takes that room back.
 #import "Core/SGCore.h"
 #import "Playlist.h"
 
@@ -52,9 +37,6 @@ static UIViewController *playlistHeaderOf(UIView *view) {
     return nil;
 }
 
-// Title, description, the creator row and the length share one column, and only the description
-// names a class of its own, so the column is reached through it and its rows go by what they hold.
-// The length is the last row rather than the second stack: a byline without faces is a stack too.
 static void applyColumn(UIView *header) {
     UIView *column = nil;
     for (UIView *v = viewNamed(header, @"ExpandableTextView"); v && v != header; v = v.superview) {
@@ -70,8 +52,6 @@ static void applyColumn(UIView *header) {
     }
 }
 
-// The identifier sits on the button, the stack arranges the action around it, so each switch hides
-// the action rather than the button and the row closes up behind it.
 static void applyActions(UIView *row) {
     static const struct { __unsafe_unretained NSString *ident, *key; } buttons[] = {
         {@"Components.UI.WatchFeedEntityExplorerButton", SGHidePlaylistVideo},
@@ -96,15 +76,6 @@ static void applyFindBar(UIView *header) {
     }
 }
 
-// Takes back the room the hidden cover was measured into. The cover swells to fill whatever the
-// header's height leaves over, so the block below it moves up to where the cover began and the
-// height constraints come down by as much; the cover then has nothing left to swell into.
-//
-// Both numbers are read back from the frames Spotify has just set, so once the header has shrunk
-// the next pass finds nothing to take and stops. The header constraint holds the content layout
-// and the top accessory above it, so it is the taller of the two; if it ever is not, it is not the
-// constraint sizing this layout and nothing is touched -- which is also the brake that stops this
-// shrinking for ever should the header stop following.
 static void collapseCover(UIViewController *headerVC, UIView *layout, UIView *cover) {
     NSLayoutConstraint *height = [headerVC respondsToSelector:@selector(headerViewHeightConstraint)] ? [headerVC headerViewHeightConstraint] : nil;
     NSLayoutConstraint *guide = [headerVC respondsToSelector:@selector(layoutGuideHeightConstraint)] ? [headerVC layoutGuideHeightConstraint] : nil;
@@ -139,10 +110,6 @@ static void collapseCover(UIViewController *headerVC, UIView *layout, UIView *co
 
 static char kBackdropKey, kSourceKey;
 
-// The cover blurred behind the header in place of Spotify's colour wash. The header's background
-// (trees/test6.txt) is a HeaderView under _backgroundViewContainer holding the wash, then a black
-// view that fades in as the page scrolls; the backdrop goes between them so the scroll still darkens
-// it, and its scrim ends in the black of the rows below. No cover, no backdrop: the wash stays.
 static void applyBackdrop(UIView *layout) {
     if (!SGFlag(SGKeyPlaylistBackdrop, NO)) return;
     UIImage *image = nil;
@@ -199,8 +166,6 @@ static void applyBackdrop(UIView *layout) {
 }
 %end
 
-// The buttons fill in after the header is laid out, and a row that keeps its size never makes the
-// header lay out again, so they stay up until something else does -- the cover loading, a second on.
 %hook UIStackView
 - (void)layoutSubviews {
     %orig;
@@ -208,8 +173,6 @@ static void applyBackdrop(UIView *layout) {
 }
 %end
 
-// The find bar is not in the header layout, and it fades in on its own rather than appearing, so
-// the controller's pass is soon enough for it.
 %hook SPTFreeTierPlaylistEncoreHeaderViewController
 - (void)viewDidLayoutSubviews {
     %orig;
@@ -218,9 +181,6 @@ static void applyBackdrop(UIView *layout) {
 }
 %end
 
-// The pills are a cell of the track list. ListUXPlatform_LayoutKit.ListLayout gives every item its
-// height, so a cell can only close up where the layout asks it how tall it wants to be; if it
-// never asks, the log stays quiet and the pills stay.
 %hook _TtC35ListUXPlatform_FreeTierPlaylistImpl25ElementCollectionViewCell
 - (UICollectionViewLayoutAttributes *)preferredLayoutAttributesFittingAttributes:(UICollectionViewLayoutAttributes *)attributes {
     UICollectionViewLayoutAttributes *result = %orig;

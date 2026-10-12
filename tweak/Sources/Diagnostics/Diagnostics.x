@@ -1,6 +1,3 @@
-// Screen dumps for FLEX builds. The tree of the visible screen is served over HTTP on the phone's
-// loopback (fetched from the Mac through `iproxy` over USB), and also logged when the app goes to
-// the background or the full player appears.
 #import "Core/SGCore.h"
 #import "Diagnostics.h"
 #import <sys/socket.h>
@@ -43,11 +40,6 @@ BOOL SGIsDebugBuild(void) {
     return NSClassFromString(@"FLEXManager") != nil;
 }
 
-// What the mod has set, so a recorded tree says whether it shows Spotify as it came or a screen some
-// switch has already changed: the stock marker Reset all settings leaves, then every key of the mod's
-// with its value. The counters, the update check, the signing warning, the tour and the Musixmatch
-// token belong to the install rather than to a choice, as in About/Backup.m, and are left out.
-// scripts/record-session.py reads this section to call a snapshot clean or not.
 static NSString *describeValue(id value) {
     if ([value isKindOfClass:NSArray.class] || [value isKindOfClass:NSDictionary.class]) {
         return [NSString stringWithFormat:@"%@%lu", [value isKindOfClass:NSArray.class] ? @"list:" : @"map:", (unsigned long)[value count]];

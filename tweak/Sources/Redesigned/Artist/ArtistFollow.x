@@ -1,6 +1,3 @@
-// Whether the user follows the page's artist, read from Spotify's collection state (following saves the
-// artist to the collection) rather than the Follow button, whose only state is its localized title.
-// The provider is the one Spotify's own code uses, kept weakly.
 #import "Core/SGCore.h"
 #import "Artist.h"
 
@@ -148,8 +145,6 @@ static id currentProvider(void) {
 
 static char kWatchKey;
 
-// The artist the page is for. The artist page's controllers carry no URI, but the header's ⋯ does:
-// Components.UI.ContextMenuButton-<artist id>.
 static NSURL *artistURI(UIView *page, NSString *moreIdentifier) {
     for (UIResponder *responder = page; responder; responder = responder.nextResponder) {
         if (![responder isKindOfClass:UIViewController.class] || ![responder respondsToSelector:@selector(spt_pageURI)]) continue;

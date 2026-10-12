@@ -1,6 +1,3 @@
-// The effects SGDSPEngine chains (SGDSPTone.m, SGDSPDynamics.m, SGDSPCrossfeed.m, SGDSPReverb.m,
-// SGDSPLiveprog.m; the convolver is SGDSPConvolver.h). Create, Set and Free are never the render thread's, and
-// a Set changes a running state, so it is called under the engine's lock. Run never allocates, locks or logs.
 #import <stdbool.h>
 #import <stddef.h>
 #import <stdint.h>
@@ -12,8 +9,6 @@ typedef void (*SGDSPFree)(void *state);
 // Every Run takes up to this many frames.
 enum { kSGDSPEffectMaxFrames = 1024 };
 
-// A low shelf at 100 Hz lifting by up to `maxGainDB`, less while the lows are loud: never past -3 dBFS
-// where the headroom allows none.
 typedef struct SGDSPBass SGDSPBass;
 SGDSPBass *SGDSPBassCreate(double rate, double maxGainDB);
 void SGDSPBassSet(SGDSPBass *bass, double maxGainDB);
@@ -37,9 +32,6 @@ SGDSPWide *SGDSPWideCreate(double rate, double levelPercent);
 void SGDSPWideSet(SGDSPWide *wide, double levelPercent);
 void SGDSPWideRun(void *wide, float *left, float *right, uint32_t frames);
 
-// Seven Linkwitz-Riley bands around `frequencies`, each band's loud and quiet moments pulled towards its own
-// running level by gains[i] (1: 60% less dynamics) or pushed away from it (-1: 60% more), by 12 dB at most.
-// `timeConstant` is the release; the attack a tenth of it, the running level ten times it.
 typedef struct SGDSPCompander SGDSPCompander;
 SGDSPCompander *SGDSPCompanderCreate(double rate, double timeConstant, const double frequencies[7], const double gains[7]);
 void SGDSPCompanderSet(SGDSPCompander *compander, double timeConstant, const double gains[7]);
@@ -66,9 +58,6 @@ void SGDSPReverbSet(SGDSPReverb *reverb, int preset, double amount);
 void SGDSPReverbRun(void *reverb, float *left, float *right, uint32_t frames);
 void SGDSPReverbFree(void *reverb);
 
-// A script in JSFX's shape: a desc: line and sliderN: defaults, then @init, @slider, @block and @sample
-// sections, spl0 and spl1 the samples, srate the rate. NULL and why, with the file's line, when it does
-// not compile.
 typedef struct SGDSPLiveprog SGDSPLiveprog;
 SGDSPLiveprog *SGDSPLiveprogCreate(const char *script, double rate, char *error, size_t errorSize);
 void SGDSPLiveprogRun(void *liveprog, float *left, float *right, uint32_t frames);

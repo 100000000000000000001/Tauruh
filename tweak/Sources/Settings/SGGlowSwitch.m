@@ -9,20 +9,24 @@ static NSString *const kTurnKey = @"turn";
 + (instancetype)filterWithType:(NSString *)type;
 @end
 
-// Around the capsule the way a conic gradient runs, starting and ending on the same pink so the turn
-// has no seam.
-static NSArray *rainbow(void) {
+NSArray<UIColor *> *SGGlowRainbowColors(void) {
     static NSArray *colors;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         NSMutableArray *list = [NSMutableArray array];
         for (NSNumber *rgb in @[@0xFF375F, @0xFF9F0A, @0xFFD60A, @0x30D158, @0x64D2FF, @0x0A84FF, @0xBF5AF2, @0xFF375F]) {
             uint32_t v = rgb.unsignedIntValue;
-            [list addObject:(id)[UIColor colorWithRed:((v >> 16) & 0xFF) / 255.0 green:((v >> 8) & 0xFF) / 255.0 blue:(v & 0xFF) / 255.0 alpha:1].CGColor];
+            [list addObject:[UIColor colorWithRed:((v >> 16) & 0xFF) / 255.0 green:((v >> 8) & 0xFF) / 255.0 blue:(v & 0xFF) / 255.0 alpha:1]];
         }
         colors = list;
     });
     return colors;
+}
+
+static NSArray *rainbow(void) {
+    NSMutableArray *list = [NSMutableArray array];
+    for (UIColor *color in SGGlowRainbowColors()) [list addObject:(id)color.CGColor];
+    return list;
 }
 
 static CAGradientLayer *newRainbow(void) {
@@ -70,8 +74,6 @@ static CAShapeLayer *newStroke(CGFloat width) {
     [_wash addSublayer:_washColors];
     [self.layer addSublayer:_wash];
 
-    // The glow: the rainbow cut to a wide stroke, blurred as a whole, in a layer larger than the switch
-    // so the blur has room to spread.
     _glow = [CALayer layer];
     _glowShape = [CALayer layer];
     _glowMask = newStroke(kGlowWidth);
@@ -156,8 +158,6 @@ static CAShapeLayer *newStroke(CGFloat width) {
     _knob.layer.cornerRadius = side / 2;
 }
 
-// Colours for the state. Off is meant to tempt: the rainbow already circles the rim, softer, with a
-// fainter glow. On it comes in full, glow and all.
 - (void)paint {
     BOOL on = self.on;
     BOOL glow = !UIAccessibilityIsReduceTransparencyEnabled();

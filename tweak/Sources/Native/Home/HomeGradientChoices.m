@@ -1,6 +1,3 @@
-// What the Gradient page offers and what the hooks read back, one entry per setting: the names, the
-// key it is stored under and the index it falls back to. HomeGradient.x carries the numbers behind
-// the names, in the same order as the names themselves.
 #import "Core/SGCore.h"
 #import "Home.h"
 
@@ -9,8 +6,6 @@ static NSDictionary *choiceDef(SGHomeChoice choice) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         table = @{
-            // Eight rotations of the green the wash was born as, at the same depth and saturation
-            // around the wheel, so each of them sits behind white text the way the green does.
             @(SGHomeChoiceTint): @{
                 @"key": @"spotifyglass.homeGradientTint",
                 @"default": @0,

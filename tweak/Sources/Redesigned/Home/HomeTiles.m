@@ -1,17 +1,3 @@
-// Home redesign: a shortcut tile the way an Apple list row holds artwork. The cover sits inset from the tile's
-// edges with its own corners, the title follows it in, and the tile is a dark surface tinted faintly towards the
-// cover's dominant colour (Kit/SGRPalette.h, +tintForImage:), so the grid is not one grey and white text always
-// reads. Until the cover has loaded, the tile is the untinted surface.
-//
-// The surface sits behind Spotify's stack, over the tile's own fill, so the title, the playing indicator and
-// the button's touches stay Spotify's. The inset and the title's move are transforms, which Spotify's layout
-// never reads, so its constraints are left as they are. The tint is worked out off the main thread once per
-// picture and follows the cover as Spotify sets it (SGRObserveImage), since a cover lands after layout.
-//
-// Tree (trees/home 3 more scrolled.txt:36-50, 2026-09-17): InteractableLayoutBackingButton id=Shortcut.Card.Home
-// 181x48 clips > UIView 181x48 bg=#FFFFFF@0.10 (the fill), then Encore.StackView > AutoLayoutStackView >
-// UIView 173x48 (the row) > UIView {0, 0} 48x48 bg=#000000@0.90 r=4 (the cover's square) > Encore.ImageView >
-// UIImageView 48x48 and the PlaceholderView; then the row's 8pt spacer and the title's stack at x 56.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"
@@ -72,8 +58,6 @@ static UIView *surfaceIn(UIView *tile, UIView *fill) {
     return surface;
 }
 
-// The square scaled about its centre so it clears the tile's edges by kInset, and everything after it in the
-// row moved in by what that took off its trailing side.
 static void inset(UIView *square) {
     CGFloat side = square.bounds.size.height;
     if (side <= kInset * 4) return;

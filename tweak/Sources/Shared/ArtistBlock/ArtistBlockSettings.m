@@ -1,6 +1,3 @@
-// The Blocked artists page: the switch, whether a featured credit counts, blocking someone off the
-// track playing now, and the list, swiped to unblock. The hook reads all of it per track, so a change
-// needs no restart.
 #import "Core/SGCore.h"
 #import "Settings/SGPage.h"
 #import "Settings/SGPageStyle.h"

@@ -1,16 +1,3 @@
-// Library redesign: the search inside the library, the page the header's magnifier opens.
-//
-// Tree (trees/clean/library/04.txt:21-63): YourLibrarySearchView holds the same YourLibraryContentView and list
-// as the library itself, and over them YourLibrarySearchHeaderView 402x142 -- LiquidGlass.GradientView (the
-// scrim) and, at {0, 94}, a SearchHeaderLibraryLayout of two shapes 32pt tall: the field,
-// id=Components.Header.UI.Toolbar.SearchField 320x32 r=4, and id=Components.Header.UI.Toolbar.ButtonContainer
-// 58x32 r=4 around Cancel. Both already draw Reprise_LiquidGlassKit's LiquidGlass.SearchBarView inside
-// themselves, so there is nothing to put behind them: what Spotify's own glass is missing here is the shape.
-// They become capsules, which is the shape the Search tab's field has (Redesigned/Navbar/SearchField.x), and
-// the scrim goes the way it goes on every other redesigned page.
-//
-// The header is 142pt and holds no filter chips, so there is nothing here to close up: LibraryHeader.x shrinks
-// a header only where chips leave a band behind.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Library.h"

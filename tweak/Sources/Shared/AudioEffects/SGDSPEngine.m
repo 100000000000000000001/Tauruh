@@ -13,12 +13,8 @@
 
 _Static_assert(kSGDSPEngineBlock == kSGDSPConvolverBlock && kSGDSPEngineBlock == kSGDSPEffectMaxFrames, "one block size throughout");
 
-// The FIFO the processed blocks wait in: a power of two holding the primed block, the one being handed out
-// and the one just made, with room to spare.
 enum { kRing = 4 * kSGDSPEngineBlock };
 
-// The order a block goes through the effects: tone, then dynamics and colour, the script, the stereo image,
-// and the rooms last.
 typedef enum {
     SlotBass, SlotEqualizer, SlotGraphicEq, SlotDDC, SlotCompander, SlotTube, SlotLiveprog, SlotWide, SlotCrossfeed,
     SlotConvolver, SlotReverb, SlotCount,
@@ -215,8 +211,6 @@ static void crossfade(SGDSPEngine *engine, Slot slot, float *left, float *right)
     effect->fade = false;
 }
 
-// The gain, moving to a new one over the block, then a limiter with no lookahead: it clamps a peak the
-// sample it comes, stereo linked, and lets go at the release's pace.
 static void output(SGDSPEngine *engine, float *left, float *right) {
     float from = engine->gain, to = engine->gainTarget, step = (to - from) / kSGDSPEngineBlock;
     float threshold = engine->threshold, release = engine->release, limiter = engine->limiter;
@@ -248,8 +242,6 @@ static bool process(SGDSPEngine *engine, float *left, float *right) {
     return active;
 }
 
-// The gathered block, processed (or as it is, when a setter holds the lock) into the ring. The ring is a
-// whole number of blocks and blocks are written whole, so a block never wraps.
 static void runBlock(SGDSPEngine *engine) {
     uint64_t at = engine->written & (kRing - 1);
     float *left = engine->ringLeft + at, *right = engine->ringRight + at;
@@ -268,8 +260,6 @@ static void runBlock(SGDSPEngine *engine) {
             atomic_store_explicit(&engine->peakNanos, nanos, memory_order_relaxed);
         }
         atomic_fetch_add_explicit(&engine->blocks, 1, memory_order_relaxed);
-        // An effect gone unstable would put NaN into its own state and every block after; silence rather
-        // than noise, and the config side resets the engine when it sees the count move.
         if (active && !allFinite(left, right)) {
             memset(left, 0, sizeof engine->blockLeft);
             memset(right, 0, sizeof engine->blockRight);
@@ -293,8 +283,6 @@ void SGDSPEngineProcess(SGDSPEngine *engine, float *left, float *right, uint32_t
             runBlock(engine);
             engine->fill = 0;
         }
-        // As many frames out as came in: the ring is always a block ahead, so it has them, and the frames
-        // overwritten were copied into the block already.
         while (out < in) {
             uint32_t at = (uint32_t)(engine->read & (kRing - 1));
             uint32_t count = in - out;
@@ -327,8 +315,6 @@ SGDSPEngineStats SGDSPEngineReadStats(SGDSPEngine *engine, bool takePeak) {
 
 #pragma mark - setting the effects
 
-// A new state for the slot (NULL: off), crossfaded in over the next block. A fade still to be heard keeps
-// what is heard now as its start, and the state it was going to drops.
 static void install(SGDSPEngine *engine, Slot slot, void *state) {
     Effect *effect = &engine->effects[slot];
     void *dropped;

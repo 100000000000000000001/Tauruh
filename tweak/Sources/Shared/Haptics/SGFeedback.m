@@ -1,12 +1,3 @@
-// The taps of Vibrations > Controls, one per kind of control, from UIKit's feedback generators, so they
-// feel like the rest of iOS: impacts for a press that does something, selection ticks for a value moving
-// under the finger (Apple's Playing haptics: impact complements a physical action, selection a changing
-// value). Starting playback is a crisp tap and stopping it a soft one, so the two can be told apart
-// without looking.
-//
-// Controls' strength scales every impact's intensity. A selection tick has no intensity to scale, so under
-// 100% it becomes a rigid impact, the nearest thing UIKit has to it, at about a tick's weight times the
-// strength; at 100% it stays the system's own tick.
 #import "Core/SGCore.h"
 #import "Haptics.h"
 

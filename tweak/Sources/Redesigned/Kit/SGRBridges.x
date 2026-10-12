@@ -1,6 +1,3 @@
-// The Kit's bridge into Spotify: the now playing artwork. The player's state, its open and close and
-// links are Shared's (Shared/Player/PlayerState.h, Shared/Player/PlayerEvents.h,
-// Shared/Navigation/Links.h). SGRBridges.h names the hook and why it is the one.
 #import "Core/SGCore.h"
 #import "Shared/Player/PlayerEvents.h"
 #import "SGRBridges.h"
@@ -18,8 +15,6 @@ static SGRArtworkQuality sg_artworkQuality;
 static NSUInteger sg_artworkSerial;
 // The playing track and the picture its metadata names.
 static NSString *sg_wantedURI, *sg_wantedKey;
-// Every picture published, held weakly, with the key it was published as. A view still showing one of
-// these while another picture is wanted is showing the last track's.
 static NSMapTable<UIImage *, NSString *> *sg_published;
 static NSURLSessionDataTask *sg_fetch;
 
@@ -122,8 +117,6 @@ static void fetchPicture(NSString *key, NSURL *url, NSUInteger attempt) {
     [sg_fetch resume];
 }
 
-// Brings the playing track's picture up to date with the player's state, and fetches a picture newly
-// wanted. Called on every state report and before any view read is believed, whichever comes first.
 static void followPlayer(void) {
     SPTPlayerTrack *track = SGPlayerState().track;
     NSString *uri = SGURIString(track.URI);
@@ -160,8 +153,6 @@ void SGRSetNowPlayingArtwork(UIImage *image, NSString *trackURI, SGRArtworkQuali
 
 UIImage *SGRNowPlayingArtwork(NSString **trackURI, NSString **identity) {
     if (trackURI) *trackURI = sg_artworkURI;
-    // A fetched picture is known for what it is; one read off a screen is only what it looked like then,
-    // so each of those is a picture of its own and a field redraws it.
     if (identity) {
         *identity = !sg_artwork ? nil : sg_artworkQuality == SGRArtworkQualityExact
             ? [sg_artworkKey stringByAppendingString:@"#exact"]
@@ -198,8 +189,6 @@ static void publishBarArtwork(void) {
     SGRSetNowPlayingArtwork(image, uri, SGRArtworkQualityLow);
 }
 
-// The bar sets its picture when the image has loaded, which lays nothing out, so a track change looks
-// again a few times while the picture comes in. One that loads later still is the fetch's to bring.
 @interface SGRBarArtworkWatcher : NSObject <SGPlayerStateObserver>
 @end
 

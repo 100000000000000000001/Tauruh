@@ -1,12 +1,3 @@
-// Player declutter: hides parts of the full screen player, one switch each on the Player page. Cards
-// under the player are Element_List cells; a hidden one reports zero height when the list sizes it,
-// so the list closes up around it (the 24pt gap between cards stays). Player buttons go invisible but
-// keep their place, so their row stays centred.
-//
-// Trees (trees/now-playing*.txt): every card is a CollectionViewCell whose content view names the
-// page (NowPlaying_ScrollAPI) and whose subtree names the card. Player rows are the UIStackView of each NowPlaying_ModesImpl unit: playback controls
-// hold shuffle, previous, play, next, repeat; the footer holds connect, a hidden button, share
-// and the queue; track info ends with the add-to button.
 #import "Core/SGCore.h"
 #import "NowPlaying.h"
 
@@ -24,8 +15,6 @@ static const struct { __unsafe_unretained NSString *marker, *key; } cards[] = {
     {@"RelatedContentRecommendations", SGHideRecommendations},
 };
 
-// Class names of everything in the cell. Lists nested in the cell are laid out first so the
-// cells that name the card (video cards) exist.
 static NSString *classNamesIn(UIView *cell) {
     NSMutableString *names = [NSMutableString string];
     SGForEachView(cell, ^(UIView *v) {

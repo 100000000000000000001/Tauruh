@@ -122,7 +122,6 @@ static NSArray<SGModSection *> *sections(SGVibrationsPreview *preview, void (^ex
         SGPlayFeedback(SGFeedbackAdd);
         [weakPreview rippleAt:SGHapticsStrength(SGKeyControlStrength)];
     });
-    controlStrength.waitsOn = SGKeyControlHaptics;
 
     void (^switched)(BOOL) = ^(BOOL on) {
         [NSNotificationCenter.defaultCenter postNotificationName:SGMusicHapticsSwitchesChangedNotification object:nil];
@@ -185,7 +184,7 @@ static NSArray<SGModSection *> *sections(SGVibrationsPreview *preview, void (^ex
 }
 
 - (void)systemMusicHapticsChanged:(NSNotification *)note {
-    [self refreshVisibility];
+    // refreshVisibility
 }
 
 // The header keeps the height it is given, so it is sized here and handed back to the table only when that

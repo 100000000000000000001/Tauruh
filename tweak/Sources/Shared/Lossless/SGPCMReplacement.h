@@ -1,4 +1,5 @@
 #import "SGPreparedPCM.h"
+#import "Shared/Player/PlayerSource.h"
 #import "Shared/Player/SpeedPitch.h"
 
 // Prototype only: no constructor enables this in Spotify. Call Enable once before using Install.

@@ -1,15 +1,13 @@
-// A double tap on the player, read against the grid Settings draws: the recognizer, what each cell does
-// and the playback controller it does it with. Which view of the player it goes on is each look's own
-// hookup (Native/Player/PlayerGestures.x, Redesigned/Player/PlayerGestures.x), which call SGGestureAttach.
-//
-// The player already answers a sideways swipe with the next track and a vertical drag with the
-// cards below, which leaves the double tap as the one gesture free to take.
 #import "Core/SGCore.h"
 #import "Gestures.h"
 #import "Headers/SPTNowPlayingPlaybackController.h"
+#import "Headers/SPTPlayer.h"
+#import "Shared/Player/PlayerState.h"
 
 static __weak SPTNowPlayingPlaybackControllerImplementation *sg_player;
 static void (^sg_observer)(SGGestureAction action);
+
+static __weak id sg_auxModel;
 
 void SGGestureSetObserver(void (^observer)(SGGestureAction action)) {
     sg_observer = [observer copy];
@@ -17,7 +15,30 @@ void SGGestureSetObserver(void (^observer)(SGGestureAction action)) {
 
 #pragma mark - what a cell does
 
-static void perform(SGGestureAction action) {
+@protocol SGAuxActions <NSObject>
+- (void)addToCollection;
+- (BOOL)isInCollection;
+- (BOOL)disallowAddingToCollection;
+@end
+
+@protocol SGCollectableTrack <NSObject>
+@property (nonatomic, readonly) BOOL isPodcast;
+@property (nonatomic, readonly) BOOL isAudiobook;
+@end
+
+static void like(void) {
+    id<SGAuxActions> model = sg_auxModel;
+    if (![model respondsToSelector:@selector(addToCollection)]) return;
+    SPTPlayerTrack *track = SGPlayerState().track;
+    if (!track) return;
+    if ([track respondsToSelector:@selector(isPodcast)] && [(id<SGCollectableTrack>)track isPodcast]) return;
+    if ([track respondsToSelector:@selector(isAudiobook)] && [(id<SGCollectableTrack>)track isAudiobook]) return;
+    if ([model isInCollection]) return;
+    if ([model disallowAddingToCollection]) return;
+    [model addToCollection];
+}
+
+void SGPerformGestureAction(SGGestureAction action) {
     SPTNowPlayingPlaybackControllerImplementation *player = sg_player;
     if (!player) return;
     if (action != SGGestureNothing && sg_observer) sg_observer(action);
@@ -47,6 +68,9 @@ static void perform(SGGestureAction action) {
         case SGGestureRepeat:
             [player toggleRepeatMode];
             break;
+        case SGGestureLike:
+            like();
+            break;
     }
 }
 
@@ -58,11 +82,7 @@ static void perform(SGGestureAction action) {
 @implementation SGGestureTarget
 
 - (void)doubleTapped:(UITapGestureRecognizer *)tap {
-    // The recognizer outlives the switch: it stays on the player once attached, so the switch is
-    // read here as well and the gesture stops the moment it goes off.
     if (!SGFlag(SGKeyGestures, NO)) return;
-    // The host is the queue scrolled sideways, so a tap lands in content coordinates a few million
-    // points out; its bounds origin is that scroll, and taking it off gives the point on screen.
     UIView *host = tap.view;
     CGRect visible = host.bounds;
     CGPoint point = [tap locationInView:host];
@@ -71,7 +91,7 @@ static void perform(SGGestureAction action) {
     NSInteger cell = SGGestureCellAt(point, visible.size);
     NSArray<NSNumber *> *zones = SGGestureZones();
     if (cell < 0 || cell >= (NSInteger)zones.count) return;
-    perform((SGGestureAction)zones[(NSUInteger)cell].integerValue);
+    SGPerformGestureAction((SGGestureAction)zones[(NSUInteger)cell].integerValue);
 }
 
 @end
@@ -83,8 +103,6 @@ static SGGestureTarget *target(void) {
     return shared;
 }
 
-// Spotify's own single tap on the player scrolls it to the cards below, and would fire on the first
-// of a pair as well; every one above the artwork is asked to wait for the double tap to miss.
 static void yieldSingleTaps(UIView *host, UITapGestureRecognizer *tap) {
     for (UIView *view = host; view; view = view.superview) {
         for (UIGestureRecognizer *other in view.gestureRecognizers) {
@@ -97,8 +115,6 @@ static void yieldSingleTaps(UIView *host, UITapGestureRecognizer *tap) {
 
 static char kTapKey, kSeenKey;
 
-// Spotify adds its own recognizers as the player's controllers load, which is not ordered against
-// this hook: the count of what stands above the artwork is watched so a later one still yields.
 static NSUInteger tapsAbove(UIView *host) {
     NSUInteger count = 0;
     for (UIView *view = host; view; view = view.superview) count += view.gestureRecognizers.count;
@@ -131,9 +147,14 @@ void SGGestureAttach(UIView *host) {
 }
 %end
 
-// A single tap on the cover is Spotify's way into the tilt mode, the artwork alone in 3D. That is
-// the half of a double tap that misses, so while the zones are on it would open on the way to every
-// gesture; the tap goes back to Spotify with the switch.
+%hook SPTNowPlayingAuxiliaryActionsModel
+- (id)initWithCollectionPlatform:(id)collectionPlatform testManager:(id)testManager statefulPlayer:(id)statefulPlayer yourEpisodesSaveManager:(id)saveManager curationPlatform:(id)curationPlatform smartShuffleHandler:(id)shuffleHandler playingTrackProvider:(id)provider {
+    id model = %orig;
+    sg_auxModel = model;
+    return model;
+}
+%end
+
 %ctor {
     %init;
     SGRequireClasses(@[@"SPTNowPlayingPlaybackControllerImplementation"]);

@@ -560,7 +560,7 @@ static void raiseHost(UIWindow *window) {
     sg_requesting = self;
     sg_requestedAt = _requestedAt;
     // Speed and pitch's sheet test (and Edit info's) counts the ⋯'s touch, which the menu kept from Spotify's ⋯.
-    SGPlayerMenuMarkPlayers();
+    // SGPlayerMenuMarkPlayers();
     NSString *how = fireControl(self.spotify);
     SGLog(@"system menu: Spotify's sheet asked for, %.3f s after the touch down, by %@", _requestedAt - self.touchedAt, how);
     __weak SGRMenuSession *weakSelf = self;
@@ -1164,7 +1164,7 @@ static SGRMenuAnchor *anchorIn(UIView *host) {
 
 // A page's ⋯ was touched this recently: a context menu sheet that is not taken over now is worth a line saying why.
 static BOOL claimRecent(void) {
-    return SGRPinnedMoreRecentButton() != nil;
+    return SGRPinnedMoreRecentPage() != nil;
 }
 
 // Why a sheet was not taken over: every time while a ⋯ touch is recent, so the next log of a ⋯ that opened
@@ -1199,7 +1199,7 @@ static SGRMenuSession *takeOver(UIViewController *presented, NSString *via) {
         whyNot(via, YES, @"it came while a picked row fired, so it is the row's");
         return nil;
     }
-    UIView *button = SGRPinnedMoreRecentButton();
+    UIView *button = SGRPinnedMoreRecentPage();
     CFTimeInterval touchedAt = 0;
     if (!button) {
         whyNot(via, recent, @"no page's ⋯ was touched");

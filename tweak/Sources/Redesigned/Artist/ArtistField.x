@@ -1,17 +1,3 @@
-// Artist redesign: the photo's field behind the whole page, and the tab strip gone.
-//
-// Tree (trees/clean/artist/01.txt:26-40). The page is a TemplateView holding two scroll views of the page's
-// size -- PCFFTabLayoutViewController.overlayScrollView and .containerScrollView -- and the container's stack:
-// the header, then PCFFTabLayoutViewController.tabsViewAccessibilityID, the strip of tabs
-// (Components.UI.TabsSectionHeading, 44pt) over a paging scroll view with one list per tab. The field goes
-// under all of it, as the page's bottom-most view, and what Spotify paints the page, its lists and its rows
-// with -- the base surface -- is kept clear by the Kit's repaint hook while sgr_artistRoot is this page.
-//
-// The strip is Music, Video and Merch. The Music list is the page the Music app gives an artist: the videos
-// and the merch have their own tabs only so that they can be left out, so the strip goes and the Music list
-// stays. The strip sits in an AutoLayoutStackView, which traps when a view in it hides, so it goes invisible
-// and the pages under it move up into its place and stop paging, the way the native look's switch does it
-// (Native/Artist/Artist.x).
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Artist.h"
@@ -70,8 +56,6 @@ static SGRArtworkField *fieldIn(UIView *page) {
     if (![page.accessibilityIdentifier isEqualToString:kPageIdentifier] || page.bounds.size.height < 200) return;
     // The page the repaint hook keeps clear is the one laying out, which is the one on screen.
     sgr_artistRoot = page;
-    // Behind a curtain from the first pass (Kit/SGRReveal.h), which the header claims once it lays out the photo
-    // header (ArtistHeader.x); a page with a header the redesign does not lay out is shown a moment later.
     SGRRevealHold(page, 0);
     SGRArtworkField *field = fieldIn(page);
     if (field.superview != page) [page insertSubview:field atIndex:0];
@@ -80,9 +64,6 @@ static SGRArtworkField *fieldIn(UIView *page) {
 }
 %end
 
-// Each tab's list paints itself the base surface from its own pass, and may have before the page first laid
-// out and the repaint hook knew the page; its collection view is a private class whose name carries a build
-// hash, so the list view around it -- one public name, one child -- is where it is cleared, as the album's is.
 %hook _TtC32CreativeWorkPlatform_TemplateKit28CreativeWorkTemplateListView
 - (void)layoutSubviews {
     %orig;
@@ -129,11 +110,6 @@ static void hideStrip(UIView *strip) {
 %end
 
 %ctor {
-    // No flags forced here. `ios-creator-impl.context_menu_in_navigation_bar_enabled_artist` moves more out of
-    // the header's row, and with it gone Spotify's OverflowStackView force-unwraps the tallest view of a line
-    // that has none and traps as the page opens (device crash 2026-09-18 19:09, SIGTRAP in -[OverflowStackView
-    // updateConstraints], OverflowStackViewLayoutBuilder.Line.tallestView nil). The row stays Spotify's, and
-    // ArtistHeader.x draws more itself.
     if (!SGRedesignedUI()) return;
     %init;
     SGRequireClasses(@[

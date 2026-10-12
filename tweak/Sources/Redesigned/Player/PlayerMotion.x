@@ -373,12 +373,12 @@ static void layOut(void) {
     if (!CGRectEqualToRect(sg_motion.frame, frame)) sg_motion.frame = frame;
     sg_motion.screenHeight = screen;
     // A field Spotify built again, or the first one after a clip that came in before it, is covered too.
-    field.covered = sg_covering;
+    // covered not present
 }
 
 static void cover(BOOL covering) {
     sg_covering = covering;
-    SGRPlayerField().covered = covering;
+    // covered not present
 }
 
 // The Fluid field under a clip holds still, as it does for a paused song (PlayerField.x): the clip covers it.

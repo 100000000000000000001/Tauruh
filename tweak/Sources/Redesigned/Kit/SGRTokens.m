@@ -1,4 +1,5 @@
 #import <CoreText/SFNTLayoutTypes.h>
+#import <math.h>
 #import "Core/SGCore.h"
 #import "SGRTokens.h"
 #import "SGRAccent.h"
@@ -18,6 +19,9 @@ const NSTimeInterval SGRCrossfade = 0.35;
 // A layout spring settles in about this long without overshooting; a press gives a little back.
 static const NSTimeInterval kLayoutDuration = 0.45, kPressDuration = 0.32;
 static const CGFloat kPressDamping = 0.62;
+// A tap bringing something back answers a touch slower and with a little bounce; something leaving goes quickly.
+static const NSTimeInterval kRespondDuration = 0.4, kExitDuration = 0.26;
+static const CGFloat kRespondDamping = 0.78, kExitDamping = 1;
 
 UIColor *SGRPrimary(void) {
     return UIColor.whiteColor;
@@ -35,6 +39,14 @@ UIColor *SGRTertiary(void) {
 UIColor *SGRAccent(void) {
     return SGRAccentColor() ?: [UIColor colorWithRed:0x1E / 255.0 green:0xD7 / 255.0 blue:0x60 / 255.0 alpha:1];
 }
+
+NSInteger SGRAccentRGB(void) {
+    CGFloat r = 0, g = 0, b = 0, a = 1;
+    if (![SGRAccent() getRed:&r green:&g blue:&b alpha:&a]) return -1;
+    return ((NSInteger)lround(r * 255) << 16) | ((NSInteger)lround(g * 255) << 8) | (NSInteger)lround(b * 255);
+}
+
+NSString *const SGRPlainCheckIdentifier = @"sg.plaincheck";
 
 UIColor *SGRNeutralField(void) {
     return [UIColor colorWithRed:0x12 / 255.0 green:0x12 / 255.0 blue:0x12 / 255.0 alpha:1];
@@ -101,5 +113,26 @@ void SGRAnimate(SGRMotion motion, void (^animations)(void), void (^completion)(B
         case SGRMotionFade:
             [UIView animateWithDuration:SGRCrossfade delay:0 options:options | UIViewAnimationOptionCurveEaseInOut animations:animations completion:completion];
             break;
+        case SGRMotionRespond:
+            [UIView animateWithDuration:kRespondDuration delay:0 usingSpringWithDamping:kRespondDamping initialSpringVelocity:0 options:options animations:animations completion:completion];
+            break;
+        case SGRMotionExit:
+            [UIView animateWithDuration:kExitDuration delay:0 usingSpringWithDamping:kExitDamping initialSpringVelocity:0 options:options animations:animations completion:completion];
+            break;
     }
+}
+
+void SGRAnimateLayout(UIView *host, void (^animations)(void), void (^completion)(BOOL finished)) {
+    void (^move)(void) = ^{
+        if (animations) animations();
+        [host layoutIfNeeded];
+    };
+    if (SGRReduceMotion()) {
+        [UIView performWithoutAnimation:move];
+        if (completion) completion(YES);
+        return;
+    }
+    UIViewAnimationOptions options = UIViewAnimationOptionAllowUserInteraction | UIViewAnimationOptionBeginFromCurrentState
+        | UIViewAnimationOptionLayoutSubviews;
+    [UIView animateWithDuration:kLayoutDuration delay:0 usingSpringWithDamping:1 initialSpringVelocity:0 options:options animations:move completion:completion];
 }

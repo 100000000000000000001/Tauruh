@@ -28,9 +28,6 @@ UIView *SGNote(NSString *text) {
     return wrapper;
 }
 
-// Header and footer views keep the height they are given, so size them to their text. Only the
-// size is compared: the table moves the footer's origin itself, and reassigning on that would
-// loop forever.
 void SGFitNote(UITableView *table, UIView *wrapper, CGFloat top, CGFloat bottom) {
     UILabel *label = wrapper.subviews.firstObject;
     CGFloat inset = table.layoutMargins.left;
@@ -56,8 +53,6 @@ static CGFloat barsHeight(UIView *view) {
     return window.bounds.size.height - top;
 }
 
-// The now playing bar and the tab bar float over the content, and the safe area does not cover
-// them, so the pages inset themselves by however much of the window the bars take.
 void SGInsetForBars(UITableView *table) {
     CGFloat bottom = MAX(0, barsHeight(table) - table.safeAreaInsets.bottom);
     if (table.contentInset.bottom == bottom) return;
@@ -67,9 +62,6 @@ void SGInsetForBars(UITableView *table) {
     table.verticalScrollIndicatorInsets = inset;
 }
 
-// The pages follow the running look's black and accent colour, read here by their keys so the page
-// framework depends on no layer: the native look's AMOLED switch and accent (Native/Appearance), or the
-// redesign's accent (Redesigned/Kit/SGRAccent.h), which is always black.
 static NSString *const kAmoledKey = @"spotifyglass.amoled";
 static NSString *const kAccentKey = @"spotifyglass.accent";
 static NSString *const kRedesignAccentKey = @"spotifyglass.redesign.accent";
@@ -85,6 +77,13 @@ static BOOL lookBlack(void) {
 }
 
 UIColor *SGGreen(void) { return lookAccent() ?: [UIColor colorWithRed:0x1E / 255.0 green:0xD7 / 255.0 blue:0x60 / 255.0 alpha:1]; }
+UIColor *SGAccentMark(void) { return SGGreen(); }
+UIColor *SGOnAccent(void) {
+    CGFloat r, g, b, a;
+    if (![SGGreen() getRed:&r green:&g blue:&b alpha:&a]) return UIColor.whiteColor;
+    CGFloat luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return luma > 0.6 ? UIColor.blackColor : UIColor.whiteColor;
+}
 UIColor *SGRed(void) { return [UIColor colorWithRed:0xF1 / 255.0 green:0x5E / 255.0 blue:0x6B / 255.0 alpha:1]; }
 UIColor *SGDiscordColor(void) { return [UIColor colorWithRed:0x58 / 255.0 green:0x65 / 255.0 blue:0xF2 / 255.0 alpha:1]; }
 UIColor *SGPageBackground(void) { return lookBlack() ? UIColor.blackColor : [UIColor colorWithWhite:0x12 / 255.0 alpha:1]; }
@@ -107,8 +106,6 @@ UIImage *SGTileImage(NSString *symbol) {
 const CGFloat SGSectionHeaderHeight = 38;
 const CGFloat SGSectionGap = 20;
 
-// Every page below draws Spotify's own list row: a 13pt white title over an 11pt grey subtitle,
-// with an optional symbol in the leading slot.
 void SGFillCell(UITableViewCell *cell, NSString *title, NSString *subtitle, UIColor *color, NSString *symbolName) {
     UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];
     content.text = title;
@@ -209,6 +206,7 @@ UIViewController *SGTopController(void) {
 }
 
 NSString *const SGRepoURL = @"https://github.com/samj-exe/taurus";
+NSString *const SGDiscordURL = @"https://discord.gg/NsY79sGXny";
 
 void SGOpenURL(NSString *url) {
     NSURL *target = url ? [NSURL URLWithString:url] : nil;
@@ -216,4 +214,8 @@ void SGOpenURL(NSString *url) {
     dispatch_async(dispatch_get_main_queue(), ^{
         [UIApplication.sharedApplication openURL:target options:@{} completionHandler:nil];
     });
+}
+
+void SGPresentDark(UIViewController *vc) {
+    if (vc) vc.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
 }

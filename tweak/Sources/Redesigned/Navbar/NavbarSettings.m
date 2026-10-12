@@ -4,11 +4,6 @@
 #import "Navbar.h"
 #import "Shared/Navigation/Links.h"
 
-// What "Add a tab" offers: URIs Spotify's own router resolves to a page of its own, each with the
-// name of the SPTEncoreIcon class method that draws its glyph. Playlists was spotify:collection:playlists
-// until 0.20, which 9.1.78 knows only from its old iPad sidebar table and has no handler for (#66);
-// spotify:playlists is the form its collection URI parser lists, next to spotify:playlists:by-you.
-// The picker still asks the dispatcher about each one and leaves out what it has nowhere to send.
 static NSArray<NSDictionary *> *tabPresets(void) {
     return @[
         @{SGRNavbarTitle: @"Home", SGRNavbarURI: @"spotify:home", SGRNavbarIcon: @"home"},
@@ -31,8 +26,6 @@ static NSArray<NSDictionary *> *tabPresets(void) {
     ];
 }
 
-// The list the Navbar page edits: the saved order first, then every tab of Spotify's it does not
-// name, in Spotify's order. Entries for tabs Spotify no longer has drop out.
 static NSMutableArray<NSMutableDictionary *> *navbarEntries(void) {
     NSArray<NSString *> *stock = SGRNavbarStock();
     NSMutableArray<NSMutableDictionary *> *entries = [NSMutableArray array];
@@ -51,8 +44,6 @@ static NSMutableArray<NSMutableDictionary *> *navbarEntries(void) {
     return entries;
 }
 
-// A tab of the mod's own carries an identity of its own, so the same page can sit on the bar twice
-// and renaming one does not shuffle the order.
 static void appendTab(NSDictionary *tab) {
     NSMutableDictionary *entry = [tab mutableCopy];
     entry[SGRNavbarID] = NSUUID.UUID.UUIDString;
@@ -63,8 +54,6 @@ static void appendTab(NSDictionary *tab) {
 @interface SGRTabPickerPage : SGPage
 @end
 
-// The presets the dispatcher can send somewhere, each verdict logged. When it cannot be asked (not set
-// up yet, or 9.1.78's registry is not where it was) every preset stays, as before.
 static NSArray<NSDictionary *> *openablePresets(void) {
     NSMutableArray<NSDictionary *> *kept = [NSMutableArray array];
     for (NSDictionary *tab in tabPresets()) {
@@ -195,9 +184,6 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
     SGRNavbarSectionCount,
 };
 
-// The tabs, in the order the bar shows them: drag to reorder, tap to show or hide, swipe a tab of
-// your own away. Spotify's own tabs can only be hidden, never removed. Mod Settings and the welcome
-// tour show the same editor.
 @interface SGRNavbarPage : SGPage
 @end
 

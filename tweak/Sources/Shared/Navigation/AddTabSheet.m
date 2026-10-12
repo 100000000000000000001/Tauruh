@@ -100,7 +100,7 @@ static void showProblem(UIViewController *page, NSString *title, NSString *messa
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return SGSectionHeaderHeight();
+    return UITableViewAutomaticDimension;
 }
 
 - (UIView *)tableView:(UITableView *)table viewForFooterInSection:(NSInteger)section {
@@ -310,7 +310,7 @@ static void showProblem(UIViewController *page, NSString *title, NSString *messa
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
     NSString *title = _headers[(NSUInteger)section];
-    return title.length && _sections[(NSUInteger)section].count ? SGSectionHeaderHeight() : SGSectionGap;
+    return title.length && _sections[(NSUInteger)section].count ? UITableViewAutomaticDimension : SGSectionGap;
 }
 
 - (BOOL)isLast:(NSInteger)section {
@@ -466,7 +466,7 @@ typedef NS_ENUM(NSInteger, SGAddTabSection) {
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return section == SGAddTabSectionRemove ? SGSectionGap : SGSectionHeaderHeight();
+    return section == SGAddTabSectionRemove ? SGSectionGap : UITableViewAutomaticDimension;
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section {

@@ -57,10 +57,10 @@ static void needReader(BOOL need) {
     if (need) {
         if (sg_readers++ == 0) {
             SGRSpectrumPrepare();
-            SGAudioSetOutputReader(SGRSpectrumFeed);
+            /* no audio reader */
         }
     } else if (sg_readers && --sg_readers == 0) {
-        SGAudioSetOutputReader(NULL);
+        /* no audio reader */
     }
 }
 
@@ -165,7 +165,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     UIImage *image = SGRNowPlayingArtwork(NULL, NULL);
     if (!image) return;
     NSUInteger generation = ++_palette;
-    SGRPaletteRequest request = {CGSizeZero, NO, YES, YES, NO};
+    SGRPaletteRequest request = {CGSizeZero, NO, YES, YES};
     __weak SGRVisualiserView *weakSelf = self;
     [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
         SGRVisualiserView *view = weakSelf;
@@ -444,9 +444,9 @@ void SGRPlayerVisualiserUpdate(void) {
 
 void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind) {
     SGRPlayerBackgroundKind current = SGRPlayerBackground();
-    if (!SGPlayerMenuOffersAnimatedArtwork() || kind < SGRPlayerBackgroundFluid || kind == current) return;
+    if (!NO || kind < SGRPlayerBackgroundFluid || kind == current) return;
     // Animated's own switch lets the clip go or looks it up, and calls back here.
-    if (kind == SGRPlayerBackgroundAnimated || current == SGRPlayerBackgroundAnimated) SGPlayerMenuSetAnimatedArtwork(kind == SGRPlayerBackgroundAnimated);
+    if (kind == SGRPlayerBackgroundAnimated || current == SGRPlayerBackgroundAnimated) // ignored;
     if (kind != SGRPlayerBackgroundAnimated) SGSetInt(SGRKeyPlayerBackground, kind);
     SGLog(@"redesign player: background switched to %@ from the menu", SGRPlayerBackgroundNames()[(NSUInteger)kind]);
     SGRPlayerHoldField();

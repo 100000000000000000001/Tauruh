@@ -1,25 +1,3 @@
-// Search redesign: of the cells the Browse page lists, only the category cards stay. Every other cell reports no
-// height, so the list closes up around it: the watch feed carousels (Playlists you can watch, Explore episodes for
-// you), and the promos, showcases and ad cards the page can also carry (BrowseStructure's other cases in the binary,
-// swift-fields.txt 2026-09-17), and any kind the server adds later. An allow list, as for Home's sections
-// (Redesigned/Home/HomeSections.x): the page is the server's, and a new kind should not turn up on a redesigned Search.
-//
-// Tree (trees/clean/search/01.txt): a cell of the list (id=BrowsePage.ContentScrollView) is an
-// Element_List.CollectionViewCell whose content view is an ElementContentView over Browse_BrowsePageImpl.BrowseStructure,
-// then an ElementView<BrowseStructure>, then the cell's own root:
-//   Control<Box> id=Components.UI.CategoryCardBrowse   a category card 177x108 (:332)
-//   UIView > UIView > UIStackView > ... WatchFeedCarouselEntryPointElement   a carousel 402x224 under its heading (:26-30)
-//
-// A collapsed cell keeps its content at the height it measured, hidden and cut off by the cell, the way Home's do: content
-// squeezed to 0 with the cell breaks its constraints on every layout pass (Home.h, home perf 2026-09-17).
-//
-// The carousels are the page's first two sections, and the list keeps its spacing between sections whatever their
-// height: collapsed, they still leave 16pt after the first and 24pt after the second (01.txt:30-31, :325), 40pt of black
-// between the search field and the cards. So every cell of the list moves up by the spacing the collapsed cells above the
-// first card leave, measured from the list's own layout attributes. The move is the cell's transform, set after UIKit
-// applies the cell's attributes and on the cell's layout passes, so it holds through scrolling, reuse and reloads (a
-// compositional list with the same shape on the iOS 27 simulator, 2026-09-17), and touches follow it. Spotify's content
-// inset, which its collapsing header is worked out from, stays its own.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Search.h"

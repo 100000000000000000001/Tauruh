@@ -5,6 +5,7 @@
 //     Lossless.x           anchors again at each track start, seek or resume (the switch below)
 //     SGSourceEvents.x     drops the anchor at a seek, skip, pause or route change
 #import <Foundation/Foundation.h>
+#import "Shared/Player/PlayerSource.h"
 
 #define SGKeyLossless @"spotifyglass.lossless"   // off unless set
 

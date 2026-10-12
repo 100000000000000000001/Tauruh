@@ -1,9 +1,6 @@
 #import "SGGlass.h"
 #import "SGRuntime.h"
 
-// +effectWithStyle: is the only initialiser UIGlassEffect has; a bare -init leaves the material
-// unresolved and the pane renders as a plain blur, while the capsule shape, which is the view's
-// own property, still comes out right. Spotify's own Reprise glass builds its effect the same way.
 UIVisualEffect *SGGlassEffect(void) {
     Class glass = NSClassFromString(@"UIGlassEffect");
     if ([glass respondsToSelector:@selector(effectWithStyle:)]) return [glass effectWithStyle:0];
@@ -13,8 +10,6 @@ UIVisualEffect *SGGlassEffect(void) {
 static UIVisualEffectView *newPane(void) {
     UIVisualEffectView *glass = [[UIVisualEffectView alloc] initWithEffect:SGGlassEffect()];
     glass.userInteractionEnabled = NO;
-    // A pane goes in at index 0, but a host that rebuilds its content puts that in at index 0 too
-    // and the pane would end up over it. Depth keeps a pane behind whatever the host draws.
     glass.layer.zPosition = -1;
     return glass;
 }

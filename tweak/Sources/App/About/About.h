@@ -15,18 +15,15 @@ NSString *SGUpdateVersion(void);  // nil unless GitHub has a release newer than 
 void SGCheckForUpdate(void);
 UIViewController *SGLicensesPage(void); // Licenses.m: the mod's license and the third-party ones it ships
 
-// Whether the now playing card on the lock screen can open this build. It depends on the signature,
-// not on the mod: iOS launches by the App ID of the application-identifier entitlement, so a build
-// whose bundle id is not that App ID cannot be opened from the card. Signing.m says so once.
 extern NSString *const SGSigningHelpURL;
 NSString *SGSigningAppIdentifier(void);      // App ID without the team prefix, nil if unreadable
 BOOL SGSigningOpensFromLockScreen(void);     // YES when unreadable, so a build that works stays quiet
 SGModRow *SGSigningWarningRow(void);          // nil while the signature is sound
 void SGCheckSigningOnce(void);
 void SGShowSigningFixIfPending(void);   // the sheet the tour held back, if any
+// The Misc switch (App/ModSettings.x) hides both the settings banner and the once-per-signature alert.
+#define SGKeyHideSigningWarning @"spotifyglass.hide.signingWarning"
 
-// Backup.m: the settings out to a JSON file through the share sheet, and back in from one, replacing
-// what is set and restarting.
 void SGExportSettings(void);
 void SGImportSettings(void);
 

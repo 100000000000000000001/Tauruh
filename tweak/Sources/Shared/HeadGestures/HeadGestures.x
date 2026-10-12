@@ -390,6 +390,22 @@ BOOL SGHeadGesturesAvailable(void) {
     return manager().deviceMotionAvailable;
 }
 
+NSString *SGHeadGestureStatus(void) {
+    if (!SGFlag(SGKeyHeadGestures, NO)) return @"Off";
+    if (!SGHeadGesturesAvailable()) return @"This iPhone cannot track AirPods motion";
+    switch (CMHeadphoneMotionManager.authorizationStatus) {
+        case CMAuthorizationStatusDenied:
+            return @"Turn on Motion & Fitness for Spotify in Settings";
+        case CMAuthorizationStatusRestricted:
+            return @"Motion & Fitness is restricted on this iPhone";
+        case CMAuthorizationStatusNotDetermined:
+            return @"Waiting for Motion & Fitness access";
+        case CMAuthorizationStatusAuthorized:
+            break;
+    }
+    return @"Listening for a nod or a shake";
+}
+
 #pragma mark - the page's listening
 
 void SGHeadGesturesStopListening(void) {

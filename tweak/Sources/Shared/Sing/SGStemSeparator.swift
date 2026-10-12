@@ -1,9 +1,3 @@
-// Sing's separator: the Mel-Band RoFormer vocal model (harness/sing/model.json has its provenance) run by
-// Core ML on this iPhone. The compiled graph is the model's spectral core alone: the worker takes the STFT
-// and its inverse with Accelerate (SGStemSpectralDSP.swift), and Core ML turns one two-second spectrum into
-// the spectrum of its vocals. The same model is loaded twice, once for the CPU, which is all iOS lets an app
-// in the background use, and once for the CPU and the GPU, used while Spotify is the active app. Nothing
-// here runs on the render thread or on UIKit's, and no audio leaves the process.
 import CoreML
 import Foundation
 #if canImport(UIKit)
@@ -14,8 +8,6 @@ enum SGStemError: Error {
     case invalidModel, invalidInput, invalidOutput
 }
 
-// The one shape the model has. The C side (Shared/Sing/SGSingFormat.h) names the same window, and
-// SGStemWorkerStart checks the loaded model against the window it is given.
 enum SGStemShape {
     static let fftSize = 2048, stftHop = 441, stftFrames = 201
     static let bins = fftSize / 2 + 1
@@ -72,21 +64,14 @@ actor SGStemSeparator {
         SGStemShape.spectrum[($0 + 1)...].reduce(1, *)
     }
 
-    // Core ML's first prediction allocates and specializes beyond loading, so it is paid here, before the
-    // worker says Ready, while Spotify still plays its own audio. Both copies are warmed, so going to the
-    // background or coming back never meets a cold model in the middle of the reduced mix.
     func warmUp() async throws {
         try encode([Float](repeating: 0, count: windowFrames * 2))
         _ = try predict(accelerated: false)
         if gpu != nil, await foreground() { _ = try predict(accelerated: true) }
     }
 
-    // One window of stereo interleaved PCM in, its vocals out; the instrumental is the mix less these. The
-    // streaming worker overlaps consecutive windows itself (SGStemWindowProcessor.swift).
     func vocals(for pcm: [Float]) async throws -> [Float] {
         guard pcm.count == windowFrames * 2, pcm.allSatisfy(\.isFinite) else { throw SGStemError.invalidInput }
-        // Asking UIKit whether Spotify is active suspends this actor, and another window may come in
-        // meanwhile. The two share one input tensor, so they take turns.
         await acquire()
         defer { release() }
         try Task.checkCancellation()
@@ -131,9 +116,6 @@ actor SGStemSeparator {
             do { result = try gpu.prediction(from: provider) }
             catch {
                 try Task.checkCancellation()
-                // Going to the background can race the foreground check, and iOS then refuses the GPU.
-                // The same window goes to the warm CPU model with its timestamp kept, and the GPU is not
-                // asked again until Spotify has been inactive.
                 gpuFailed = true
                 NSLog("[spotifyglass] Sing using CPU after foreground prediction failed: %@", String(describing: error))
                 result = try cpu.prediction(from: provider)

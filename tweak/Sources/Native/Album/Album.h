@@ -1,5 +1,3 @@
-// Album: parts of the album page hidden one switch each, and the cover behind its header (Album.x).
-// An unset switch is off.
 #import <UIKit/UIKit.h>
 
 #define SGKeyAlbumBackdrop @"spotifyglass.albumBackdrop"

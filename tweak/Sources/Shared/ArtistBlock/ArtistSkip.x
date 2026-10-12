@@ -1,9 +1,3 @@
-// Skips a track by a blocked artist the moment the player moves onto it, whatever started it: the
-// queue, autoplay, a radio or a tap. The track is read off SPTEsperantoPlayer, the app's player,
-// which the now playing bar asks for its state from launch on; the full screen player's playback
-// controller only exists while that player does, so it is the skip's first choice, not the source. A
-// track change is heard from the lock screen's now playing info, which Spotify sets on every track.
-// A track is looked at once, so an update within it does not skip twice.
 #import <MediaPlayer/MediaPlayer.h>
 #import "Core/SGCore.h"
 #import "ArtistBlock.h"

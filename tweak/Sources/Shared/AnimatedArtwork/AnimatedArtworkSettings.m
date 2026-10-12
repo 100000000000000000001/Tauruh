@@ -39,7 +39,7 @@ NSArray *SGLockScreenMotionRows(void) {
             SGLockArtwork artwork = SGLockScreenArtwork();
             return artwork == SGLockArtworkMotion || artwork == SGLockArtworkEverySong;
         };
-        SGModRow *sources = SGMotionSourcesRow();
+        SGModRow *sources = nil;
         sources.visible = lowData.visible;
         return @[
             SGChoiceRow(@"Full-screen artwork", @"The Canvas or Apple Music's animated cover, or the lyrics a line at a time. "

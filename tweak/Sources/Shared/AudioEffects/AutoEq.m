@@ -142,12 +142,12 @@ static void changed(void) {
 
 // A headphone's correction is what the Graphic EQ plays, rather than nothing or the user's own curve.
 static BOOL correctionInUse(void) {
-    return SGDSPSwitch(SGKeyDSPGraphicEq) && SGDSPString(SGKeyDSPGraphicEqHeadphone).length;
+    return NO;
 }
 
 static void takeOff(void) {
     if (!correctionInUse()) return;
-    SGDSPSetString(SGKeyDSPGraphicEqHeadphone, @"");
+    SGDSPSetString(SGKeyDSPGraphicEq, @"");
     SGDSPSetSwitch(SGKeyDSPGraphicEq, NO);
 }
 
@@ -155,7 +155,7 @@ static void takeOff(void) {
 static void rememberPick(void) {
     if (!sg_outputUID.length || !outputs()[sg_outputUID]) return;
     BOOL on = correctionInUse();
-    setOutput(sg_outputUID, @{@"name": sg_outputName ?: sg_outputUID, @"path": on ? SGDSPString(SGKeyDSPGraphicEqHeadphone) : @"",
+    setOutput(sg_outputUID, @{@"name": sg_outputName ?: sg_outputUID, @"path": on ? nil : @"",
                               @"nodes": on ? SGDSPString(SGKeyDSPGraphicEqNodes) : @""});
     setFollowed(sg_outputUID);
     changed();
@@ -165,7 +165,7 @@ BOOL SGAutoEqApplyText(NSString *path, NSString *text) {
     NSString *line = SGDSPGraphicEqLine(text);
     if (!line || !path.length) return NO;
     SGDSPSetString(SGKeyDSPGraphicEqNodes, line);
-    SGDSPSetString(SGKeyDSPGraphicEqHeadphone, path);
+    SGDSPSetString(SGKeyDSPGraphicEq, path);
     SGDSPSetSwitch(SGKeyDSPGraphicEq, YES);
     // The correction is meant to be heard: the master switch, off until asked for, comes on with it.
     if (!SGDSPSwitch(SGKeyDSP)) SGDSPSetSwitch(SGKeyDSP, YES);
@@ -192,7 +192,7 @@ void SGAutoEqOutputChanged(NSString *uid, NSString *name) {
         NSString *path = entry[@"path"], *nodes = entry[@"nodes"];
         if (path.length && nodes.length) {
             SGDSPSetString(SGKeyDSPGraphicEqNodes, nodes);
-            SGDSPSetString(SGKeyDSPGraphicEqHeadphone, path);
+            SGDSPSetString(SGKeyDSPGraphicEq, path);
             SGDSPSetSwitch(SGKeyDSPGraphicEq, YES);
             SGLog(@"autoeq: %@ connected, its correction %@ on%@", sg_outputName, SGAutoEqNameOf(path), SGDSPSwitch(SGKeyDSP) ? @"" : @" (Audio effects are off)");
         } else {
@@ -202,7 +202,7 @@ void SGAutoEqOutputChanged(NSString *uid, NSString *name) {
         setFollowed(uid);
     } else if (followed().length) {
         // The correction came on for another output; this one has none.
-        if (correctionInUse()) SGLog(@"autoeq: %@ connected, with no correction remembered: %@ off", sg_outputName, SGAutoEqNameOf(SGDSPString(SGKeyDSPGraphicEqHeadphone)));
+        if (correctionInUse()) SGLog(@"autoeq: %@ connected, with no correction remembered: %@ off", sg_outputName, SGAutoEqNameOf(nil));
         takeOff();
         setFollowed(@"");
     }

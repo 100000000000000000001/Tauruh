@@ -5,9 +5,6 @@
 
 NSString *const SGFakePremiumWarning = @"This is the part of EeveeSpotify Spotify's takedown went after, and it has not been tested here. It can end in a forced logout or worse for the account. A Premium account gains nothing from it.";
 
-// Every switch here forces a flag Spotify ships on to off, so the titles name the blocking: on stops
-// the thing, off is Spotify's own value. Hide ads and Hide upsells already force the first two
-// sections off, which locks those rows.
 static UIViewController *adFlagsPage(void) {
     return [[SGModPage alloc] initWithTitle:@"Ad and upsell flags" intro:SGRestartNote sections:@[
         SGNotedSection(@"Ads", @[

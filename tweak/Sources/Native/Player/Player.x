@@ -1,25 +1,3 @@
-// Full screen player: glass where Liquid Glass belongs and nowhere else, and the album colour
-// behind it traded for the cover art.
-//
-// Glass is the navigation layer floating over content, so only the header's two round buttons get
-// a pane, the way the Music app keeps its chrome. The playlist name between them is a label, and
-// shuffle, repeat, previous, next and the footer (connect, share, queue) are bare glyphs over the
-// artwork next to Spotify's white play disc: a pane each turned both rows into a strip of glass
-// discs sampling one another, which is the one thing the material cannot do. The cards below the
-// player are surfaces rather than controls; the lyrics one is in LyricsCard.x.
-//
-// Tree (trees/now-playing.txt): NowPlaying_ModesImpl units, each a child controller whose view
-// holds one UIStackView row; the header row is chevron 48x48, playlist name 110x48, more 48x48.
-//
-// The background is one plane the size of the screen painted the album colour, Spotify's gradients
-// on top of it, and it is NPVBackgroundViewController's own view. Glass over a flat fill samples
-// that same flat fill back, which is why the header panes cannot be made out on it; white text and
-// Spotify's green both sit badly on saturated colour as well. SGKeyPlayerBackdrop strips the plane
-// and puts the cover behind the player instead, shrunk until none of the picture is left in it,
-// blurred, under a scrim ending near black so the cards scrolled up from below meet it. The switch
-// covers what that field changes around it too: the artwork takes corners and a shadow so it sits
-// on the field rather than being pasted onto it, the lyric under it drops behind the title in
-// contrast, and the timestamps take monospaced digits so they stop twitching every second.
 #import "Core/SGCore.h"
 #import "Native/Appearance/Repaint.h"
 #import "NowPlaying.h"
@@ -34,9 +12,6 @@ static BOOL backdropOn(void) {
 
 #pragma mark - glass behind the header buttons
 
-// A glass circle per round button in the unit's row: children about as wide as they are tall.
-// The playlist name is 110 wide against 48 tall, so it keeps no pane, and neither do the children
-// PlayerDeclutter.x made invisible.
 static void glassBehindRoundButtons(UIViewController *unit) {
     if (!SGFlag(SGKeyPlayer, NO)) return;
     UIView *host = unit.viewIfLoaded;
@@ -50,8 +25,6 @@ static void glassBehindRoundButtons(UIViewController *unit) {
         if (f.size.width > f.size.height * 1.4) continue;
         CGFloat side = MAX(kButtonMin, MIN(MAX(f.size.width, f.size.height), kButtonMax));
         UIVisualEffectView *glass = SGGlassAt(host, index++);
-        // Dark whatever the system is set to: the player is presented outside the navigation stacks
-        // Spotify makes dark itself, so its panes took the system's light glass on a phone in light mode.
         if (glass.overrideUserInterfaceStyle != UIUserInterfaceStyleDark) glass.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
         glass.frame = CGRectMake(CGRectGetMidX(f) - side / 2, CGRectGetMidY(f) - side / 2, side, side);
         SGShapeGlass(glass, side / 2, YES);
@@ -85,8 +58,6 @@ static void showCover(UIImage *cover) {
     } completion:nil];
 }
 
-// The covers are the cells of a list scrolled sideways, one per track in the queue; the cell under
-// the middle of the list is the one playing.
 static UIImage *coverInFront(UIScrollView *list) {
     CGFloat middle = list.contentOffset.x + list.bounds.size.width / 2;
     __block UIImage *cover = nil;
@@ -167,8 +138,6 @@ static UIView *backdropIn(UIView *plane) {
 %hook _TtC22Lyrics_NPVContainerKit19LyricsContainerView
 - (void)layoutSubviews {
     %orig;
-    // White at full strength, and alone in the space under the artwork, the line reads louder than
-    // the title it sits above. PlayerDeclutter.x hides the same view outright.
     if (backdropOn()) ((UIView *)self).alpha = 0.72;
 }
 %end
