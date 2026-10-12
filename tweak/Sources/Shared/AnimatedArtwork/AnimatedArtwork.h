@@ -9,6 +9,8 @@
 #define SGKeyFullScreenArtwork @"spotifyglass.lockscreen.artwork"
 #define SGKeyLockScreenMotion @"spotifyglass.lockscreen.motion"
 #define SGKeyLegacyLockScreenArtwork @"spotifyglass.lockscreen.animatedartwork"
+#define SGKeyLockScreenCanvasLyrics @"spotifyglass.lockscreen.canvasLyrics"
+#define SGKeyLockScreenStar @"spotifyglass.lockscreen.star"
 typedef NS_ENUM(NSInteger, SGLockArtwork) {
     SGLockArtworkOff = 0,
     SGLockArtworkMotion,   // the Canvas, else Apple Music's animated cover (LockScreenMotion.x)
@@ -17,6 +19,12 @@ typedef NS_ENUM(NSInteger, SGLockArtwork) {
 };
 // Off below iOS 26, which has no animated artwork on the lock screen.
 SGLockArtwork SGLockScreenArtwork(void);
+BOOL SGLockScreenCanvasLyricsEnabled(void);
+void SGLockScreenCanvasLyricsSetEnabled(BOOL enabled);
+void SGLockMotionShowPlain(BOOL plain);
+static inline BOOL SGLockArtworkHasMotion(SGLockArtwork artwork) {
+    return artwork == SGLockArtworkMotion || artwork == SGLockArtworkEverySong;
+}
 // How the lyrics are drawn, stored as the index of SGLyricsClipStyle (Still unless changed).
 #define SGKeyLockScreenLyricsStyle @"spotifyglass.lockscreen.lyricsStyle"
 // Off until switched on: download in Low Data Mode too.

@@ -4,15 +4,15 @@
 //
 //     Speed, Pitch & Reverb   opens the sliders in a popover from the ⋯ (SGPlayerMenuSpeedPitch): speed,
 //                             pitch, reverb and Pitch follows speed, as on Spotify's sheet (issue #14)
-//     Show Fluid Artwork, Show Animated Artwork, Show Visualizer
-//                             a button for each of the two the background is not, while it is one of the
-//                             three, named for what it switches to
+//     Canvas Lyrics           toggles synced lyrics over the lock screen's moving artwork
+//     Background Style        the five backgrounds offered in Player settings
 //
 // The item says under its name what is not as Spotify plays it, so the menu reads as a settings summary.
 #import "Core/SGCore.h"
 #import "Redesigned/ContextMenu/ContextMenu.h"
 #import "Shared/Player/PlayerState.h"
 #import "Shared/Player/SpeedPitch.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Player.h"
 
 static __weak UIView *sg_moreButton;   // the ⋯ the sliders' panel comes from
@@ -48,23 +48,48 @@ static UIAction *soundMenu(void) {
     return nil;
 }
 
-static NSArray<UIMenuElement *> *playerItems(void) {
-    NSMutableArray<UIMenuElement *> *items = [NSMutableArray arrayWithObject:soundMenu()];
-    if (SGPlayerMenuOffersAnimatedArtwork()) {
-        // Buttons named for what they do, not checkmarks: the HIG's changeable label for a toggled item.
-        NSArray<NSArray *> *backgrounds = @[
-            @[@(SGRPlayerBackgroundFluid), @"Show Fluid Artwork", @"drop"],
-            @[@(SGRPlayerBackgroundAnimated), @"Show Animated Artwork", @"play.rectangle.on.rectangle"],
-            @[@(SGRPlayerBackgroundVisualiser), @"Show Visualizer", @"waveform"],
-        ];
-        SGRPlayerBackgroundKind current = SGRPlayerBackground();
-        for (NSArray *background in backgrounds) {
-            SGRPlayerBackgroundKind kind = [background[0] integerValue];
-            if (kind == current) continue;
-            [items addObject:[UIAction actionWithTitle:background[1] image:symbol(background[2]) identifier:nil
-                                               handler:^(UIAction *action) { SGRPlayerMenuSetBackground(kind); }]];
-        }
+static UIMenu *backgroundStyleMenu(void) {
+    NSArray<NSString *> *names = SGRPlayerBackgroundNames();
+    SGRPlayerBackgroundKind current = SGRPlayerBackground();
+    NSMutableArray<UIMenuElement *> *choices = [NSMutableArray arrayWithCapacity:names.count];
+    for (NSUInteger index = 0; index < names.count; index++) {
+        SGRPlayerBackgroundKind kind = (SGRPlayerBackgroundKind)index;
+        UIMenuElementState state = kind == current ? UIMenuElementStateOn : UIMenuElementStateOff;
+        UIAction *choice = [UIAction actionWithTitle:names[index]
+                                               image:nil
+                                          identifier:nil
+                                  discoverabilityTitle:nil
+                                          attributes:UIMenuElementAttributesNone
+                                               state:state
+                                             handler:^(UIAction *action) { SGRPlayerMenuSetBackground(kind); }];
+        [choices addObject:choice];
     }
+    return [UIMenu menuWithTitle:@"Background Style"
+                           image:symbol(@"circle.lefthalf.filled")
+                      identifier:nil
+                         options:UIMenuOptionsSingleSelection
+                        children:choices];
+}
+
+static UIAction *canvasLyricsMenu(void) {
+    BOOL enabled = SGLockScreenCanvasLyricsEnabled();
+    return [UIAction actionWithTitle:@"Canvas Lyrics"
+                               image:symbol(@"star")
+                          identifier:nil
+                  discoverabilityTitle:nil
+                          attributes:UIMenuElementAttributesNone
+                               state:enabled ? UIMenuElementStateOn : UIMenuElementStateOff
+                             handler:^(UIAction *action) {
+        SGLockScreenCanvasLyricsSetEnabled(!SGLockScreenCanvasLyricsEnabled());
+    }];
+}
+
+static NSArray<UIMenuElement *> *playerItems(void) {
+    NSMutableArray<UIMenuElement *> *items = [NSMutableArray array];
+    UIAction *sound = soundMenu();
+    if (sound) [items addObject:sound];
+    [items addObject:canvasLyricsMenu()];
+    [items addObject:backgroundStyleMenu()];
     return items;
 }
 

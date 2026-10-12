@@ -45,6 +45,19 @@ static NSDictionary *noActions(void) {
     NSMutableArray<void (^)(void)> *_whenColored;
 }
 
+- (void)readPaletteForImage:(UIImage *)image animated:(BOOL)animated {
+    if (_fluid) [_fluidLayer setArtwork:image animated:animated && self.window != nil];
+    NSUInteger generation = ++_generation;
+    SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows};
+    if (_showsBackdrop && !_flows && !_fluid) request.backdropSize = CGSizeMake(self.bounds.size.width > 0 ? self.bounds.size.width : 402, [self backdropHeightNow]);
+    __weak SGRArtworkField *weakSelf = self;
+    [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
+        SGRArtworkField *field = weakSelf;
+        if (!field || !palette || generation != field->_generation) return;
+        [field applyPalette:palette animated:animated && field.window != nil];
+    }];
+}
+
 - (instancetype)initWithFrame:(CGRect)frame {
     if (!(self = [super initWithFrame:frame])) return nil;
     self.userInteractionEnabled = NO;
@@ -122,7 +135,7 @@ static NSDictionary *noActions(void) {
     // The fluid field is the whole picture, as the moving one is.
     _fluidLayer.hidden = !fluid || _covered;
     _black.hidden = fluid || _flows;
-    if (fluid) _backdrop.hidden = YES;
+    _backdrop.hidden = fluid || _flows;
     if (fluid && _image) [_fluidLayer setArtwork:_image animated:NO];
     [self watch];
     [self updateMotion];
@@ -139,9 +152,9 @@ static NSDictionary *noActions(void) {
         [self.layer insertSublayer:_flow above:_solid];
     }
     // The moving field is the whole picture: no still backdrop over it, no fade to black under it.
-    _black.hidden = flows;
-    if (flows) _backdrop.hidden = YES;
-    else _flow.hidden = YES;
+    _black.hidden = flows || _fluid;
+    _backdrop.hidden = flows || _fluid;
+    if (!flows) _flow.hidden = YES;
     [self watch];
     [self updateMotion];
     [self setNeedsLayout];
@@ -258,16 +271,11 @@ static NSDictionary *noActions(void) {
     if (!image || image == _image || (identity && [identity isEqualToString:_identity])) return;
     _image = image;
     _identity = [identity copy];
-    NSUInteger generation = ++_generation;
-    if (_fluid) [_fluidLayer setArtwork:image animated:animated && self.window != nil];
-    SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows};
-    if (_showsBackdrop && !_flows && !_fluid) request.backdropSize = CGSizeMake(self.bounds.size.width > 0 ? self.bounds.size.width : 402, [self backdropHeightNow]);
-    __weak SGRArtworkField *weakSelf = self;
-    [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
-        SGRArtworkField *field = weakSelf;
-        if (!field || !palette || generation != field->_generation) return;
-        [field applyPalette:palette animated:animated && field.window != nil];
-    }];
+    [self readPaletteForImage:image animated:animated];
+}
+
+- (void)refreshStyleAnimated:(BOOL)animated {
+    if (_image) [self readPaletteForImage:_image animated:animated];
 }
 
 - (void)applyPalette:(SGRPalette *)palette animated:(BOOL)animated {

@@ -23,6 +23,7 @@ static CFAbsoluteTime sg_spotifyInfoAt;
 static NSString *sg_shownLine;
 static BOOL sg_resending;
 static dispatch_source_t sg_timer;
+static BOOL artistLyricsOn(void);
 
 static NSString *textOf(NSArray<SGKaraokeWord *> *words) {
     SGKaraokeLine *line = [SGKaraokeLine new];
@@ -98,6 +99,11 @@ static NSDictionary *withLine(NSDictionary *info, NSString *line, double elapsed
 }
 
 static void tick(void) {
+    if (!artistLyricsOn()) {
+        sg_shownLine = nil;
+        setTicking(NO);
+        return;
+    }
     NSDictionary *info;
     CFAbsoluteTime reportedAt;
     @synchronized (sg_lock) {
@@ -146,6 +152,10 @@ static BOOL playingBy(NSDictionary *info) {
     return !rate || rate.doubleValue > 0;
 }
 
+static BOOL artistLyricsOn(void) {
+    return SGFlag(SGKeyLockScreenLyrics, NO);
+}
+
 %hook MPNowPlayingInfoCenter
 - (void)setNowPlayingInfo:(NSDictionary *)info {
     if (sg_resending) {
@@ -158,6 +168,19 @@ static BOOL playingBy(NSDictionary *info) {
         sg_spotifyInfoAt = now;
     }
     BOOL playing = playingBy(info) && info[MPNowPlayingInfoPropertyElapsedPlaybackTime] != nil;
+    if (!artistLyricsOn()) {
+        if (!NSThread.isMainThread) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                sg_shownLine = nil;
+                setTicking(NO);
+            });
+        } else {
+            sg_shownLine = nil;
+            setTicking(NO);
+        }
+        %orig;
+        return;
+    }
     // Karaoke's lyrics are main-thread state; off it the info goes out as it is and the next tick adds the line.
     if (!NSThread.isMainThread || !info[MPNowPlayingInfoPropertyElapsedPlaybackTime]) {
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -184,9 +207,8 @@ static BOOL playingBy(NSDictionary *info) {
 %end
 
 %ctor {
-    if (!SGFlag(SGKeyLockScreenLyrics, NO)) return;
     sg_lock = [NSObject new];
     %init;
     // The timer waits for Spotify to report a playing track; nothing before that has a line to show.
-    SGLog(@"lock screen lyrics: on");
+    if (artistLyricsOn()) SGLog(@"lock screen lyrics: artist name replaced");
 }

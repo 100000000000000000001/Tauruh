@@ -4,8 +4,8 @@
 // color rather than on the Fluid field. A blur comes in from the seam (from above the controls for a
 // Canvas as tall as the screen) and lies under the controls; behind the lyrics the whole clip is blurred.
 // The player's square cover goes while a clip plays, so a track without one keeps its cover over Fluid
-// (PlayerField.x keeps the field Fluid for this choice). The player's ⋯ menu switches between Animated
-// and Fluid at once (Shared/Player/SpeedPitch.h).
+// (PlayerField.x keeps the field Fluid for this choice). The player's ⋯ menu switches among every
+// background style in Player Settings.
 //
 // The clip is a subview of the field, not of the background plane: the plane's layout brings the field to
 // the front on every pass, and a sibling would end up under it. Each of the field's layout passes attaches
@@ -614,27 +614,33 @@ static BOOL beginTrack(NSString *track) {
     return YES;
 }
 
-#pragma mark - the ⋯ menu's switch (Shared/Player/SpeedPitch.h)
+#pragma mark - the ⋯ menu's background style
 
-// Fluid, Animated and the Visualizer share the field, so the menu moves between them without a restart. The
-// other backgrounds are a field of another kind, chosen on the Player page (PlayerSettings.m).
-BOOL SGPlayerMenuOffersAnimatedArtwork(void) {
-    return sg_follower && SGRPlayerBackground() >= SGRPlayerBackgroundFluid;
-}
-
-BOOL SGPlayerMenuAnimatedArtwork(void) {
-    return SGRPlayerBackground() == SGRPlayerBackgroundAnimated;
-}
-
-void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
-    if (!SGPlayerMenuOffersAnimatedArtwork() || on == SGPlayerMenuAnimatedArtwork()) return;
-    SGSetInt(SGRKeyPlayerBackground, on ? SGRPlayerBackgroundAnimated : SGRPlayerBackgroundFluid);
-    SGLog(@"redesign player: animated artwork switched %@ from the menu", on ? @"on" : @"off");
-    // The playing track is let go, and looked up again when switched on.
+static void restartAnimatedArtwork(void) {
+    if (!sg_follower) return;
     clear(YES);
     [sg_follower restart];
-    // From the Visualizer, whose hills go.
+}
+
+void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind) {
+    if (kind < SGRPlayerBackgroundStill || kind > SGRPlayerBackgroundVisualiser) {
+        SGLog(@"redesign player: ignored invalid background style %ld", (long)kind);
+        return;
+    }
+    SGRPlayerBackgroundKind current = SGRPlayerBackground();
+    if (kind == current) return;
+
+    SGSetInt(SGRKeyPlayerBackground, kind);
+    SGRArtworkField *field = SGRPlayerField();
+    if (field) {
+        field.fluid = kind >= SGRPlayerBackgroundFluid;
+        field.flows = kind == SGRPlayerBackgroundColours;
+        [field refreshStyleAnimated:YES];
+    }
+    if (current == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundAnimated) restartAnimatedArtwork();
     SGRPlayerVisualiserUpdate();
+    SGRPlayerHoldField();
+    SGLog(@"redesign player: background switched to %@ from the menu", SGRPlayerBackgroundNames()[(NSUInteger)kind]);
 }
 
 %group SGRVideoSurfaces
@@ -674,8 +680,6 @@ void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
 
 %ctor {
     if (!SGRedesignedUI()) return;
-    SGRPlayerBackgroundKind background = SGRPlayerBackground();
-    if (background < SGRPlayerBackgroundFluid) return;
     sg_videos = [NSHashTable weakObjectsHashTable];
     // Here rather than on the clip's view, which is gone while they hold it off: the track is walked again
     // as either changes. The power state is reported off the main thread, which must not wait for main

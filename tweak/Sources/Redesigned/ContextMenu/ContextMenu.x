@@ -1209,6 +1209,10 @@ static SGRMenuSession *takeOver(UIViewController *presented, NSString *via) {
         whyNot(via, YES, [NSString stringWithFormat:@"the ⋯ touched (%@) is off screen", NSStringFromClass(button.class)]);
         return nil;
     }
+    if ([button.accessibilityIdentifier isEqualToString:@"creator-page"]) {
+        whyNot(via, YES, @"artist pages keep Spotify's own menu");
+        return nil;
+    }
     static BOOL canPresent, checked;
     if (!checked) {
         checked = YES;

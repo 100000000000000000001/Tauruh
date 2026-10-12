@@ -17,6 +17,7 @@
 #import "AnimatedArtwork.h"
 #import "SGFluidClip.h"
 #import "SGMotionClip.h"
+#import "Shared/LockScreenLyrics/LockScreenLyrics.h"
 #import "Shared/LockScreenLyrics/SGLyricsClip.h"
 #import "Shared/Player/NowPlayingExtras.h"
 #import "Shared/Player/PlayerState.h"
@@ -30,9 +31,11 @@ static NSUInteger sg_walk;   // counts the tracks walked, so a poster that comes
 static SGLockArtwork sg_choice;
 static dispatch_queue_t sg_queue;   // cuts clips and makes the cover's, one at a time
 static SGMotionFollower *sg_follower;
+static NSURL *sg_lyricsFile;
+static BOOL sg_plain, sg_plainShown;
 
 static BOOL motionOn(SGLockArtwork choice) {
-    return choice == SGLockArtworkMotion || choice == SGLockArtworkEverySong;
+    return SGLockArtworkHasMotion(choice);
 }
 
 // The key a clip shown at `shown` goes under, and the shape it is cut to (width over height): 1:1 for a
@@ -149,21 +152,39 @@ static void showCover(NSString *picture) {
     SGLog(@"lock motion: no moving artwork, the cover's clip offered as %@", file.lastPathComponent);
 }
 
+void SGLockMotionShowPlain(BOOL plain) {
+    if (@available(iOS 26.0, *)) {
+        sg_plain = plain;
+        BOOL want = plain && SGLockScreenCanvasLyricsEnabled() && motionOn(sg_choice) && sg_lyricsFile;
+        if (want == sg_plainShown) return;
+        sg_plainShown = want;
+        if (want) show(sg_lyricsFile);
+        else SGNowPlayingSetExtras(@"motion", nil, nil);
+    }
+}
+
 %ctor {
     if (@available(iOS 26.0, *)) {
         sg_choice = SGLockScreenArtwork();
         sg_queue = dispatch_queue_create("spotifyglass.lockscreen.motion", DISPATCH_QUEUE_SERIAL);
+        __block BOOL canvasLyrics = SGLockScreenCanvasLyricsEnabled();
         // Each walk takes the last one's clip off first, so the lock screen falls back to the still cover.
         sg_follower = [[SGMotionFollower alloc] initWithBegin:^BOOL(NSString *uri, SPTPlayerState *state) {
             sg_walk++;
             SGNowPlayingSetExtras(@"motion", nil, nil);
+            sg_lyricsFile = nil;
+            sg_plainShown = NO;
             NSDictionary *metadata = [state.track.metadata isKindOfClass:NSDictionary.class] ? state.track.metadata : nil;
             sg_title = state.track.trackTitle;
             sg_picture = pictureOf(state.track, metadata);
             sg_choice = SGLockScreenArtwork();
             return motionOn(sg_choice);
         } found:^(NSString *uri, NSURL *file) {
-            if (file) show(file);
+            if (SGLockScreenCanvasLyricsEnabled() && motionOn(sg_choice)) {
+                sg_lyricsFile = file;
+                SGLyricsArtworkSetMotion(uri, file);
+                SGLockMotionShowPlain(sg_plain);
+            } else if (file) show(file);
             else if (sg_choice == SGLockArtworkEverySong) showCover(sg_picture);
         }];
         // Heard on the writing thread and handed to main without waiting: a main-queue observer makes every
@@ -172,9 +193,11 @@ static void showCover(NSString *picture) {
                                                     usingBlock:^(NSNotification *note) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 SGLockArtwork choice = SGLockScreenArtwork();
-                if (choice == sg_choice) return;
-                SGLog(@"lock motion: the choice changed to %ld, the playing track looked up again", (long)choice);
+                BOOL lyrics = SGLockScreenCanvasLyricsEnabled();
+                if (choice == sg_choice && lyrics == canvasLyrics) return;
+                SGLog(@"lock motion: the artwork choice or Canvas lyrics changed, the playing track looked up again");
                 sg_choice = choice;
+                canvasLyrics = lyrics;
                 [sg_follower restart];
             });
         }];

@@ -17,3 +17,7 @@ CGImageRef SGLyricsClipBackdrop(CGImageRef cover, CGSize size) CF_RETURNS_RETAIN
 CGImageRef SGLyricsClipFrame(CGImageRef backdrop, NSString *line, NSString *next, CGSize size) CF_RETURNS_RETAINED;
 // Writes the clip as H.264 to `file`, replacing it, and returns once it is written; NO if it was not.
 BOOL SGLyricsClipWrite(NSURL *file, CGImageRef backdrop, NSString *line, NSString *next, CGSize size, SGLyricsClipStyle style);
+BOOL SGLyricsClipWriteOverMotion(NSURL *file, NSURL *motion, NSString *previous, NSString *line, NSString *next,
+                                 double from, double seconds);
+NSString *SGLyricsClipLook(NSURL *motion, SGLyricsClipStyle style);
+CGImageRef SGLyricsClipMotionFrame(NSURL *motion, NSString *previous, NSString *line, NSString *next, double from) CF_RETURNS_RETAINED;

@@ -43,7 +43,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
         @"The cover, blurred and held still.",
         @"The cover's colors, drifting slowly.",
         @"The cover itself, blurred and slowly turning. It rests while a song is paused.",
-        @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between this, Fluid and Visualizer.",
+        @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between all five backgrounds.",
         @"The song's sound as gentle hills in the cover's colors, over Fluid held still. They settle while a song is paused.",
     ];
 }
@@ -360,9 +360,8 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         SGNotedSection(@"Mini player", SGRNowPlayingBarRows(),
                        @"Apple Music style moves the now playing bar in between two tabs as you scroll down."), nil];
     [sections addObjectsFromArray:more];
-    // Fluid, Animated and Visualizer share the field (PlayerMotion.x reads the choice on every track, PlayerVisualiser.m
-    // on the field's layout); Still and Colors are a field of another kind, made once a launch (PlayerField.x).
-    NSString *footer = @"Fluid, Animated and Visualizer change with the next song. Still, Colors and Hide on the player apply after you restart Spotify.";
+    // The settings page keeps its documented next-song/restart behavior; the player's menu changes the live field immediately.
+    NSString *footer = @"From the player's ⋯ menu, any background takes effect immediately. Here, Fluid, Animated and Visualizer change with the next song; Still, Colors and Hide on the player apply after you restart Spotify.";
     SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:footer];
     weakPage = page;
     page.showcase = showcase;

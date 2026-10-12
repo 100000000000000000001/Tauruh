@@ -23,5 +23,6 @@ extern NSNotificationName const SGRFieldColorDidChangeNotification;
 - (void)setProvisionalColor:(UIColor *)color;
 - (void)setPreferredColor:(UIColor *)color;
 - (void)setArtwork:(UIImage *)image identity:(NSString *)identity animated:(BOOL)animated;
+- (void)refreshStyleAnimated:(BOOL)animated;
 - (void)whenColored:(void (^)(void))colored;
 @end

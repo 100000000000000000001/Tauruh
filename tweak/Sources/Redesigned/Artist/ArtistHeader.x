@@ -238,7 +238,8 @@ static void applyHeader(UIView *header) {
     if (name && play && listening) SGRRevealMark(page, SGRRevealHeader);
 
     UIView *more = SGRFindByIdentifier(header, @"Components.UI.ContextMenuButton*", &kMoreKey);
-    SGRPinnedMore(page, &kMoreButtonKey, more);
+    SGRMirrorButton *pinnedMore = SGRPinnedMore(page, &kMoreButtonKey, more);
+    pinnedMore.layer.zPosition = SGRRevealWaitsFor(page, SGRRevealPage) ? 0 : 1;
 
     CGFloat alpha = MAX(0, MIN(1, (header.bounds.size.height - kBar) / kFade));
     if (fabs(info.alpha - alpha) > 0.01) info.alpha = alpha;

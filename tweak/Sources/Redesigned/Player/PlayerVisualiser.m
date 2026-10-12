@@ -1,6 +1,6 @@
 // Player redesign: the Visualizer background, a calm spectrum of what is playing behind the player, in the
 // cover's colors, over the Fluid field held still (PlayerField.x keeps the field Fluid for this choice, as for
-// Animated, so the ⋯ menu moves between the three without a restart).
+// Animated, so the ⋯ menu moves between all five background styles without a restart).
 //
 // The sound is Spotify's output as it plays, read on the render thread through the audio effects' notify
 // (SGAudioSetOutputReader, Shared/AudioEffects/AudioEffects.h) into SGRSpectrum.m's bands. Here, on the main
@@ -438,17 +438,4 @@ void SGRPlayerVisualiserUpdate(void) {
         BOOL open = SGRPlayerLyricsOpen();
         if (open != sg_view.blurred) [sg_view setBlurred:open animated:sg_view.window != nil];
     }
-}
-
-#pragma mark - the ⋯ menu's switch
-
-void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind) {
-    SGRPlayerBackgroundKind current = SGRPlayerBackground();
-    if (!SGPlayerMenuOffersAnimatedArtwork() || kind < SGRPlayerBackgroundFluid || kind == current) return;
-    // Animated's own switch lets the clip go or looks it up, and calls back here.
-    if (kind == SGRPlayerBackgroundAnimated || current == SGRPlayerBackgroundAnimated) SGPlayerMenuSetAnimatedArtwork(kind == SGRPlayerBackgroundAnimated);
-    if (kind != SGRPlayerBackgroundAnimated) SGSetInt(SGRKeyPlayerBackground, kind);
-    SGLog(@"redesign player: background switched to %@ from the menu", SGRPlayerBackgroundNames()[(NSUInteger)kind]);
-    SGRPlayerHoldField();
-    SGRPlayerVisualiserUpdate();
 }

@@ -102,12 +102,15 @@ Shared:
                   lyrics and show the card. has_lyrics is forced on for every track, the walk starts at the track change
                   for it and the next, and the player's card-loading timeout flag is forced to its 5 s maximum while a
                   source is on
-    LockScreenLyrics/ the line being sung in the system's now playing
+    LockScreenLyrics/ the artist-name replacement in system Now Playing, and the full-screen lyric clips,
+                       drawn over the moving artwork when Canvas lyrics is on
     LockScreenArtwork/ the track's Canvas or its album's Apple Music cover as the lock screen's animated
                   artwork, from iOS 26 (Apple takes an MPMediaItemAnimatedArtwork under one of
                   MPNowPlayingInfoCenter's animated artwork keys, and the mod puts one there through a second
-                  hook on setNowPlayingInfo:, so the lock screen lyrics' rewrites of the same dictionary carry
-                  it). The sources are asked in the user's order (Spotify, then Apple Music until set, on the
+                  hook on setNowPlayingInfo:, so the lock screen artwork and lyric clips' rewrites of the same dictionary carry
+                  it). With Canvas lyrics on, each lyric clip is composited over the moving video; the
+                  player menu and the lock-screen star toggle that independently of the artist-name setting.
+                  The sources are asked in the user's order (Spotify, then Apple Music until set, on the
                   shared Settings/SGOrderPage the lyrics sources use too). Spotify's URL comes off canvas.url
                   in the played track's metadata, which Spotify's core fills whatever
                   ios-feature-canvas.canvas_enabled says, and failing that from spotify.canvaz.cache with the
@@ -218,7 +221,9 @@ Redesigned:
                   through that ListRow; a page Spotify pushes onto the sheet (Share's destinations) shows the
                   sheet, and a sheet with no rows within 4 s is shown as it is. It opens on the rows the last
                   menu had, kept across launches, and moves to Spotify's as they come in, a tap meanwhile held
-                  until they do. Always on in the redesign. Tested in the simulator against harness/playermenu/
+                  until they do. Its star-marked Canvas Lyrics switch is live, and Background Style offers
+                  the same five choices as Player settings and applies them immediately. Always on in the redesign.
+                  Tested in the simulator against harness/playermenu/
                   With Sing on and its voice model downloaded (Mod Settings > Karaoke, Redesigned/Lyrics/SingSettings.m,
                   both applying at once), its microphone (Redesigned/Lyrics/SGRSingControl.m) sits in the
                   lyrics' bottom trailing corner, opposite their glass button, and goes down with the lines when the
@@ -268,6 +273,9 @@ Redesigned:
                   like, and whatever it adds next -- but the album's own line and its copyright (Album.h lists its
                   files). A podcast's episode page is the same template, so it is given the same field, and what it
                   paints over it is taken off. Laid out on the Mac against harness/album/
+    Artist/       the artist's photo dissolving into the black page, with its actions pinned above the scrolling
+                  header; Spotify's own three-dot menu stays in use on this page. Music-video rows and their headings
+                  are dropped, and pagination clears cached row positions so Show more remains below the tracks
 
 App:
 
@@ -313,9 +321,10 @@ what the restart will bring. In the redesign Karaoke comes next, on a card of it
 voice model's download (Redesigned/Lyrics/SingSettings.m), with Off, On, No model or the download's percentage
                 beside the row, "Needs iOS 18" below iOS 18. Then a card of parts. Navbar: the tab editor of the stored look,
 each with its own list of tabs. Lyrics, beside Player: the ordered list of lyrics sources, lyrics for every track,
-naming the source in the redesign, the lock screen, and glass lyrics in the native look; in the redesign also
+naming the source in the redesign, artist-name replacement on the lock screen (independent of Canvas lyrics),
+and glass lyrics in the native look; in the redesign also
 which of the lyrics, their pronunciation and their translation is set largest, and the translation's language.
-Player: Gestures, Blocked artists (with the count on the row) and Lock screen widget (its controls and, under Artwork, Animated lock screen, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls, on until switched off, with a Sources page for their order, and a "Needs iOS 26" row below that), which work with either look;
+Player: Gestures, Blocked artists (with the count on the row) and Lock screen widget (its controls and, under Artwork, Animated lock screen, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls, with optional Canvas lyrics toggled from the redesigned player's ⋯ menu or the lock-screen star, a Sources page for their order, and a "Needs iOS 26" row below that), which work with either look;
 in the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player

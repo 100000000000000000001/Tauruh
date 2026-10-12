@@ -14,9 +14,6 @@ typedef NS_ENUM(NSInteger, SGRPlayerBackgroundKind) {
 };
 SGRPlayerBackgroundKind SGRPlayerBackground(void);
 NSArray<NSString *> *SGRPlayerBackgroundNames(void);
-BOOL SGPlayerMenuOffersAnimatedArtwork(void);
-BOOL SGPlayerMenuAnimatedArtwork(void);
-void SGPlayerMenuSetAnimatedArtwork(BOOL on);
 
 #define SGRKeyPlayerMotion @"spotifyglass.redesign.player.movingBackground"
 #pragma mark - the ⋯ menu (PlayerMenu.x)

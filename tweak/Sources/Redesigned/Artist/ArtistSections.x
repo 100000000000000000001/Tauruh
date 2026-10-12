@@ -2,7 +2,7 @@
 #import "Redesigned/Kit/SGRKit.h"
 #import "Artist.h"
 
-static char kSettledKey, kKindsKey, kDroppedKey, kTrackKey;
+static char kSettledKey, kKindsKey, kDroppedKey, kCountsKey, kTrackKey;
 
 typedef NS_ENUM(NSInteger, SGRArtistCell) {
     SGRArtistCellOther,
@@ -45,6 +45,20 @@ static NSMutableSet<NSIndexPath *> *droppedOf(UICollectionView *list) {
         objc_setAssociatedObject(list, &kDroppedKey, dropped, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     return dropped;
+}
+
+static void refreshListState(UICollectionView *list) {
+    NSMutableArray<NSNumber *> *counts = [NSMutableArray arrayWithCapacity:list.numberOfSections];
+    for (NSInteger section = 0; section < list.numberOfSections; section++) {
+        [counts addObject:@([list numberOfItemsInSection:section])];
+    }
+    NSArray<NSNumber *> *previous = objc_getAssociatedObject(list, &kCountsKey);
+    if (previous && ![previous isEqualToArray:counts]) {
+        // Pagination shifts index paths; cached video drops must not land on the newly appended rows.
+        [kindsOf(list) removeAllObjects];
+        [droppedOf(list) removeAllObjects];
+    }
+    objc_setAssociatedObject(list, &kCountsKey, [counts copy], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 static UICollectionView *listOf(UIView *cell) {
@@ -120,6 +134,7 @@ static void logOnce(NSString *what) {
         return %orig;
     }
     UICollectionViewLayoutAttributes *result = %orig;
+    refreshListState(list);
     NSIndexPath *path = attributes.indexPath;
     UIView *content = cell.contentView.subviews.firstObject ?: cell.contentView;
     SGRArtistCell kind = kindOf(content, result.size.height);
