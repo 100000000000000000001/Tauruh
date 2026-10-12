@@ -46,7 +46,7 @@ static void checkInstalled(void) {
     assert([model isEqualToString:under(@"separator.mlmodelc").path]);
     for (NSString *name in @[@"weights/weight.bin", @"model.mil", @"metadata.json", @"coremldata.bin", @"analytics/coremldata.bin"])
         assert(exists([NSURL fileURLWithPath:[model stringByAppendingPathComponent:name]]));
-    assert(!exists(under(@"Download")));
+    assert(!exists(under(@"Download-vitrine-ane")));
     NSNumber *excluded = nil;
     [folder() getResourceValue:&excluded forKey:NSURLIsExcludedFromBackupKey error:nil];
     assert(excluded.boolValue);
@@ -68,7 +68,8 @@ static void corrupted(void) {
     assert(SGSingModelCurrentState() == SGSingModelMissing && !SGSingModelPath());
     assert([SGSingModelFailure() containsString:@"didn't match"]);
     // The corrupted graph is gone; nothing was put in place.
-    assert(!exists(under(@"Download/1.part")) && !exists(under(@"Download/separator.mlmodelc/model.mil")));
+    assert(!exists(under(@"Download-vitrine-ane/3.part")) &&
+           !exists(under(@"Download-vitrine-ane/separator.mlmodelc/model.mil")));
     assert(!exists(under(@"separator.mlmodelc")));
     printf("corrupted model.mil rejected and deleted: %s\n", SGSingModelFailure().UTF8String);
     removeAll();
@@ -81,7 +82,7 @@ static void cancelAndResume(void) {
     SGSingModelCancel();
     assert(SGSingModelCurrentState() == SGSingModelMissing && !SGSingModelFailure());
     // The weights keep what came in for the resume, written once the task hands it over.
-    assert(waitFor(10, ^{ return (BOOL)exists(under(@"Download/0.resume")); }));
+    assert(waitFor(10, ^{ return (BOOL)exists(under(@"Download-vitrine-ane/4.resume")); }));
     int64_t kept = SGSingModelReceived();
     assert(kept > 100ll << 20 && kept < SGSingModelSize());
     printf("cancelled at %lld of %lld bytes, resume kept\n", kept, SGSingModelSize());
@@ -108,8 +109,8 @@ int main(int argc, char **argv) { @autoreleasepool {
     NSString *mode = argc > 1 ? @(argv[1]) : @"all";
     if ([mode isEqualToString:@"all"]) {
         [NSUserDefaults.standardUserDefaults removeObjectForKey:SGKeySingModelDownload];
-        assert(SGSingModelCurrentState() == SGSingModelMissing && SGSingModelSize() == 489658578);
-        assert([SGSingModelBytesText(SGSingModelSize()) isEqualToString:@"467 MB"]);
+        assert(SGSingModelCurrentState() == SGSingModelMissing && SGSingModelSize() == 210426814);
+        assert([SGSingModelBytesText(SGSingModelSize()) isEqualToString:@"201 MB"]);
         corrupted();
         cancelAndResume();
         removeAll();

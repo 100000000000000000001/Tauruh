@@ -17,7 +17,7 @@ int64_t SGSingModelSize(void);       // all of it, as pinned
 int64_t SGSingModelReceived(void);   // what of it is on this iPhone, checked or not
 NSString *SGSingModelFailure(void);  // why the last download stopped short, nil unless it did
 NSString *SGSingModelPath(void);     // the installed separator.mlmodelc, nil without one
-NSString *SGSingModelBytesText(int64_t bytes);   // "467 MB", in the units the rows use
+NSString *SGSingModelBytesText(int64_t bytes);   // rounded MiB, in the units the rows use
 
 // What keeps a download from starting: too little free space, said with how much it needs. Nil when none.
 NSString *SGSingModelSpaceProblem(void);

@@ -110,6 +110,8 @@ Shared:
                   hook on setNowPlayingInfo:, so the lock screen artwork and lyric clips' rewrites of the same dictionary carry
                   it). With Canvas lyrics on, each lyric clip is composited over the moving video; the
                   player menu and the lock-screen star toggle that independently of the artist-name setting.
+                  The Canvas lyrics switch stays visible even while full-screen artwork is off, so it can be
+                  prepared before choosing Moving artwork or Every song.
                   The sources are asked in the user's order (Spotify, then Apple Music until set, on the
                   shared Settings/SGOrderPage the lyrics sources use too). Spotify's URL comes off canvas.url
                   in the played track's metadata, which Spotify's core fills whatever
@@ -134,11 +136,12 @@ Shared:
                   packet queue is bounded and generation-stamped. Sing's source read-ahead reads guarded queue metadata
                   for the verified Spotify binary; PCM still comes through its AudioUnit. Boundary tests are in harness/audio/ and harness/sing/
     Sing/         the local Core ML separator, source-domain audio adapter, worker and player lifecycle, from iOS 18. Core ML
-                  uses the GPU in the foreground and its warm CPU model in the background. The audible
+                  uses Vitrine's Neural Engine model in the foreground and its warm CPU model in the background. The audible
                   clock follows emitted source samples while delayed audio drains. Model loading overlaps source capture;
                   verified continuous next-track PCM keeps its worker and reserve across a natural transition.
                   Redesigned/Lyrics owns the Now Playing microphone control and Mod Settings' Karaoke page. The voice
-                  model (about 470 MB) is not in the IPA: SGSingModel.m downloads its files from the model host in a
+                  model (about 201 MiB) is not in the IPA: SGSingModel.m downloads My-Name-Is-Jeff/vitrine-sing's
+                  separator-ane.mlmodelc in a
                   background URL session, checks each against a size and a SHA-256 pinned in the code, and moves
                   them into Application Support/spoti.pw/Sing only when all are right (SingModel.x reconnects at
                   launch). Tested against harness/sing/ (the download against a local server, model_test.py)
@@ -275,7 +278,7 @@ Redesigned:
                   paints over it is taken off. Laid out on the Mac against harness/album/
     Artist/       the artist's photo dissolving into the black page, with its actions pinned above the scrolling
                   header; Spotify's own three-dot menu stays in use on this page. Music-video rows and their headings
-                  are dropped, and pagination clears cached row positions so Show more remains below the tracks
+                  are dropped; the page list invalidates cached row positions when pagination changes section counts
 
 App:
 
@@ -323,12 +326,15 @@ voice model's download (Redesigned/Lyrics/SingSettings.m), with Off, On, No mode
 each with its own list of tabs. Lyrics, beside Player: the ordered list of lyrics sources, lyrics for every track,
 naming the source in the redesign, artist-name replacement on the lock screen (independent of Canvas lyrics),
 and glass lyrics in the native look; in the redesign also
-which of the lyrics, their pronunciation and their translation is set largest, and the translation's language.
+which of the lyrics, their pronunciation and their translation is set largest, Genius meaning marks (which can
+be hidden without losing the hold-on-a-line meaning sheet), and the translation's language.
 Player: Gestures, Blocked artists (with the count on the row) and Lock screen widget (its controls and, under Artwork, Animated lock screen, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls, with optional Canvas lyrics toggled from the redesigned player's ⋯ menu or the lock-screen star, a Sources page for their order, and a "Needs iOS 26" row below that), which work with either look;
 in the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
-buttons to hide); in the redesign instead Now playing (its device button and the moving background). Then Vibrations under either look, a card for
+buttons to hide); in the redesign instead Now Playing (its device button and moving background, the volume slider
+visible by default with its thumb hidden by default, each independently switchable). Then Vibrations
+under either look, a card for
 Controls (on until switched off) and one for Music Haptics (off until switched on, with an ⓘ saying it
 follows the sound this iPhone plays while Spotify is open), each opening out while its switch is on:
 Controls into its Strength (10 to 100%, a tap at the new strength with each step), Music Haptics into its
@@ -343,9 +349,9 @@ out Off, On or how many effects are on. Home & Library, in the native look only:
 the Gradient page (the wash behind the top of Home in one of eight colours, at three strengths and
 four heights) and the Home flags, the parts of Home to hide including the DJ button and badge, the
 playlist header, buttons and pills to hide, and the Library flags. Then Premium, ads & privacy
-(EeveeSpotify's Hide ads and Hide upsells, hiding the video carousel and social proof in Search, and
+(EeveeSpotify's Hide ads and Hide upsells, on by default, hiding the video carousel and social proof in Search, and
 an Ad and upsell flags page under them, every switch there forcing a flag Spotify ships on to off;
-Spoof Premium; Block telemetry; then what the ad
+Spoof Premium, on by default; Block telemetry; then what the ad
 blocking and the telemetry blocking have stopped) and Labs (features Spotify built and did not ship,
 AI Chat (Martini) first). Last, All flags, Spotify's remote-config flags with a search field and an
 Auto / Off / On control per flag (a text field for the number and text ones), and Mod: Updates

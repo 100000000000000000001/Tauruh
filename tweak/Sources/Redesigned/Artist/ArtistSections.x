@@ -57,6 +57,8 @@ static void refreshListState(UICollectionView *list) {
         // Pagination shifts index paths; cached video drops must not land on the newly appended rows.
         [kindsOf(list) removeAllObjects];
         [droppedOf(list) removeAllObjects];
+        __weak UICollectionView *weakList = list;
+        dispatch_async(dispatch_get_main_queue(), ^{ [weakList.collectionViewLayout invalidateLayout]; });
     }
     objc_setAssociatedObject(list, &kCountsKey, [counts copy], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }

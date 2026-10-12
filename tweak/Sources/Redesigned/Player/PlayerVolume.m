@@ -46,6 +46,17 @@ static UIImage *thumbImage(void) {
     }];
 }
 
+static UIImage *hiddenThumbImage(void) {
+    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+    format.opaque = NO;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(1, 1) format:format];
+    return [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {}];
+}
+
+static UIImage *volumeThumbImage(void) {
+    return SGFlag(SGRKeyHidePlayerVolumeThumb, YES) ? hiddenThumbImage() : thumbImage();
+}
+
 static UIImageView *glyph(NSString *symbol) {
     UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:kGlyphSize weight:UIImageSymbolWeightSemibold];
     UIImageView *view = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:symbol withConfiguration:configuration]];
@@ -64,7 +75,9 @@ static UIImageView *glyph(NSString *symbol) {
 #pragma clang diagnostic pop
     [_volume setMinimumVolumeSliderImage:trackImage(UIColor.whiteColor) forState:UIControlStateNormal];
     [_volume setMaximumVolumeSliderImage:trackImage([UIColor colorWithWhite:1 alpha:0.22]) forState:UIControlStateNormal];
-    [_volume setVolumeThumbImage:thumbImage() forState:UIControlStateNormal];
+    UIImage *thumb = volumeThumbImage();
+    [_volume setVolumeThumbImage:thumb forState:UIControlStateNormal];
+    [_volume setVolumeThumbImage:thumb forState:UIControlStateHighlighted];
     _quiet = glyph(@"speaker.fill");
     _loud = glyph(@"speaker.wave.3.fill");
     [self addSubview:_quiet];
@@ -89,12 +102,24 @@ static UIImageView *glyph(NSString *symbol) {
 @end
 
 static char kVolumeKey, kPlayKey;
+static NSString *const kVolumeDefaultMigration = @"spotifyglass.redesign.player.volumeDefaultMigration";
 
 // Read at launch, as the player's other switches are: the footer asks on every layout pass.
 BOOL SGRPlayerVolumeOn(void) {
     static BOOL on;
     static dispatch_once_t once;
-    dispatch_once(&once, ^{ on = SGEnabled(SGRKeyPlayerVolume); });
+    dispatch_once(&once, ^{
+        NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+        if (![defaults boolForKey:kVolumeDefaultMigration]) {
+            id legacy = [defaults objectForKey:SGRKeyPlayerVolume];
+            id hidden = [defaults objectForKey:SGRKeyHidePlayerVolume];
+            // The earlier hide-by-default implementation persisted its default as a user choice.
+            if (!legacy && [hidden boolValue]) [defaults removeObjectForKey:SGRKeyHidePlayerVolume];
+            [defaults setBool:YES forKey:kVolumeDefaultMigration];
+        }
+        id hidden = [defaults objectForKey:SGRKeyHidePlayerVolume];
+        on = hidden ? ![hidden boolValue] : SGFlag(SGRKeyPlayerVolume, YES);
+    });
     return on;
 }
 

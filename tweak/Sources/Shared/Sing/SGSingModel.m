@@ -8,22 +8,23 @@
 NSNotificationName const SGSingModelDidChangeNotification = @"spotifyglass.singModelChanged";
 
 #ifndef SGSingModelBase
-#define SGSingModelBase @"https://huggingface.co/Darkkos/spoti-sing/resolve/main/"
+#define SGSingModelBase @"https://huggingface.co/My-Name-Is-Jeff/vitrine-sing/resolve/main/"
 #endif
 #ifndef SGSingModelRoot
 #define SGSingModelRoot nil
 #endif
 
 static const struct { const char *path; int64_t size; const char *sha256; } kFiles[] = {
-    {"weights/weight.bin", 488986336, "970a99fb4b15724bf76d2918ceb177df592c69265d3e2fabaab6e5ba72738e62"},
-    {"model.mil", 669061, "966560ed5125174a98f19b94f5de04450a7112ade0e731f2236c202c0280a623"},
-    {"metadata.json", 2431, "52a8d5e3f09e33236d495dbed5bbce1c75bac6f2a6b6097637cf214f37c1de53"},
-    {"coremldata.bin", 507, "2090acaf7a6df72ec83857cb88d101654023a6baad222a25d0173827d3347e28"},
-    {"analytics/coremldata.bin", 243, "f7ee4ec9b5cc1c97171bd5aad93af61e183aa0db1451ef3b775bd4e77f0b7cfd"},
+    {"metadata.json", 2333, "101714d1a37ad29c70bf1705ec25ec99584c3cbce27f2245858ace06dacbfb44"},
+    {"coremldata.bin", 388, "bcfd38a8b121681dfb9fdfe6f9d88ffb29068e0dd6d24d4012f4c3a7bdcbc81b"},
+    {"analytics/coremldata.bin", 243, "55f78aab64f5b1250ce4d6016dff23aee43fb97feb77bbceab4e36b3d9ccffb3"},
+    {"model.mil", 1346642, "957024c1075fe331f7ca3410b8bf5e2f83a58c61763caf154729829ce0a92d08"},
+    {"weights/weight.bin", 209077208, "bb4a0effafb5121b9aaa5ea96371fa14d0d8dc30a5ae44a93e0c15a2f4077635"},
 };
 enum { kFileCount = sizeof kFiles / sizeof *kFiles };
 
 static NSString *const kSessionIdentifier = @"spotifyglass.sing.model";
+static NSString *const kRepoFolder = @"separator-ane.mlmodelc";
 static const int64_t kHeadroom = 64ll << 20;               // free space left over once the model is in
 static const NSTimeInterval kProgressInterval = 0.25;      // between two progress notifications
 
@@ -41,6 +42,7 @@ static NSTimeInterval sg_lastPost;
 #pragma mark - the files
 
 static NSString *pathOf(int i) { return @(kFiles[i].path); }
+static NSString *repoPathOf(int i) { return [kRepoFolder stringByAppendingFormat:@"/%@", pathOf(i)]; }
 
 static NSURL *singFolder(void) {
     static NSURL *folder;
@@ -53,7 +55,7 @@ static NSURL *singFolder(void) {
     return folder;
 }
 static NSURL *installedModel(void) { return [singFolder() URLByAppendingPathComponent:@"separator.mlmodelc" isDirectory:YES]; }
-static NSURL *staging(void) { return [singFolder() URLByAppendingPathComponent:@"Download" isDirectory:YES]; }
+static NSURL *staging(void) { return [singFolder() URLByAppendingPathComponent:@"Download-vitrine-ane" isDirectory:YES]; }
 static NSURL *stagedModel(void) { return [staging() URLByAppendingPathComponent:@"separator.mlmodelc" isDirectory:YES]; }
 static NSURL *stagedFile(int i) { return [stagedModel() URLByAppendingPathComponent:pathOf(i)]; }
 // Where a file waits for its hash, and where a stopped download of it keeps what it needs to resume.
@@ -179,14 +181,14 @@ static void startFile(int i) {
     }
     sg_fromResume[i] = task != nil;
     if (!task) {
-        NSURL *url = [NSURL URLWithString:pathOf(i) relativeToURL:[NSURL URLWithString:SGSingModelBase]];
+        NSURL *url = [NSURL URLWithString:repoPathOf(i) relativeToURL:[NSURL URLWithString:SGSingModelBase]];
         NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url.absoluteURL];
         request.allowsExpensiveNetworkAccess = sg_metered;
         request.allowsConstrainedNetworkAccess = sg_metered;
         task = [session() downloadTaskWithRequest:request];
         sg_bytes[i] = 0;
     }
-    task.taskDescription = pathOf(i);
+    task.taskDescription = repoPathOf(i);
     task.countOfBytesClientExpectsToReceive = kFiles[i].size;
     sg_tasks[@(i)] = task;
     [task resume];
@@ -258,7 +260,7 @@ static void check(int i) {
 }
 
 static int indexOf(NSURLSessionTask *task) {
-    for (int i = 0; i < kFileCount; i++) if ([task.taskDescription isEqualToString:pathOf(i)]) return i;
+    for (int i = 0; i < kFileCount; i++) if ([task.taskDescription isEqualToString:repoPathOf(i)]) return i;
     return -1;
 }
 

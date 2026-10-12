@@ -83,7 +83,7 @@ static void allowRadioRequest(id request, Class options) {
 }
 
 __attribute__((constructor)) static void SGRadioModesInstall(void) {
-    if (!SGHidden(SGKeyFakePremium)) return;
+    if (!SGFlag(SGKeyFakePremium, YES)) return;
     Class restrictions = objc_getClass("SPTPlayerRestrictions");
     Class player = objc_getClass("SPTEsperantoPlayer");
     Class options = objc_getClass("ESPCommandOptions");

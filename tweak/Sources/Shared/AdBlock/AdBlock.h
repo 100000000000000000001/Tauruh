@@ -1,12 +1,12 @@
-// EeveeSpotify's layers, ported, at the top of the Premium, ads & privacy page. Three switches, each off until asked for. Hide ads
-// keeps the ad services from starting (AdServices.x), takes ad components out of Home and Search
-// before they render (AdHubs.x, Feeds.m) and answers the requests behind them empty (AdNetwork.x).
-// Hide upsells drops the Premium prompts (AdPopups.x, AdServices.x) and forces the flags that show
-// them off (AdBlock.m, through Flags.x). Spoof Premium rewrites the product state and remote
-// config as they arrive (Premium.m), crossfade and automix included (Crossfade.x), enables shuffle
-// and repeat in radio/autoplay (RadioModes.m), and keeps the
-// session alive when the server disagrees (AdNetwork.x). Hide the video carousel in Search forces its
-// flag off (AdBlock.m, through Flags.x).
+// EeveeSpotify's layers, ported, at the top of the Premium, ads & privacy page. Hide ads and Hide
+// upsells are on by default; Hide ads keeps the ad services from starting (AdServices.x), takes ad
+// components out of Home and Search before they render (AdHubs.x, Feeds.m), and answers their
+// requests empty (AdNetwork.x). Hide upsells drops Premium prompts (AdPopups.x, AdServices.x) and
+// forces the flags that show them off (AdBlock.m, through Flags.x). Spoof Premium rewrites product
+// state and remote config as they arrive (Premium.m), crossfade and automix included (Crossfade.x),
+// enables shuffle and repeat in radio/autoplay (RadioModes.m), and keeps the session alive when the
+// server disagrees (AdNetwork.x). Hide the video carousel in Search forces its flag off (AdBlock.m,
+// through Flags.x).
 #import <UIKit/UIKit.h>
 
 #define SGKeyHideAds @"spotifyglass.adblock.ads"

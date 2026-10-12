@@ -90,7 +90,7 @@ UIViewController *SGLyricsSettingsPage(void) {
         SGModRow *landscape = SGSwitchRow(@"Landscape lyrics", @"Show lyrics beside the player controls", SGRKeyLandscapeLyrics);
         landscape.changed = ^(BOOL on) { SGRPlayerLyricsOrientationChanged(); };
         [sections addObject:SGSection(@"Display", @[landscape, SGLyricsWordTimingRow(), SGLyricsRomanisedRow(), SGLyricsDelayRow(),
-            SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow()])];
+            SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow(), SGLyricsMeaningMarkersRow()])];
         [sections addObject:SGSection(@"Translation", @[SGTranslateEverySongRow(), SGGeminiKeyRow(), SGSavedTranslationsRow()])];
     }
     [sections addObject:SGSection(nil, more)];

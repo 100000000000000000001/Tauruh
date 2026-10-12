@@ -13,6 +13,12 @@ static const double kLeastShared = 0.75;
 @implementation SGLyricsMeaning
 @end
 
+NSNotificationName const SGLyricsMeaningMarkersDidChangeNotification = @"spotifyglass.lyricsMeaningMarkersDidChange";
+
+BOOL SGLyricsMeaningMarkersShown(void) {
+    return SGFlag(SGKeyLyricsMeaningMarkers, YES);
+}
+
 SGLyricsMeaningsLevel SGLyricsMeaningsShown(void) {
     NSInteger level = SGInt(SGKeyLyricsMeanings, SGLyricsMeaningsAll);
     return level >= SGLyricsMeaningsOff && level <= SGLyricsMeaningsAll ? level : SGLyricsMeaningsOff;
@@ -22,6 +28,15 @@ SGModRow *SGLyricsMeaningsRow(void) {
     SGModRow *row = SGChoiceRow(@"Line meanings", nil, SGKeyLyricsMeanings,
                                 @[@"Off", @"From the artist", @"Artist and editors", @"Everyone"], SGLyricsMeaningsAll);
     row.choiceFooter = @"Explanations from Genius. Tap the bubble after a line, or hold the line.";
+    return row;
+}
+
+SGModRow *SGLyricsMeaningMarkersRow(void) {
+    SGModRow *row = SGSwitchRow(@"Genius meaning markers", @"Show a mark on lyrics lines with Genius explanations",
+                                SGKeyLyricsMeaningMarkers);
+    row.changed = ^(BOOL on) {
+        [NSNotificationCenter.defaultCenter postNotificationName:SGLyricsMeaningMarkersDidChangeNotification object:nil];
+    };
     return row;
 }
 

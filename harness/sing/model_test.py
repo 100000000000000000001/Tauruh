@@ -68,7 +68,7 @@ class Handler(BaseHTTPRequestHandler):
             self.answer(404, b"not found", "text/plain")
             return
         size, modified = path.stat().st_size, int(path.stat().st_mtime)
-        corrupt = Server.corrupt and name == GRAPH
+        corrupt = Server.corrupt and name == f"separator-ane.mlmodelc/{GRAPH}"
         tag = f'"{size}-{modified}-{int(corrupt)}"'
         start, end = 0, size - 1
         wanted = re.fullmatch(r"bytes=(\d+)-(\d*)", self.headers.get("Range", ""))
@@ -76,7 +76,7 @@ class Handler(BaseHTTPRequestHandler):
         if ranged:
             start = int(wanted[1])
             end = int(wanted[2]) if wanted[2] else size - 1
-        if name == WEIGHTS:
+        if name == f"separator-ane.mlmodelc/{WEIGHTS}":
             Server.offset, Server.requests = start, Server.requests + 1
         self.send_response(206 if ranged else 200)
         self.send_header("Content-Type", "application/octet-stream")
@@ -97,7 +97,7 @@ class Handler(BaseHTTPRequestHandler):
                         data[-1] ^= 0xFF
                     self.wfile.write(data)
                     at += len(data)
-                    if name == WEIGHTS and Server.throttle:
+                    if name == f"separator-ane.mlmodelc/{WEIGHTS}" and Server.throttle:
                         time.sleep(len(data) / Server.throttle)
         except (BrokenPipeError, ConnectionResetError):
             pass   # the client cancelled

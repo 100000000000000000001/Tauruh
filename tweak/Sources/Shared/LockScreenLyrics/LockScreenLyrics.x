@@ -153,6 +153,29 @@ static BOOL playingBy(NSDictionary *info) {
     return !rate || rate.doubleValue > 0;
 }
 
+static void refreshArtistLyrics(void) {
+    NSDictionary *info;
+    CFAbsoluteTime reportedAt;
+    @synchronized (sg_lock) {
+        info = sg_spotifyInfo;
+        reportedAt = sg_spotifyInfoAt;
+    }
+    BOOL enabled = artistLyricsOn();
+    BOOL playing = info && playingBy(info) && info[MPNowPlayingInfoPropertyElapsedPlaybackTime] != nil;
+    setTicking(enabled && playing);
+    if (!enabled) {
+        sg_shownLine = nil;
+        if (info) {
+            sg_resending = YES;
+            MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo =
+                withLine(info, nil, elapsedAt(info, reportedAt, CFAbsoluteTimeGetCurrent()));
+            sg_resending = NO;
+        }
+    } else if (playing) {
+        tick();
+    }
+}
+
 static BOOL artistLyricsOn(void) {
     return SGFlag(SGKeyLockScreenLyrics, NO);
 }
@@ -210,6 +233,10 @@ static BOOL artistLyricsOn(void) {
 %ctor {
     sg_lock = [NSObject new];
     %init;
+    [NSNotificationCenter.defaultCenter addObserverForName:NSUserDefaultsDidChangeNotification object:nil queue:nil
+                                                usingBlock:^(NSNotification *note) {
+        dispatch_async(dispatch_get_main_queue(), ^{ refreshArtistLyrics(); });
+    }];
     // The timer waits for Spotify to report a playing track; nothing before that has a line to show.
     if (artistLyricsOn()) SGLog(@"lock screen lyrics: artist name replaced");
 }

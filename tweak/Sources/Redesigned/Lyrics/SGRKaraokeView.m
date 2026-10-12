@@ -819,7 +819,7 @@ static const NSUInteger kLinesPerFrame = 4;
     _bubble = nil;
     [_underline removeFromSuperlayer];
     _underline = nil;
-    if (!meanings.count || !_lyricWords.count) return;
+    if (!SGLyricsMeaningMarkersShown() || !meanings.count || !_lyricWords.count) return;
     if (meanings.firstObject.author == SGLyricsMeaningByArtist) {
         SGRKaraokeWordView *last = _lyricWords.lastObject;
         BOOL rightToLeft = readsRightToLeft(SGKaraokeLineText(_line));
@@ -1053,6 +1053,7 @@ typedef struct {
 @interface SGRKaraokeView () <UIScrollViewDelegate>
 - (void)translateWith:(SGRTranslator)translator;
 - (void)translationsChanged;
+- (void)meaningMarkersChanged;
 - (BOOL)anyUntranslated:(NSArray<SGKaraokeLine *> *)lines;
 - (void)takeTranslations:(NSArray<NSString *> *)translations into:(NSArray<SGKaraokeLine *> *)lines;
 @end
@@ -1150,6 +1151,7 @@ typedef struct {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(restyle) name:SGRLyricsTextDidChangeNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(rebuild) name:SGLyricsRomanisedDidChangeNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(translationsChanged) name:SGLyricsTranslationsDidChangeNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(meaningMarkersChanged) name:SGLyricsMeaningMarkersDidChangeNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(linesChanged:) name:SGKaraokeLinesDidChangeNotification object:nil];
     // A locked phone leaves the card in its window, so the link has to be put down by the app going
     // away rather than by the view going: see scheduleLink.
@@ -1162,6 +1164,10 @@ typedef struct {
     [NSNotificationCenter.defaultCenter removeObserver:self];
     free(_spans);
     free(_breaks);
+}
+
+- (void)meaningMarkersChanged {
+    for (NSNumber *key in _shown) [_shown[key] markMeaning:_meanings[key]];
 }
 
 - (void)tapped:(UITapGestureRecognizer *)tap {

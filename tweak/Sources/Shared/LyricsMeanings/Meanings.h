@@ -3,6 +3,8 @@
 
 // Whose annotations show, as SGLyricsMeaningsLevel; unset is off.
 #define SGKeyLyricsMeanings @"spotifyglass.lyricsMeanings"
+#define SGKeyLyricsMeaningMarkers @"spotifyglass.lyricsMeanings.markers"
+extern NSNotificationName const SGLyricsMeaningMarkersDidChangeNotification;
 
 typedef NS_ENUM(NSInteger, SGLyricsMeaningsLevel) {
     SGLyricsMeaningsOff = 0,
@@ -28,6 +30,8 @@ typedef NS_ENUM(NSUInteger, SGLyricsMeaningAuthor) {
 SGLyricsMeaningsLevel SGLyricsMeaningsShown(void);
 @class SGModRow;
 SGModRow *SGLyricsMeaningsRow(void);
+SGModRow *SGLyricsMeaningMarkersRow(void);
+BOOL SGLyricsMeaningMarkersShown(void);
 
 void SGLyricsMeaningsFor(NSString *trackID, NSArray<SGKaraokeLine *> *lines,
                          void (^done)(NSDictionary<NSNumber *, NSArray<SGLyricsMeaning *> *> *byLine));

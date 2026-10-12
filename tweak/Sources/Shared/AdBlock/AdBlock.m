@@ -83,8 +83,8 @@ static BOOL listed(NSString *key, NSString *const list[], size_t count) {
 enum { kAds = 1, kVideos = 2, kUpsells = 4 };
 
 static unsigned switchesNow(void) {
-    return (SGHidden(SGKeyHideAds) ? kAds : 0) | (SGHidden(SGKeyHideSearchVideos) ? kVideos : 0)
-         | (SGHidden(SGKeyHideUpsells) ? kUpsells : 0);
+    return (SGFlag(SGKeyHideAds, YES) ? kAds : 0) | (SGFlag(SGKeyHideSearchVideos, YES) ? kVideos : 0)
+         | (SGFlag(SGKeyHideUpsells, YES) ? kUpsells : 0);
 }
 
 static NSNumber *forcedValue(NSString *key, unsigned on) {

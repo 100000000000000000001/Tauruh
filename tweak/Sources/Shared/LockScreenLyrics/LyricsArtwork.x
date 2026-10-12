@@ -356,7 +356,8 @@ static void setTicking(BOOL on) {
                 [observer playerStateDidChange:SGPlayerState()];
             });
         }];
-        SGLog(@"lock lyrics: %@, the lock screen takes %@", choice == SGLockArtworkLyrics || canvasLyrics ? @"on" : @"off",
+        BOOL lyricsOn = choice == SGLockArtworkLyrics || (canvasLyrics && SGLockArtworkHasMotion(choice));
+        SGLog(@"lock lyrics: %@, the lock screen takes %@", lyricsOn ? @"on" : @"off",
               MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys);
     }
 }

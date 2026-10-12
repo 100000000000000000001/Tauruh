@@ -1,8 +1,9 @@
 # Sing
 
 Sing turns a song's vocals down, anywhere from 20 to 100 %, while Spotify plays it, from the
-redesigned player's lyrics. The vocals are separated on the iPhone by a Core ML export of
-Mel-Band RoFormer; no audio leaves the phone. It needs iOS 18.
+redesigned player's lyrics. The vocals are separated on the iPhone by Vitrine's full Neural Engine
+Core ML export of Mel-Band RoFormer, mirrored at `My-Name-Is-Jeff/vitrine-sing`; no audio leaves
+the phone. It needs iOS 18.
 
 ## Audio and model integration
 
@@ -49,14 +50,16 @@ format failures stop Sing and keep the original audio playing.
 
 ## The model
 
-The separator is Mel-Band RoFormer with the pinned third-party checkpoint below, exported by
-`export_coreml.py` as the model's spectral core alone (`SepCore` of the pinned conversion). The
-worker performs the 2,048-point periodic-Hann STFT and its inverse with Accelerate, using reflected
-boundaries, a 441-sample step and window-weight normalization (`SGStemSpectralDSP.swift`). Core ML
-receives a float32 tensor `[1, 2050, 201, 2]`, `spectrum`, and returns `vocals_spectrum` in the
-same layout: two seconds of audio per prediction. Reusable FFT plans, the input tensor and the
-inverse accumulator belong to the separator's actor; model loading and prediction never run on
-UIKit or RemoteIO.
+The app downloads the five files of Vitrine's `separator-ane.mlmodelc` from
+`https://huggingface.co/My-Name-Is-Jeff/vitrine-sing/resolve/main/separator-ane.mlmodelc/`,
+pinned by size and SHA-256 in `SGSingModel.m`. The Vitrine 6-bit Neural Engine export has the same
+two-second spectral contract as the earlier model: `spectrum` `[1, 2050, 201, 2]` in,
+`vocals_spectrum` out. Its Core ML schema uses Float16 input and output; the worker supplies the
+Float32 input accepted by the model and converts the Float16 output to Float32. The worker performs
+the 2,048-point periodic-Hann STFT and its inverse with Accelerate, using reflected boundaries, a
+441-sample step and window-weight normalization (`SGStemSpectralDSP.swift`). Reusable FFT plans,
+the input tensor and the inverse accumulator belong to the separator's actor; model loading and
+prediction never run on UIKit or RemoteIO.
 
 The streaming worker overlap-adds two-second windows with a 1.5-second hop and a 0.5-second
 linear overlap. One zero-input prediction on each loaded copy warms the model before the worker
@@ -64,50 +67,25 @@ announces Ready, so first-use allocation happens while Spotify still plays its o
 The model store shares that load, keeps it warm for 60 seconds across seeks and songs, and purges
 it on memory or thermal pressure.
 
-The same compiled model is loaded twice: once with `.cpuOnly`, used whenever Spotify is not the
-active app (iOS refuses GPU work from the background), and once with `.cpuAndGPU`, used while it is.
-If backgrounding races a GPU submission, that window is retried on the CPU with its timestamp
-kept, and the GPU is not asked again until Spotify has been inactive. A GPU copy that fails to
-load leaves the CPU one doing everything.
-
-The export uses mixed precision: normalization, its denominator replication, attention, softmax
-and matrix products stay FP32 (the seven operation types in `model.json`), the rest FP16. Keeping
-only normalization in FP32 failed parity, and an FP16 `tile` made silence non-finite because its
-1e-12 floor rounded to zero. In the paired Mac benchmark the mixed model took 0.472–0.476 seconds
-per window against 0.675–0.715 for FP32, with cosine 0.999995 and RMS ratio 0.998743 against the
-reference, and peak RSS fell from about 1.91 GB to 1.52 GB. Three short corpus excerpts changed SDR
-by at most 0.018 dB; silence, quiet input, a silent channel and boundary impulses stay finite, and
-silence stays exactly zero. These are conversion checks, not a listening study.
-
-On an iPhone 17 Pro a ten-minute model-only probe of the CPU/GPU pair completed 401 windows,
-364 of them in the background, without missing a 1.5-second hop: about 0.30 s per window in the
-foreground and 0.53 s in the background. Inside Spotify, 149 seconds of foreground playback ran
-without recovery, and a 295-second run passed foreground, background and foreground again, kept
-70 % and an explicit Off, and crossed a natural track transition, with a 1.354-second worst window.
-A CPU-only model could not sustain Sing in the foreground once the phone was warm (1.59–2.42 s per
-window), which is why the GPU copy exists. Seamless song boundaries, locked-screen playback and a
-sustained thermal run are still open, so `deviceValidated` in `model.json` stays false.
-
-Experiments and their outcome:
-
-| Experiment | Observation | Decision |
-| --- | --- | --- |
-| Spectral Core ML FP16, CPU | Cosine 0.9318 and RMS ratio 0.9590 against the FP32 reference | Rejected |
-| Spectral Core ML FP32, CPU | Parity and a short background test pass; a warm foreground run missed the hop deadline | Kept as the full-precision comparison export |
-| INT8 weights with FP32 CPU activations | Passed parity; missed 43 deadlines in a five-minute isolated iPhone run | Rejected |
-| Core ML fast-prediction specialization, FP32 CPU | No clear speed gain; slower loading and about 200 MB more resident memory | Not adopted |
-| Mixed precision, CPU and Neural Engine | 1.67–2.02 s per 1.5 s hop on the Mac; two iPhone attempts ended with signal 9 while preparing | Not adopted |
-| Mixed precision, CPU only | Parity, edge cases and worker recovery pass; too slow in the foreground once warm | Superseded by the CPU/GPU pair |
-| Mixed precision, CPU/GPU in the foreground and CPU in the background | Ten-minute iPhone probe without a missed deadline; Spotify runs above | Used |
+The separator loads with `.cpuOnly` as a fallback and with `.cpuAndNeuralEngine` for use while
+Spotify is active. If the app backgrounds during a Neural Engine prediction, the worker retries the
+window on CPU with its timestamp kept; a failed accelerated copy leaves CPU inference available.
+Vitrine reports 14.58 dB SDR on four MUSDB18 excerpts and 226–359 ms per 1.5 seconds of audio on an
+iPhone 15 Pro. These are the mirror's measurements, not validation of this tweak's end-to-end audio
+pipeline. The production model's latency, quality and locked-screen behavior still need device
+verification.
 
 ## Checks
+
+The DSP, timeline, controller and Swift utility tests do not validate the production separator.
+The golden/model comparison utilities here and under Legacy export use the previous local model.
+Use the Vitrine fixture and downloader test below for production bundle integrity; on-device
+separation quality and playback still need device verification.
 
 ```sh
 python3 harness/sing/test.py                 # DSP, timeline and stream, ASan/UBSan
 TSAN=1 python3 harness/sing/test.py          # the same under ThreadSanitizer
 python3 harness/sing/test_controller.py <booted-iOS-27-simulator-UDID>
-python3 harness/sing/fetch_goldens.py        # golden_raw.f32 and golden_vocals.f32 into build/goldens
-python3 harness/sing/test_worker.py /path/to/separator.mlmodelc harness/sing/build/goldens/golden_raw.f32
 ```
 
 The C tests run the production packet queue, mixer, timeline and stream: wraparound, queue
@@ -126,7 +104,7 @@ Play, keeping 70 % through a loading/track transition, continuing the expected n
 repeat-one with the same worker, interruptions, backgrounding, and an explicit Off. It is not a
 live Spotify playback test.
 
-The worker test runs the real model through the production stream at 44.1 kHz callback cadence,
+The legacy worker test runs the previous local model through the production stream at 44.1 kHz callback cadence,
 checking sample order through activation and a drain back to direct audio, disabling during an
 in-flight inference, a withheld result that forces recovery (which must end within the stream's
 eight-second budget), unloading while the model prepares, and rendering from the first callback
@@ -171,7 +149,10 @@ a cloud-synced folder. Install it with `xcrun devicectl device install app`; lau
 or `-hopSeconds 1` for another cadence. It stops at serious heat or when it leaves the foreground,
 and writes `Documents/progress.json` and `Documents/result.json`. It runs no Spotify and no audio.
 
-## Exporting
+## Legacy export and comparison tooling
+
+The exporter and model-comparison tools below describe the previous local Float32 model. They are
+not used to produce or validate the Vitrine bundle downloaded by the app.
 
 `export_coreml.py` takes the pinned conversion and reference checkouts, the checkpoint, the
 original golden input and a new output directory. It verifies their provenance, traces the
@@ -193,25 +174,25 @@ with it.
 python harness/sing/export_coreml.py zoo ref MelBandRoformer.ckpt build/goldens/golden_raw.f32 export --unpinned-tools
 ```
 
-The model the app downloads is that public-tools export (`export.unpinnedPayloadHashes`).
+The app downloads Vitrine's pinned `separator-ane.mlmodelc` bundle instead.
 
 ## The model on the phone
 
 The model is not in the IPA. In the redesigned look, **Mod Settings → Karaoke**
 has Sing's switch, which puts the microphone in the player's lyrics and takes it away at once (off,
-Sing does no work), and the voice model's row: Not downloaded, Downloading 43 % · 210 of 467 MB with
-a bar under it and Cancel download, Checking…, Downloaded · 467 MB with Remove voice model, or
+Sing does no work), and the voice model's row: Not downloaded, Downloading 43 % · 86 of 201 MB with
+a bar under it and Cancel download, Checking…, Downloaded · 201 MB with Remove voice model, or
 Paused / Download failed, whose tap says why. Below iOS 18 the section is a "Needs iOS 18" row.
 
-`Shared/Sing/SGSingModel.m` downloads the five files of `separator.mlmodelc` one by one from
-`https://huggingface.co/Darkkos/spoti-sing/resolve/main/<path>` (no archive: iOS has no public
-unzip) and pins each file's size and SHA-256 in its table; nothing the server says about them is
-trusted. It checks for free space first (the model plus 64 MB), asks before using a cellular or Low
+`Shared/Sing/SGSingModel.m` downloads the five files of Vitrine's full `separator-ane.mlmodelc`
+one by one from `https://huggingface.co/My-Name-Is-Jeff/vitrine-sing/resolve/main/separator-ane.mlmodelc/<path>`
+(no archive: iOS has no public unzip) and pins each file's size and SHA-256 in its table; nothing the
+server says about them is trusted. It checks for free space first (the model plus 64 MB), asks before using a cellular or Low
 Data Mode network, and otherwise keeps off them and waits for Wi-Fi. The download runs in a
 background `URLSession`, so it goes on while Spotify is away; the app delegate is given
 `application:handleEventsForBackgroundURLSession:completionHandler:` for it (Spotify's has none), and
 a launch reconnects to a download left running by the session's identifier. Each file lands in
-`Library/Application Support/spoti.pw/Sing/Download/`, is hashed off the main thread and named there
+`Library/Application Support/spoti.pw/Sing/Download-vitrine-ane/`, is hashed off the main thread and named there
 only if it is the pinned one; a file that is not is deleted and stops the download. Cancel keeps each
 file's resume data, and Download goes on from it (a resume that fails starts that file over, once).
 Once every file is in, the staged `separator.mlmodelc` becomes
@@ -220,14 +201,12 @@ excluded from the iCloud backup. Remove deletes the folder and drops the warm mo
 loads the model from there; without it Sing is unavailable and the lyrics show no microphone.
 
 ```sh
-python3 harness/sing/stage_model.py export/separator.mlmodelc build/spoti-sing
-python3 harness/sing/model_test.py build/spoti-sing
+python3 harness/sing/stage_model.py /path/to/vitrine/separator-ane.mlmodelc build/model-fixture
+python3 harness/sing/model_test.py build/model-fixture
 ```
 
-`stage_model.py` makes the folder to upload to the model repository, the model's files at their
-paths with `NOTICE` and a model card, and prints the manifest the way `SGSingModel.m` pins it,
-saying whether the code pins that one; a new export needs the table replaced before it ships.
-`model_test.py` serves such a folder on localhost and runs the production download code against it
+`stage_model.py` stages only the exact pinned Vitrine ANE bundle as a local fixture; it uploads
+nothing. `model_test.py` serves that folder on localhost and runs the production download code against it
 in a real background session on the Mac (ASan/UBSan): a corrupted `model.mil` rejected and deleted, a
 cancel at 100 MB resumed from where it stopped (the server sees the range), the install, a download
 left running by one process and picked up by the next, and removal.
@@ -237,11 +216,8 @@ left running by one process and picked up by the next, and removal.
 The full-screen view, lyrics host, header, footer, controls and hosting controller names were
 verified in the user-supplied Spotify **9.1.78** IPA. No Spotify binary or lyrics are committed.
 
-Model provenance is pinned in [the manifest](model.json):
-
-* [Conversion](https://github.com/john-rocky/coreai-model-zoo/tree/5029e6df8100650fe175d3e276fffb0177754ca1/conversion/melband_roformer).
-* [Golden input and vocals](https://huggingface.co/mlboydaisuke/MelBandRoformer-Vocal-CoreAI/tree/06f257a0d1d2ee4938595f872a23e9fc4c3fc97d), model card explicitly tagged MIT.
-* [Checkpoint](https://huggingface.co/KimberleyJSN/melbandroformer/tree/ac9b0614ab3cd7f77219e18ba494dfd93956c348), weight repository explicitly tagged MIT.
+The production bundle's pinned manifest and provenance are documented in
+[Vitrine's model card](https://huggingface.co/My-Name-Is-Jeff/vitrine-sing).
 
 Attribution: Mel-Band RoFormer by Ju-Chiang Wang, Wei-Tsung Lu and Minz Won; the vocal checkpoint
 by KimberleyJensen; lucidrains' BS-RoFormer implementation; ZFTurbo training code; the conversion

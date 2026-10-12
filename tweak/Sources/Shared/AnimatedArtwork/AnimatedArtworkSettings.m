@@ -44,10 +44,8 @@ NSArray *SGLockScreenMotionRows(void) {
         style.visible = ^BOOL { return SGLockScreenArtwork() == SGLockArtworkLyrics; };
         SGModRow *canvasLyrics = SGOptionRow(@"Canvas lyrics", @"Show synced lines over the moving artwork",
                                              SGKeyLockScreenCanvasLyrics);
-        canvasLyrics.visible = ^BOOL { return SGLockArtworkHasMotion(SGLockScreenArtwork()); };
         SGModRow *star = SGOptionRow(@"Switch with the star", @"Use the lock-screen favorite star to toggle Canvas lyrics",
                                      SGKeyLockScreenStar);
-        star.visible = ^BOOL { return SGLockArtworkHasMotion(SGLockScreenArtwork()); };
         SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Moving artwork, up to about 7 MB a song", SGKeyMotionLowData);
         lowData.visible = ^BOOL { return SGLockArtworkHasMotion(SGLockScreenArtwork()); };
         SGModRow *sources = SGMotionSourcesRow();

@@ -49,20 +49,21 @@ UIViewController *SGAdsSettingsPage(void) {
     [counts addObject:SGActionRow(@"Reset the counters", nil, ^{ SGResetAdBlock(); })];
 
     SGModRow *fakePremium = SGOptionRow(@"Spoof Premium", nil, SGKeyFakePremium);
+    fakePremium.defaultOn = YES;
     fakePremium.warning = SGFakePremiumWarning;
 
     // The redesign's Search keeps only its category cards, so the video carousel switch is the native look's.
     NSMutableArray<SGModRow *> *ads = [NSMutableArray arrayWithObjects:
-        SGWithSymbol(SGOptionRow(@"Hide ads", nil, SGKeyHideAds), @"speaker.slash"),
-        SGWithSymbol(SGOptionRow(@"Hide upsells", nil, SGKeyHideUpsells), @"hand.raised"), nil];
-    if (!SGRedesignedUIStored()) [ads addObject:SGWithSymbol(SGOptionRow(@"Hide the video carousel in Search", nil, SGKeyHideSearchVideos), @"play.rectangle.on.rectangle")];
+        SGWithSymbol(SGSwitchRow(@"Hide ads", nil, SGKeyHideAds), @"speaker.slash"),
+        SGWithSymbol(SGSwitchRow(@"Hide upsells", nil, SGKeyHideUpsells), @"hand.raised"), nil];
+    if (!SGRedesignedUIStored()) [ads addObject:SGWithSymbol(SGSwitchRow(@"Hide the video carousel in Search", nil, SGKeyHideSearchVideos), @"play.rectangle.on.rectangle")];
     [ads addObject:SGWithSymbol(SGPageRow(@"Ad and upsell flags", ^UIViewController *{ return adFlagsPage(); }), @"flag")];
 
     return [[SGModPage alloc] initWithTitle:@"Premium, ads & privacy" intro:SGRestartNote sections:@[
         SGNotedSection(@"Ads", ads, @"Audio ads between songs need Spoof Premium."),
         SGNotedSection(@"Premium", @[
             SGWithSymbol(fakePremium, @"crown"),
-        ], @"Free accounts only."),
+        ], @"Enabled by default. For free accounts only; Spoof Premium is unstable and may force a logout."),
         SGPrivacySection(),
         SGNotedSection(@"Ads blocked so far", counts,
                        @"\"3 of 214\" is 3 stopped of 214 checked. 0 of 0 means Spotify never asked, so that part does nothing on this version."),

@@ -51,6 +51,8 @@ void SGRPlayerLyricsChanged(void);
 
 // The system volume slider below the player controls.
 #define SGRKeyPlayerVolume @"spotifyglass.redesign.player.volume"
+#define SGRKeyHidePlayerVolume @"spotifyglass.redesign.player.hideVolume"
+#define SGRKeyHidePlayerVolumeThumb @"spotifyglass.redesign.player.hideVolumeThumb"
 BOOL SGRPlayerVolumeOn(void);
 BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat margin);
 

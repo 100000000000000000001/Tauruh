@@ -83,7 +83,6 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
     [_mastheadTitle sizeToFit];
     _mastheadTitle.textColor = SGRainbowTextColor(_mastheadTitle.bounds.size.width, _mastheadTitle.bounds.size.height, 0);
     _mastheadByline = [UILabel new];
-    _mastheadByline.text = @"by Samj & Natasha";
     _mastheadByline.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
     _mastheadByline.textColor = [UIColor colorWithWhite:1 alpha:0.72];
     _mastheadByline.textAlignment = NSTextAlignmentRight;
@@ -104,6 +103,7 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    _mastheadByline.text = arc4random_uniform(2) ? @"by natsha and samj." : @"by samj and natsha.";
     [self startRainbow];
 }
 
