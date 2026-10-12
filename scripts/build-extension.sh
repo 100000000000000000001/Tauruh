@@ -15,6 +15,7 @@ OUT="${2:?usage: $0 <host Info.plist> <out dir>}"
 NAME=SpotifyGlassLiveActivity
 APPEX="$OUT/$NAME.appex"
 SHARED="$ROOT/tweak/Sources/Shared/LiveActivity/LiveActivityShared.swift"
+SHORTCUTS="$ROOT/tweak/Sources/Shared/LiveActivity/AppShortcuts.swift"
 WIDGET="$ROOT/extension/LiveActivity/LiveActivityWidget.swift"
 
 SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
@@ -55,9 +56,9 @@ sed -e "s/HOST_BUNDLE_ID/$(plutil -extract CFBundleIdentifier raw -o - "$HOST_PL
     "$ROOT/extension/LiveActivity/Info.plist" > "$APPEX/Info.plist"
 plutil -convert binary1 "$APPEX/Info.plist"
 
-# The taps' intents run inside Spotify, so Spotify's metadata has to name them too, under the
-# module the tweak compiles them in (Theos names it after the tweak instance).
-metadata spotifyglass 16.0 "$OUT/app" "$SHARED"
+# The taps' intents run inside Spotify, so Spotify's metadata has to name them too, under the module the
+# tweak compiles them in (Theos names it after the tweak instance), the App Shortcuts provider with them.
+metadata spotifyglass 16.0 "$OUT/app" "$SHARED" "$SHORTCUTS"
 
 codesign -f -s - "$APPEX" >/dev/null 2>&1
 rm -rf "$WORK"

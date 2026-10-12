@@ -1,6 +1,6 @@
 // Player redesign: the cover sits on the field with continuous corners and a soft shadow, and shrinks
-// back while playback is paused, the way the Music app's does. Spotify's lyric preview under it, and the cover's size
-// beside it, are Spotify's, as its own lyrics setting has them.
+// back while playback is paused, the way the Music app's does; the lyric preview under it is the
+// page's own view at the size of Spotify's room, so the line sweeps word by word.
 //
 // Tree (trees/clean/player/01.txt:36-43): CoverArtCellImpl > ... > CoverArtTiltView 354x354 > an
 // ElementView the same size > ImageViewProxy > Encore.ImageView (clips) > UIImageView, with
@@ -14,12 +14,15 @@
 // grow before a close.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Redesigned/Lyrics/SGRKaraokeView.h"
 #import "Shared/Haptics/Haptics.h"
 #import "Shared/Player/SpeedPitch.h"
 #import "Player.h"
+#import <objc/runtime.h>
 
 static const CGFloat kPausedScale = 0.84;
-// The bar's 40pt cover lives in a tilt view of its own; the player's is 354.
+// The bar's 40pt cover lives in a tilt view of its own; the player's is 354. The preview's room under
+// the cover is the player's too; a smaller one is another preview, not ours.
 static const CGFloat kCoverMinWidth = 200;
 
 static char kPlateKey;
@@ -279,6 +282,36 @@ static void watchHold(UIView *tilt) {
 }
 %end
 
+// The lyric preview under the cover (Lyrics_NPVContainerKit.LyricsContainerView, 01.txt:35): Spotify's
+// one line is replaced with ours, the page's own view (Redesigned/Lyrics/SGRKaraokeView.h) at the size
+// of the room, so the line sweeps word by word under the artwork as it does on the full screen. The
+// view dims the rest of its host while it has lines, which is Spotify's own line; a song it cannot
+// time, or one with no lyrics at all, leaves it hidden and Spotify's line is back. A tap on the
+// preview still goes to Spotify, whose view remains the one under ours to receive it.
+static const void *kPreviewKey;
+
+%hook _TtC22Lyrics_NPVContainerKit19LyricsContainerView
+- (void)layoutSubviews {
+    %orig;
+    UIView *host = (UIView *)self;
+    CGRect bounds = host.bounds;
+    if (bounds.size.width < kCoverMinWidth || bounds.size.height <= 0) return;
+    SGRKaraokeView *preview = objc_getAssociatedObject(host, &kPreviewKey);
+    if (!preview) {
+        preview = [[SGRKaraokeView alloc] initWithFrame:bounds];
+        preview.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [host addSubview:preview];
+        objc_setAssociatedObject(host, &kPreviewKey, preview, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        static dispatch_once_t once;
+        dispatch_once(&once, ^{ SGLog(@"redesign player: lyric preview at %.0fx%.0f taken by the mod", bounds.size.width, bounds.size.height); });
+    }
+    preview.frame = bounds;
+    // One line reads at about half the room's height; a room that grows or shrinks takes the font with it.
+    [preview useCompactFontSize:MAX(13, MIN(22, bounds.size.height * 0.5))];
+    [preview syncSiblings];   // a line Spotify puts in after ours was built is dimmed too
+}
+%end
+
 // The cover's image (ImageViewProxy > Encore.ImageView) keeps the size Spotify gave it for a cell with the preview,
 // 317 in a 345 box on a track with lyrics, at the box's top left: the image sat off center with a blank band right
 // and under it (issue #21). In the player's cover it fills the box the cover now is, whatever size it is given.
@@ -363,5 +396,6 @@ static SGRPlayerArtworkWatcher *sg_artworkWatcher;
     SGRequireClasses(@[
         @"_TtC35CreativeWorkCommons_CoverArtTiltKit16CoverArtTiltView",
         @"_TtC28NowPlaying_ContentLayersImpl16CoverArtCellImpl",
+        @"_TtC22Lyrics_NPVContainerKit19LyricsContainerView",
     ]);
 }

@@ -62,8 +62,8 @@ static const double kRetrySeconds = 2;
     SGLosslessLowerQuality(_nextHas);
 
     if (!_path || _busy || SGLosslessPlaying()) return;
-    if (!state.isPlaying || state.isPaused || NO || SGSingEnabled()) return;
-    uint64_t epoch = 0ULL;
+    if (!state.isPlaying || state.isPaused || fabs(state.playbackSpeed - 1) > 0.001 || SGSingEnabled()) return;
+    uint64_t epoch = SGPlayerSourceEpoch();
     if (_gaveUpEpoch && _gaveUpEpoch == epoch) return;
     double now = CFAbsoluteTimeGetCurrent();
     if (now < _retryAt) return;
@@ -86,7 +86,7 @@ static const double kRetrySeconds = 2;
             self->_retryAt = CFAbsoluteTimeGetCurrent() + kRetrySeconds;
             if (++self->_failures >= kTries) {
                 self->_failures = 0;
-                self->_gaveUpEpoch = 0ULL;
+                self->_gaveUpEpoch = SGPlayerSourceEpoch();
                 SGLog(@"lossless: gave up on %@ until the source changes: %@", path.lastPathComponent, error);
             } else {
                 SGLog(@"lossless: no anchor (%@)", error);

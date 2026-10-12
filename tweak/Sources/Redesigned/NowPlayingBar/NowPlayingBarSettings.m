@@ -13,3 +13,11 @@ UIViewController *SGRNowPlayingBarSettingsPage(void) {
         ]),
     ] footer:nil];
 }
+
+// The Mini player section on the redesign's Player page: Spotify's own flag for the bar moving in between
+// the tabs as the page scrolls (the Apple Music style transition the section's footer describes).
+NSArray<SGModRow *> *SGRNowPlayingBarRows(void) {
+    return @[
+        SGFlagRow(@"Mini player transition animations", @"ios-feature-nowplaying.miniplayer_transition_animations"),
+    ];
+}

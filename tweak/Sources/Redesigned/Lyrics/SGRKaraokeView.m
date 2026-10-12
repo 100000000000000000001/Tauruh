@@ -21,6 +21,7 @@
 #import <NaturalLanguage/NaturalLanguage.h>
 
 static const CGFloat kFontSize = 30, kMargin = 24, kLineGap = 24, kRowTighten = 2;
+static const CGFloat kCompactMargin = 24, kCompactGap = 6;   // the preview under the player's cover: tighter room, a peek of the next line
 static const CGFloat kDimAlpha = 0.3, kFillEdge = 22, kLift = 2.5, kDimScale = 0.97;
 static const CGFloat kAnchor = 0.28;   // where the sung line rests, as a share of the height
 static const CGFloat kEdgeFade = 0.1;  // the lines fade out over this share at the top and bottom
@@ -439,6 +440,18 @@ static CGFloat layPair(NSArray<SGKaraokeWord *> *lead, UIFont *leadFont, NSArray
     return bottom;
 }
 
+// The Lyrics page's romanisation: whether it is on, and whether the song reads Japanese, read once a
+// build on the main thread, where each line's Latin reading is worked out and kept on the line too.
+static BOOL sg_romanised, sg_japanese;
+
+// What a line shows under its words: its romanisation, when asked for, above its translation.
+static NSString *secondaryText(SGKaraokeLine *line) {
+    NSString *translation = line.translation, *romanised = line.romanised;
+    if (!romanised.length) return translation;
+    if (!translation.length) return romanised;
+    return [NSString stringWithFormat:@"%@\n%@", romanised, translation];
+}
+
 // The texts a line has, in the style's order, the lyrics and their pronunciation set as a pair where
 // the order has them side by side, and the backing row after the lyrics. `right` is the side a backing
 // row keeps to, its line's; -1 for a line of its own, which takes its side from its voice and script.
@@ -447,7 +460,7 @@ static SGRKaraokeLayout *layOut(SGKaraokeLine *line, CGFloat width, SGRKaraokeSt
     layout.right = right >= 0 ? right : alignsRight(line);
     layout.translation = CGRectNull;
     NSArray<SGKaraokeWord *> *spoken = style.pronunciation ? line.pronunciation.words : nil;
-    NSString *translation = style.translation ? line.translation : nil;
+    NSString *translation = style.translation ? secondaryText(line) : nil;
     NSMutableArray<NSNumber *> *parts = [NSMutableArray array];
     for (NSNumber *text in style.order) {
         if (text.integerValue == SGRLyricsTextPronunciation && !spoken.count) continue;
@@ -696,7 +709,7 @@ static double wholeFrom(SGKaraokeLine *run, BOOL sweepsEstimates) {
         _translation.textColor = UIColor.whiteColor;
         _translation.alpha = kDimAlpha;
         _translation.textAlignment = _right ? NSTextAlignmentRight : NSTextAlignmentLeft;
-        _translation.text = line.translation;
+        _translation.text = secondaryText(line);
         [self addSubview:_translation];
     }
     if (layout.backingTop > 0) {
@@ -1135,7 +1148,9 @@ typedef struct {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionEndedNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(restyle) name:SGRLyricsTextDidChangeNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(rebuild) name:SGLyricsRomanisedDidChangeNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(translationsChanged) name:SGLyricsTranslationsDidChangeNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(linesChanged:) name:SGKaraokeLinesDidChangeNotification object:nil];
     // A locked phone leaves the card in its window, so the link has to be put down by the app going
     // away rather than by the view going: see scheduleLink.
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(scheduleLink) name:UIApplicationDidBecomeActiveNotification object:nil];
@@ -1189,6 +1204,7 @@ typedef struct {
 
 // Genius is asked once the song's lines are in; lines that change under it are matched again.
 - (void)askMeanings {
+    if (_compact) return;   // the preview shows the line alone; nothing there explains a word
     _meanings = nil;
     NSUInteger asked = ++_meaningsAsked;
     NSArray<SGKaraokeLine *> *lines = _lines;
@@ -1461,11 +1477,26 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
 
 #pragma mark - the pronunciation and the translation
 
+// Works out each line's Latin reading when the Lyrics page asks for it, on the main thread, before a
+// layout off it reads them; clears it otherwise.
+- (void)romanise {
+    sg_romanised = _lines && SGFlag(SGKeyLyricsRomanised, NO);
+    sg_japanese = sg_romanised && SGLyricsLooksJapanese(_lines);
+    for (SGKaraokeLine *line in _lines) {
+        line.romanised = sg_romanised ? SGLyricsRomanised(SGKaraokeLineText(line), sg_japanese) : nil;
+    }
+}
+
 // What a line shows besides its words: what the song has, of what the lyrics menu has switched on.
 - (SGRKaraokeStyle *)styleNow {
+    if (_compact) {   // the preview sets the line alone, however the words are switched for the page
+        return [[SGRKaraokeStyle alloc] initWithSize:_fontSize order:SGRLyricsTextOrder() pronunciation:NO translation:NO];
+    }
+    [self romanise];
+    BOOL translationOn = SGFlag(SGRKeyLyricsTranslation, NO) || sg_romanised;
     return [[SGRKaraokeStyle alloc] initWithSize:_fontSize order:SGRLyricsTextOrder()
                                    pronunciation:_hasSpoken && SGFlag(SGRKeyLyricsPronunciation, NO)
-                                     translation:_hasTranslation && SGFlag(SGRKeyLyricsTranslation, NO)];
+                                     translation:(_hasTranslation || sg_romanised) && translationOn];
 }
 
 // A switch of the menu or the Lyrics page's order: the song is measured again in the new style off
@@ -1508,6 +1539,10 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
 // The button shows only for a song with a pronunciation or a translation to show, and its menu only
 // what the song has: a switch for each, reading what tapping it will do.
 - (void)offerExtras {
+    if (_compact) {   // the preview has no room for the button, and nothing to open
+        _extras.hidden = YES;
+        return;
+    }
     NSString *language = SGLyricsGeminiLanguage();
     BOOL gemini = SGGeminiKeySet();
     BOOL onDevice = SGOnDeviceTranslation.translationAvailable;
@@ -1639,7 +1674,7 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
     [lines enumerateObjectsUsingBlock:^(SGKaraokeLine *line, NSUInteger index, BOOL *stop) {
         if (index < translations.count && translations[index].length && !line.translation.length) {
             line.translation = translations[index];
-            
+            line.translationMade = YES;
             took = YES;
         }
     }];
@@ -1890,7 +1925,7 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
         [self timeLines];
         [self setNeedsLayout];
     }
-    [self setShowing:_tops != nil];
+    [self setShowing:_tops != nil && !(_compact && _plain)];
     // The source is settled a moment after the lines are, so it is asked for until it answers.
     if (_crediting && _lines && !_credit.text.length) [self creditTo:SGLyricsCreditFor(track)];
     if (!_tops) return;
@@ -1932,6 +1967,18 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
 // other are both lit, and the last line begun on through the pause after it, as Apple Music keeps a
 // line lit until the next one comes. A pause that is a break is the dots' instead, until the moment
 // before its end when the line after it moves up to the anchor, sharp but not yet lit.
+- (void)linesChanged:(NSNotification *)note {
+    if (note.object && ![note.object isEqualToString:_track]) return;
+    _builtWidth = 0;
+    if (_lines) {
+        _lines = nil;
+        [self dropLineViews];
+    }
+    _plain = NO;
+    [self setNeedsLayout];
+    [self scheduleLink];
+}
+
 - (NSUInteger)sungAt:(double)now into:(NSInteger *)sung focus:(NSInteger *)focus openBreak:(NSInteger *)openBreak {
     NSInteger count = (NSInteger)_lines.count, last = -1;
     while (last + 1 < count && _spans[last + 1].start <= now) last++;
@@ -1962,8 +2009,8 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
     if (!_compact) {
         _compact = YES;
         _crediting = NO;
-        _margin = 24;
-        _lineGap = 6;
+        _margin = kCompactMargin;
+        _lineGap = kCompactGap;
         _blurPerLine = 0;
         _maxBlur = 0;
         _scroll.scrollEnabled = NO;

@@ -150,7 +150,7 @@ static void keep(NSString *track, NSArray<SGKaraokeLine *> *lines) {
             [sg_requested removeObject:kept];
         }
     }
-    sg_lyrics[track] = lines;
+    sg_lyrics[track] = SGKaraokeInTimeOrder(lines);
     if (lines.count) translate(track);
     announce(track);
 }
@@ -246,7 +246,7 @@ static BOOL eeveeLyricsOn(void) {
 }
 
 BOOL SGLyricsStandAsideForEevee(void) {
-    return SGEeveeSpotifyInjected() && eeveeLyricsOn() && !NO;
+    return SGEeveeSpotifyInjected() && eeveeLyricsOn() && !SGFlag(SGKeyLyricsBesideEevee, NO);
 }
 
 BOOL SGEeveeLyricsOn(void) {
@@ -406,7 +406,7 @@ NSInteger SGKaraokePositionMs(void) {
 }
 
 NSInteger SGKaraokeDelayMs(void) {
-    return SGInt(SGKeyLyricsSimulateWords, 0);
+    return SGInt(SGKeyLyricsDelay, 0);
 }
 
 void SGKaraokeSeek(NSInteger ms) {

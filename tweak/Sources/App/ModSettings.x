@@ -68,7 +68,7 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
 }
 
 - (instancetype)initWithSections:(NSArray<SGModSection *> *)sections {
-    return [super initWithTitle:@"Taurus" intro:nil sections:sections footer:nil];
+    return [super initWithTitle:@"taurus" intro:nil sections:sections footer:nil];
 }
 
 - (void)viewDidLoad {
@@ -77,7 +77,7 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
     _masthead.backgroundColor = SGPageBackground();
     _masthead.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     _mastheadTitle = [UILabel new];
-    _mastheadTitle.text = @"Taurus";
+    _mastheadTitle.text = @"taurus";
     _mastheadTitle.font = [UIFont systemFontOfSize:36 weight:UIFontWeightBold];
     _mastheadTitle.textAlignment = NSTextAlignmentRight;
     [_mastheadTitle sizeToFit];
@@ -92,7 +92,7 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
     self.tableView.tableHeaderView = _masthead;
 
     _compactTitle = [UILabel new];
-    _compactTitle.text = @"Taurus";
+    _compactTitle.text = @"taurus";
     _compactTitle.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     [_compactTitle sizeToFit];
     _compactTitle.textColor = SGRainbowTextColor(_compactTitle.bounds.size.width, _compactTitle.bounds.size.height, 0);
@@ -220,6 +220,7 @@ static UIViewController *modSettingsPage(void) {
     SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", ^UIViewController *{ return SGDSPSettingsPage(); });
     audioEffects.value = ^NSString *{ return SGDSPSummary(); };
     NSMutableArray<SGModRow *> *parts = [NSMutableArray arrayWithArray:@[
+        pageRow(@"Appearance", @"paintpalette", ^UIViewController *{ return SGAppearanceSettingsPage(); }),
         pageRow(@"Navbar", @"dock.rectangle", ^UIViewController *{ return SGNavbarPage(); }),
         pageRow(@"Player", @"play.circle", ^UIViewController *{ return SGPlayerSettingsPage(); }),
         pageRow(@"Lyrics", @"quote.bubble", ^UIViewController *{ return SGLyricsSettingsPage(); }),
@@ -238,11 +239,10 @@ static UIViewController *modSettingsPage(void) {
     if (SGRedesignedUIStored()) [parts addObject:pageRow(@"Albums", @"square.stack", ^UIViewController *{ return SGRAlbumSettingsPage(); })];
     else [parts addObject:pageRow(@"Home & Library", @"house", ^UIViewController *{ return SGHomeSettingsPage(); })];
     [parts addObject:pageRow(@"Misc", @"ellipsis.circle", ^UIViewController *{ return miscSettingsPage(); })];
-    [sections addObject:SGAppearanceSection()];
     // Sing's microphone is the redesigned player's, so Karaoke is the redesign's; its row follows a download.
     if (SGRedesignedUIStored()) {
-        SGModRow *karaoke = pageRow(@"Karaoke", @"music.mic", ^UIViewController *{ return nil; });
-        karaoke.value = ^NSString *{ return @"Karaoke"; };
+        SGModRow *karaoke = pageRow(@"Karaoke", @"music.mic", ^UIViewController *{ return SGRKaraokeSettingsPage(); });
+        karaoke.value = ^NSString *{ return SGRKaraokeSummary(); };
         karaoke.refreshOn = SGSingModelDidChangeNotification;
         [sections addObject:SGSection(nil, @[karaoke])];
     }
@@ -276,7 +276,7 @@ static UIViewController *modSettingsPage(void) {
     if (!(self = [super initWithFrame:frame])) return nil;
     _icon = SGSymbolView(@"slider.horizontal.3", 20, UIImageSymbolWeightRegular, 24);
     _title = [UILabel new];
-    _title.text = @"Taurus Settings";
+    _title.text = @"taurus settings";
     _title.textColor = UIColor.whiteColor;
     _chevron = SGSymbolView(@"chevron.right", 11, UIImageSymbolWeightSemibold, 12);
     for (UIView *v in @[_icon, _title, _chevron]) [self addSubview:v];

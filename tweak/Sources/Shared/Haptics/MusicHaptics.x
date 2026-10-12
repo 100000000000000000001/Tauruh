@@ -40,6 +40,7 @@
 #import <pthread.h>
 #import <stdatomic.h>
 #import "Core/SGCore.h"
+#import "Shared/Audio/SGAudioPipeline.h"
 #import "Shared/Player/SpeedPitch.h"
 #import "Haptics.h"
 #import "SGMusicAnalyzer.h"
@@ -128,7 +129,7 @@ static inline float sampleAt(const void *data, UInt32 index, UInt32 bytes, BOOL 
 static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
                          UInt32 frames, AudioBufferList *data) {
     if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
-    if (!atomic_load_explicit(&sg_listening, memory_order_relaxed) || refCon != NULL) return noErr;
+    if (!atomic_load_explicit(&sg_listening, memory_order_relaxed)) return noErr;
     if (*flags & kAudioUnitRenderAction_OutputIsSilence) return noErr;
 
     uint64_t layout = atomic_load_explicit(&sg_layout, memory_order_relaxed);
@@ -575,7 +576,8 @@ void SGMusicHapticsWatchTaps(void (^watcher)(float intensity)) {
     mach_timebase_info_data_t timebase;
     mach_timebase_info(&timebase);
     sg_secondsPerTick = (double)timebase.numer / timebase.denom / 1e9;
-    if (!NO) {
+    static const SGAudioProcessor processor = {readFormat, rendered};
+    if (!SGAudioPipelineRegister(SGAudioStageHaptics, &processor)) {
         SGLog(@"music haptics: Spotify's output cannot be reached, Music Haptics is inactive");
         return;
     }

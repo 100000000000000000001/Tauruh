@@ -12,6 +12,7 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
+#import "Settings/SGPageStyle.h"
 #import "Shared/Player/PlayerState.h"
 #import "Shared/Player/SpeedPitch.h"
 #import "LocalFiles.h"
@@ -372,7 +373,7 @@ void SGLocalFilePresentEditor(UIViewController *presenter, NSString *uri) {
     UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:editor];
     navigation.modalPresentationStyle = UIModalPresentationFormSheet;
     // Outside Spotify's navigation stacks a sheet takes the system's appearance, light in light mode.
-    ;
+    SGPresentDark(navigation);
     navigation.presentationController.delegate = editor;
     UISheetPresentationController *sheet = navigation.sheetPresentationController;
     sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent, UISheetPresentationControllerDetent.largeDetent];
@@ -474,7 +475,7 @@ static void install(UIViewController *menu) {
     SGEditInfoRow *row = objc_getAssociatedObject(menu, &kRowKey);
     if (!row) {
         NSString *uri = SGURIString(SGPlayerState().track.URI);
-        if (!SGLocalFileIs(uri) || !NO) {
+        if (!SGLocalFileIs(uri)) {
             decide(menu, NO);
             return;
         }

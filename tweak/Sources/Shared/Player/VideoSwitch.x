@@ -39,7 +39,7 @@ static UIView *switchIn(UIView *root, int depth) {
 %end
 
 %ctor {
-    if (!YES) return;
+    if (!SGHidden(SGKeyHideVideoSwitch)) return;
     %init;
     SGRequireClasses(@[@"_TtC20NowPlaying_ModesImpl20FloatingElementsUnit"]);
 }

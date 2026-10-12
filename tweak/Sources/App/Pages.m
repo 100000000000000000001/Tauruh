@@ -4,12 +4,10 @@
 #import "Pages.h"
 #import "Shared/ArtistBlock/ArtistBlock.h"
 #import "Shared/Gestures/Gestures.h"
-#import "Shared/HeadGestures/HeadGestures.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/LyricsMeanings/Meanings.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
 #import "Shared/Fonts/Fonts.h"
-#import "Shared/HeadGestures/HeadGestures.h"
 #import "Shared/ListeningStats/ListeningStats.h"
 #import "Shared/Lossless/SGLossless.h"
 #import "Shared/Player/PlayerSettings.h"
@@ -52,28 +50,30 @@ static SGModRow *unavailableRow(void) {
     return SGWithSymbol(row, @"sparkles");
 }
 
-SGModSection *SGAppearanceSection(void) {
+UIViewController *SGAppearanceSettingsPage(void) {
+    NSMutableArray<SGModRow *> *rows = [NSMutableArray array];
     if (!SGRedesignAvailable()) {
-        NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:unavailableRow()];
+        [rows addObject:unavailableRow()];
         [rows addObjectsFromArray:SGNativeAppearanceRows()];
-        return SGNotedSection(@"Appearance", rows, @"Changes apply after you restart Spotify.");
-    }
-    SGModRow *redesign = SGOptionRow(@"Redesigned UI", nil, SGKeyRedesign);
-    redesign.glows = YES;
-    redesign.info = SGRedesignedUIInfo;
-    redesign.changed = ^(BOOL on) {
-        SGSetRedesignedUI(on);
-        offerRestart(on);
-    };
-    NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:SGWithSymbol(redesign, @"sparkles")];
-    if (SGRedesignedUIStored()) {
-        [rows addObjectsFromArray:SGRAppearanceRows()];
-        [rows addObject:SGRHomeTopPicksRow()];
     } else {
-        [rows addObjectsFromArray:SGNativeAppearanceRows()];
+        SGModRow *redesign = SGOptionRow(@"Redesigned UI", nil, SGKeyRedesign);
+        redesign.glows = YES;
+        redesign.info = SGRedesignedUIInfo;
+        redesign.changed = ^(BOOL on) {
+            SGSetRedesignedUI(on);
+            offerRestart(on);
+        };
+        [rows addObject:SGWithSymbol(redesign, @"sparkles")];
+        if (SGRedesignedUIStored()) {
+            [rows addObjectsFromArray:SGRAppearanceRows()];
+            [rows addObject:SGRHomeTopPicksRow()];
+        } else {
+            [rows addObjectsFromArray:SGNativeAppearanceRows()];
+        }
+        [rows addObjectsFromArray:SGAppFontRows()];
     }
-    [rows addObjectsFromArray:SGAppFontRows()];
-    return SGNotedSection(@"Appearance", rows, @"Changes apply after you restart Spotify.");
+    SGModSection *section = SGNotedSection(nil, rows, @"Changes apply after you restart Spotify.");
+    return [[SGModPage alloc] initWithTitle:@"Appearance" intro:nil sections:@[section] footer:nil];
 }
 
 UIViewController *SGNavbarPage(void) {
@@ -89,7 +89,7 @@ UIViewController *SGLyricsSettingsPage(void) {
     if (redesigned) {
         SGModRow *landscape = SGSwitchRow(@"Landscape lyrics", @"Show lyrics beside the player controls", SGRKeyLandscapeLyrics);
         landscape.changed = ^(BOOL on) { SGRPlayerLyricsOrientationChanged(); };
-        [sections addObject:SGSection(@"Display", @[landscape, SGLyricsWordTimingRow(), 
+        [sections addObject:SGSection(@"Display", @[landscape, SGLyricsWordTimingRow(), SGLyricsRomanisedRow(), SGLyricsDelayRow(),
             SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow()])];
         [sections addObject:SGSection(@"Translation", @[SGTranslateEverySongRow(), SGGeminiKeyRow(), SGSavedTranslationsRow()])];
     }
@@ -102,13 +102,11 @@ UIViewController *SGPlayerSettingsPage(void) {
     blocked.value = ^NSString *{
         return SGFlag(SGKeyArtistBlock, NO) ? @(SGBlockedArtists().count).stringValue : @"Off";
     };
-    SGModRow *head = SGPageRow(@"AirPods gestures", ^UIViewController *{ return SGHeadGesturesSettingsPage(); });
-    head.value = ^NSString *{ return SGHeadGestureStatus(); };
     BOOL native = !SGRedesignedUIStored();
 
+    // AirPods gestures has its own row on the Mod Settings root, so it is not repeated here.
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObject:SGSection(nil, @[
         SGWithSymbol(SGPageRow(@"Gestures", ^UIViewController *{ return SGGesturesSettingsPage(); }), @"hand.tap"),
-        SGWithSymbol(head, @"airpods"),
         SGWithSymbol(blocked, @"person.crop.circle.badge.xmark"),
     ])];
     NSMutableArray<SGModRow *> *pages = [NSMutableArray array];

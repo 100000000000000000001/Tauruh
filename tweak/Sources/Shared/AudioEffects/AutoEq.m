@@ -142,7 +142,7 @@ static void changed(void) {
 
 // A headphone's correction is what the Graphic EQ plays, rather than nothing or the user's own curve.
 static BOOL correctionInUse(void) {
-    return NO;
+    return SGDSPSwitch(SGKeyDSPGraphicEq) && SGDSPString(SGKeyDSPGraphicEq).length;
 }
 
 static void takeOff(void) {
@@ -155,7 +155,7 @@ static void takeOff(void) {
 static void rememberPick(void) {
     if (!sg_outputUID.length || !outputs()[sg_outputUID]) return;
     BOOL on = correctionInUse();
-    setOutput(sg_outputUID, @{@"name": sg_outputName ?: sg_outputUID, @"path": on ? nil : @"",
+    setOutput(sg_outputUID, @{@"name": sg_outputName ?: sg_outputUID, @"path": on ? SGDSPString(SGKeyDSPGraphicEq) : @"",
                               @"nodes": on ? SGDSPString(SGKeyDSPGraphicEqNodes) : @""});
     setFollowed(sg_outputUID);
     changed();
@@ -202,7 +202,7 @@ void SGAutoEqOutputChanged(NSString *uid, NSString *name) {
         setFollowed(uid);
     } else if (followed().length) {
         // The correction came on for another output; this one has none.
-        if (correctionInUse()) SGLog(@"autoeq: %@ connected, with no correction remembered: %@ off", sg_outputName, SGAutoEqNameOf(nil));
+        if (correctionInUse()) SGLog(@"autoeq: %@ connected, with no correction remembered: %@ off", sg_outputName, SGAutoEqNameOf(SGDSPString(SGKeyDSPGraphicEq)));
         takeOff();
         setFollowed(@"");
     }

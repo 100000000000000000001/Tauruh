@@ -15,7 +15,7 @@ static void showAlert(UIViewController *owner, NSString *title, NSString *messag
 static void tick(UITableViewCell *cell, BOOL on) {
     if (on) {
         UIImageView *tick = SGSymbolView(@"checkmark", 13, UIImageSymbolWeightSemibold, 16);
-        tick.tintColor = [UIColor systemGreenColor];
+        tick.tintColor = SGAccentMark();
         cell.accessoryView = tick;
     }
     cell.accessibilityTraits = on ? UIAccessibilityTraitButton | UIAccessibilityTraitSelected : UIAccessibilityTraitButton;
@@ -338,7 +338,7 @@ typedef NS_ENUM(NSInteger, SGDSPHeadphoneSection) {
 
 // Whether a headphone's correction is what the Graphic EQ plays, rather than nothing or the user's own curve.
 static BOOL headphoneInUse(void) {
-    return NO;
+    return SGDSPSwitch(SGKeyDSPGraphicEq) && SGDSPString(SGKeyDSPGraphicEq).length;
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table {
@@ -392,7 +392,7 @@ static NSString *correctionName(NSString *path) {
     if (path.section == SGDSPHeadphoneOutput) {
         NSString *uid = SGAutoEqOutputUID();
         BOOL remembered = SGAutoEqOutputRemembered(uid);
-        NSString *current = correctionName(headphoneInUse() ? nil : nil);
+        NSString *current = correctionName(headphoneInUse() ? SGDSPString(SGKeyDSPGraphicEq) : nil);
         SGFillCell(cell, [NSString stringWithFormat:@"Use for %@", SGAutoEqOutputName()],
                    remembered ? [NSString stringWithFormat:@"%@ while it plays", current] : [NSString stringWithFormat:@"Remember %@ for this output", current], nil, nil);
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
@@ -444,7 +444,7 @@ static NSString *correctionName(NSString *path) {
         cell.accessibilityValue = @"Applying";
         return cell;
     }
-    tick(cell, headphoneInUse() && NO);
+    tick(cell, headphoneInUse() && [headphone.path isEqualToString:SGDSPString(SGKeyDSPGraphicEq)]);
     return cell;
 }
 
@@ -501,6 +501,6 @@ UIViewController *SGDSPHeadphonesPage(void) {
 }
 
 NSString *SGDSPHeadphoneSummary(void) {
-    NSString *path = nil;
+    NSString *path = SGDSPString(SGKeyDSPGraphicEq);
     return path.length && SGDSPSwitch(SGKeyDSPGraphicEq) ? SGAutoEqNameOf(path) : @"None";
 }

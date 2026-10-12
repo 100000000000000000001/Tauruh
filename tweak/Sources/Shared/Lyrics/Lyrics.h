@@ -1,12 +1,25 @@
 #import <UIKit/UIKit.h>
 
-@class SGModRow, SGModSection;
+@class SGModRow, SGModSection, SGKaraokeLine;
 SGModSection *SGLyricsSourcesSection(BOOL namingSource);
 SGModRow *SGLockScreenLyricsRow(void);
 SGModRow *SGLyricsTranslationLanguageRow(void);
 SGModRow *SGLyricsWordTimingRow(void);
+SGModRow *SGLyricsRomanisedRow(void);
+SGModRow *SGLyricsDelayRow(void);
 
 #define SGKeyLyricsSimulateWords @"spotifyglass.lyricsSimulateWords"
+#define SGKeyLyricsDelay @"spotifyglass.lyricsDelay"
+// Shows a line in another alphabet again in Latin letters (Romanise.m), under the lyrics.
+#define SGKeyLyricsRomanised @"spotifyglass.lyricsRomanised"
+extern NSNotificationName const SGLyricsRomanisedDidChangeNotification;
+NSString *SGLyricsRomanised(NSString *text, BOOL japanese);   // nil where there is nothing to read
+BOOL SGLyricsLooksJapanese(NSArray<SGKaraokeLine *> *lines);
+
+// The Lyrics page's "Use these sources anyway", for an EeveeSpotify whose settings read wrong.
+#define SGKeyLyricsBesideEevee @"spotifyglass.lyrics.besideEevee"
+BOOL SGEeveeLyricsOn(void);
+BOOL SGLyricsStandAsideForEevee(void);
 
 typedef NS_ENUM(NSUInteger, SGKaraokeTiming) {
     SGKaraokeTimingWords = 0,   // every word or syllable timed by the source
@@ -26,7 +39,7 @@ typedef NS_ENUM(NSUInteger, SGKaraokeAlign) {
 @property (nonatomic) BOOL joined;
 @end
 
-@interface SGKaraokeLine : NSObject
+@interface SGKaraokeLine : NSObject <NSCopying>
 @property (nonatomic, copy) NSArray<SGKaraokeWord *> *words;
 @property (nonatomic) NSInteger start, end;
 @property (nonatomic, copy) NSString *voice;
@@ -37,6 +50,11 @@ typedef NS_ENUM(NSUInteger, SGKaraokeAlign) {
 @property (nonatomic, strong) SGKaraokeLine *pronunciation;
 // The line in another language, the backing's words with it; nil where the source has none.
 @property (nonatomic, copy) NSString *translation;
+// The translation came from a translator of the lyrics' menu (LyricsTranslation), not from the source.
+@property (nonatomic) BOOL translationMade;
+// The line in Latin letters (SGLyricsRomanised), worked out for the view when the Lyrics page asks
+// for it; nil otherwise or where there is nothing to read. Not part of the source's own data.
+@property (nonatomic, copy) NSString *romanised;
 @end
 
 // The line as one string, a space between the words that are not joined.
@@ -44,6 +62,8 @@ NSString *SGKaraokeLineText(SGKaraokeLine *line);
 // When the singing of a line is over: its own end, or its backing's when that runs on past it.
 NSInteger SGKaraokeSungEnd(SGKaraokeLine *line);
 NSInteger SGKaraokeLeadLine(NSArray<SGKaraokeLine *> *lines, NSInteger ms);
+// The page's own delay in milliseconds, added to Spotify's position before a line is found.
+NSInteger SGKaraokeDelayMs(void);
 BOOL SGKaraokeUnspacedScript(NSString *text);
 void SGKaraokeAlignVoices(NSArray<SGKaraokeLine *> *lines);
 
@@ -54,6 +74,8 @@ NSArray<SGKaraokeLine *> *SGKaraokeEstimatedLines(NSArray<NSNumber *> *starts, N
 NSArray<SGKaraokeLine *> *SGKaraokeStaticLines(NSArray<NSString *> *texts);
 // The finest timing any of the lines has; SGKaraokeTimingNone for none at all.
 SGKaraokeTiming SGKaraokeLinesTiming(NSArray<SGKaraokeLine *> *lines);
+// The lines sorted by their starts, where a source listed one out of its place in time.
+NSArray<SGKaraokeLine *> *SGKaraokeInTimeOrder(NSArray<SGKaraokeLine *> *lines);
 
 NSArray<SGKaraokeLine *> *SGKaraokeLinesForTrack(NSString *trackID);   // nil until the lyrics came
 void SGKaraokeKeepLines(NSString *trackID, NSArray<SGKaraokeLine *> *lines);

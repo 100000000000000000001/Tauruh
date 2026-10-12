@@ -50,7 +50,7 @@ static UIAction *soundMenu(void) {
 
 static NSArray<UIMenuElement *> *playerItems(void) {
     NSMutableArray<UIMenuElement *> *items = [NSMutableArray arrayWithObject:soundMenu()];
-    if (NO) {
+    if (SGPlayerMenuOffersAnimatedArtwork()) {
         // Buttons named for what they do, not checkmarks: the HIG's changeable label for a toggled item.
         NSArray<NSArray *> *backgrounds = @[
             @[@(SGRPlayerBackgroundFluid), @"Show Fluid Artwork", @"drop"],

@@ -34,12 +34,12 @@ void SGLyricsSyncSavedTranslation(NSString *track, NSString *language, NSArray<S
     for (SGKaraokeLine *line in lines) {
         id translation = saved[SGKaraokeLineText(line) ?: @""];
         BOOL has = [translation isKindOfClass:NSString.class] && [translation length];
-        if (line.translation && !has) {
+        if (line.translationMade && !has) {
             line.translation = nil;
-            
+            line.translationMade = NO;
         } else if (!line.translation.length && has) {
             line.translation = translation;
-            
+            line.translationMade = YES;
         }
     }
 }
