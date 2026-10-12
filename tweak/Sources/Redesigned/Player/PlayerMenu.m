@@ -54,14 +54,11 @@ static UIMenu *backgroundStyleMenu(void) {
     NSMutableArray<UIMenuElement *> *choices = [NSMutableArray arrayWithCapacity:names.count];
     for (NSUInteger index = 0; index < names.count; index++) {
         SGRPlayerBackgroundKind kind = (SGRPlayerBackgroundKind)index;
-        UIMenuElementState state = kind == current ? UIMenuElementStateOn : UIMenuElementStateOff;
         UIAction *choice = [UIAction actionWithTitle:names[index]
                                                image:nil
                                           identifier:nil
-                                  discoverabilityTitle:nil
-                                          attributes:UIMenuElementAttributesNone
-                                               state:state
                                              handler:^(UIAction *action) { SGRPlayerMenuSetBackground(kind); }];
+        choice.state = kind == current ? UIMenuElementStateOn : UIMenuElementStateOff;
         [choices addObject:choice];
     }
     return [UIMenu menuWithTitle:@"Background Style"
@@ -73,15 +70,14 @@ static UIMenu *backgroundStyleMenu(void) {
 
 static UIAction *canvasLyricsMenu(void) {
     BOOL enabled = SGLockScreenCanvasLyricsEnabled();
-    return [UIAction actionWithTitle:@"Canvas Lyrics"
-                               image:symbol(@"star")
-                          identifier:nil
-                  discoverabilityTitle:nil
-                          attributes:UIMenuElementAttributesNone
-                               state:enabled ? UIMenuElementStateOn : UIMenuElementStateOff
-                             handler:^(UIAction *action) {
+    UIAction *action = [UIAction actionWithTitle:@"Canvas Lyrics"
+                                           image:symbol(@"star")
+                                      identifier:nil
+                                         handler:^(UIAction *action) {
         SGLockScreenCanvasLyricsSetEnabled(!SGLockScreenCanvasLyricsEnabled());
     }];
+    action.state = enabled ? UIMenuElementStateOn : UIMenuElementStateOff;
+    return action;
 }
 
 static NSArray<UIMenuElement *> *playerItems(void) {
