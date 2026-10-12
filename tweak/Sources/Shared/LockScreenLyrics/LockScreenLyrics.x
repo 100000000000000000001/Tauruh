@@ -24,6 +24,7 @@ static NSString *sg_shownLine;
 static BOOL sg_resending;
 static dispatch_source_t sg_timer;
 static BOOL artistLyricsOn(void);
+static void setTicking(BOOL on);
 
 static NSString *textOf(NSArray<SGKaraokeWord *> *words) {
     SGKaraokeLine *line = [SGKaraokeLine new];
