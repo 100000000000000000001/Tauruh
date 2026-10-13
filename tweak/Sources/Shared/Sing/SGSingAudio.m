@@ -114,7 +114,7 @@ bool SGSingAudioAttach(SGSingAudio *a) {
     }
     if (!SGAudioPipelineSourceCanReadAhead()) {
         if (!atomic_exchange(&loggedUnverifiedQueue, true))
-            SGLog(@"Sing: Spotify's local decoder queue does not match the verified 9.1.78 read-ahead layout");
+            SGLog(@"Sing: Spotify's decoder-queue layout is not verified for this executable");
         return false;
     }
     if (!SGAudioPipelineSetSourceProcessor(process, a)) {

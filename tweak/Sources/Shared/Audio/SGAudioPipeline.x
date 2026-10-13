@@ -114,7 +114,10 @@ bool SGAudioPipelineSourceCanReadAhead(void) {
     AudioUnit source = atomic_load(&sourceUnit);
     bool supported = false;
     for (unsigned i = 0; i < 8; i++)
-        if (sourceCallbacks[i].unit == source && source) supported = SGAudioSourceQueueSupported(sourceCallbacks[i].callback);
+        if (sourceCallbacks[i].unit == source && source) {
+            supported = SGAudioSourceQueueSupported(sourceCallbacks[i].callback);
+            if (!supported) SGAudioSourceQueueProbe(sourceCallbacks[i].callback);
+        }
     endChange();
     return supported;
 }

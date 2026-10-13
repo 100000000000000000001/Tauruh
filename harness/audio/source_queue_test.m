@@ -1,6 +1,9 @@
 // Exercise the actual guarded reader with owned memory; never execute a private function.
 #import <mach/mach.h>
+#import <Foundation/Foundation.h>
 static unsigned reads;
+static unsigned diagnosticLogs;
+void SGLogMessage(NSString *message) { (void)message; diagnosticLogs++; }
 static kern_return_t countedRead(vm_map_read_t task, vm_address_t at, vm_size_t size,
                                 vm_address_t output, vm_size_t *count) {
     reads++;
@@ -22,7 +25,7 @@ int main(void) {
     put((void *)sg_sourceImage, 0x1453c0, UINT64_C(0xa9016ffcd101c3ff));
     put((void *)sg_sourceImage, 0x1454b4, UINT64_C(0x95ece96591006296));
     uint64_t context[32] = {0}, sink[16] = {0}, owner[32] = {0};
-    uint64_t sinkTable[3] = {0}, delegateTable[3] = {0};
+    uint64_t sinkTable[16] = {0}, delegateTable[16] = {0};
     uint64_t node[8] = {0}, block[8] = {0}, event[8] = {0}, later[8] = {0}, nextBlock[8] = {0};
     AURenderCallbackStruct callback = {(AURenderCallback)(sg_sourceImage + 0x24dd98), context};
     assert(!SGAudioSourceQueueSupported(callback)); // unknown executable UUID
@@ -106,7 +109,23 @@ int main(void) {
     assert(SGAudioSourceQueueFrames(callback, 7340) == 3 * 1024);
     nodes[0][4] = (uintptr_t)nodes;
     assert(!SGAudioSourceQueueFrames(callback, 1024)); // cycle at the requested boundary
+    sg_sourceSpotify90 = true;
+    callback.inputProc = (AURenderCallback)(sg_sourceImage + 0x6d0b080);
+    callback.inputProcRefCon = context;
+    uint32_t channels = 2, active = 0;
+    memcpy((char *)context + 0x6c, &channels, sizeof channels);
+    memcpy((char *)context + 0x9c, &active, sizeof active);
+    put(context, 0x78, (uintptr_t)sink);
+    put(context, 0x80, 0x10000); put(context, 0x88, 0x18000);
+    sinkTable[2] = sg_sourceImage + 0x180f3c;
+    owner[3] = (uintptr_t)nodes; owner[4] = 0;
+    nodes[0][0] = (uintptr_t)blocks; blocks[0][4] = 2048;
+    unsigned logsBeforeProbe = diagnosticLogs;
+    SGAudioSourceQueueProbe(callback);
+    SGAudioSourceQueueProbe(callback);
+    assert(diagnosticLogs == logsBeforeProbe + 5);
+    assert(!SGAudioSourceQueueSupported(callback)); // diagnostics never enable the unverified ABI
     printf("source queue metadata reads: full=%u bounded=%u for a 7340-frame prefix\n", fullReads, prefixReads);
     free((void *)sg_sourceImage);
-    puts("source queue: build and callback guards, event fences, pending commands, malformed and unreadable memory passed");
+    puts("source queue: guards, event fences, malformed memory, and fail-closed ABI probe passed");
 }
