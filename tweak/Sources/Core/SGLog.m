@@ -77,17 +77,7 @@ static void appendLog(NSString *message) {
         os_log_with_type(OS_LOG_DEFAULT, OS_LOG_TYPE_ERROR, "[spotifyglass] cannot open diagnostics log");
         return;
     }
-    [handle seekToEndReturningOffset:&error];
-    if (error) {
-        os_log_with_type(OS_LOG_DEFAULT, OS_LOG_TYPE_ERROR, "[spotifyglass] cannot seek diagnostics log: %{public}s",
-                         error.localizedDescription.UTF8String ?: "unknown error");
-        NSError *closeError = nil;
-        if (![handle closeAndReturnError:&closeError]) {
-            os_log_with_type(OS_LOG_DEFAULT, OS_LOG_TYPE_ERROR, "[spotifyglass] cannot close diagnostics log: %{public}s",
-                             closeError.localizedDescription.UTF8String ?: "unknown error");
-        }
-        return;
-    }
+    [handle seekToEndOfFile];
     if (![handle writeData:addition error:&error]) {
         os_log_with_type(OS_LOG_DEFAULT, OS_LOG_TYPE_ERROR, "[spotifyglass] cannot append diagnostics log: %{public}s",
                          error.localizedDescription.UTF8String ?: "unknown error");
