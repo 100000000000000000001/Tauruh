@@ -352,11 +352,13 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
         SGSection(nil, @[sources, lowData]),
         SGNotedSection(nil, fluid, @"Brightness above 100% can make white text harder to read. A paused song holds the "
-                                   @"background still. Animated and Visualizer use these where they show Fluid."),
-        SGNotedSection(@"Controls", @[SGOptionRow(@"Hide volume slider", nil, SGRKeyHidePlayerVolume),
-                                      SGSwitchRow(@"Hide volume slider thumb", @"Keep the slider usable without the white dot",
-                                                  SGRKeyHidePlayerVolumeThumb),
-                                      SGOptionRow(@"Follow the cover", nil, SGRKeyPlayerFollowsCover)],
+                    @"background still. Animated and Visualiser use these where they show Fluid."),
+        SGNotedSection(@"Controls", @[
+                       SGOptionRow(@"Show Sing button", @"Karaoke control in the player lyrics", SGRKeyPlayerKaraokeButton),
+                       SGOptionRow(@"Show Translate button", @"Pronunciation and translation in the player lyrics", SGRKeyPlayerTranslateButton),
+                       SGOptionRow(@"Hide volume slider", nil, SGRKeyHidePlayerVolume),
+                       SGSwitchRow(@"Hide volume slider thumb", @"Keep the slider usable without the white dot", SGRKeyHidePlayerVolumeThumb),
+                       SGOptionRow(@"Follow the cover", nil, SGRKeyPlayerFollowsCover)],
                        @"The volume slider controls this iPhone, or the speaker while Spotify plays on another device. "
                        @"Hiding its thumb leaves the slider interactive. "
                        @"Follow the cover paints the like, shuffle and repeat in the color of the song playing."),
@@ -364,7 +366,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
                        @"Apple Music style moves the now playing bar in between two tabs as you scroll down."), nil];
     [sections addObjectsFromArray:more];
     // The settings page keeps its documented next-song/restart behavior; the player's menu changes the live field immediately.
-    NSString *footer = @"From the player's ⋯ menu, any background takes effect immediately. Here, Fluid, Animated and Visualizer change with the next song; Still, Colors and volume controls apply after you restart Spotify.";
+    NSString *footer = @"From the player's ⋯ menu, any background takes effect immediately. Here, Fluid, Animated and Visualiser change with the next song; Still, Colors and volume controls apply after you restart Spotify.";
     SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:footer];
     weakPage = page;
     page.showcase = showcase;

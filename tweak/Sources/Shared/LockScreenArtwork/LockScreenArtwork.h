@@ -7,7 +7,7 @@
 // Where a clip can come from: the track's Canvas, or the album's animated cover on Apple Music.
 extern NSString *const SGArtworkSourceSpotify;
 extern NSString *const SGArtworkSourceApple;
-// The sources in the user's order, the ones switched off left out; Spotify, then Apple Music until set.
+// The sources in the user's order, the ones switched off left out; Apple Music, then Spotify until set.
 NSArray<NSString *> *SGArtworkOrder(void);
 void SGArtworkSetOrder(NSArray<NSString *> *order);
 

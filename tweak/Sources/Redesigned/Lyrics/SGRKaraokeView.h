@@ -13,8 +13,9 @@
 @property (nonatomic) BOOL keepsSing;
 // YES hides the pronunciation/translation control, for when the lines are on their own in the player.
 @property (nonatomic) BOOL extrasHidden;
+// Allows the player to independently hide its translation control.
+@property (nonatomic) BOOL extrasEnabled;
 // Called as the user begins dragging the lines, for the player to bring its controls back.
 @property (nonatomic, copy) void (^browsingBegan)(void);
 - (instancetype)initWithSampleLines:(NSArray<SGKaraokeLine *> *)lines length:(NSTimeInterval)length;
 @end
-

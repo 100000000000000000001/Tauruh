@@ -127,6 +127,7 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
     [self.view addSubview:_stage];
     _lyrics = [[SGRKaraokeView alloc] initWithFrame:CGRectZero];
     _lyrics.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    _lyrics.extrasEnabled = SGEnabled(SGRKeyPlayerTranslateButton);
     [_stage addSubview:_lyrics];
     __weak SGRLandscapeLyricsController *weakSelf = self;
     _lyrics.browsingBegan = ^{ [weakSelf rest]; };
@@ -278,7 +279,7 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
 - (void)restartRest {
     [_rest invalidate];
     _rest = nil;
-    if (!SGEnabled(SGRKeyLyricsAutoHide) || SGPlayerState().isPaused || UIAccessibilityIsVoiceOverRunning()) return;
+    if (!SGEnabled(SGRKeyLyricsLandscapeAutoHide) || SGPlayerState().isPaused || UIAccessibilityIsVoiceOverRunning()) return;
     __weak SGRLandscapeLyricsController *weakSelf = self;
     _rest = [NSTimer scheduledTimerWithTimeInterval:kLandscapeRest repeats:NO block:^(NSTimer *timer) {
         // A sheet over the lines (a line's meanings) keeps them up, and the clock runs again behind it.

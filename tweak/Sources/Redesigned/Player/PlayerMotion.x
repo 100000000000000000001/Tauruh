@@ -34,6 +34,7 @@
 // Spotify's music video (Switch to video) draws in one of three of its units, each told by its video surface
 // as the video comes and goes: while one shows it, the clip goes and the cover comes back, as for Fluid.
 #import <AVFoundation/AVFoundation.h>
+#import <CoreImage/CoreImage.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
@@ -59,6 +60,19 @@ static const NSTimeInterval kHandOver = 0.4;
 static const CGFloat kDimLeast = 0.10, kDimMost = 0.80, kDimLyrics = 0.15;
 // The frames measured for the dim besides the poster, in seconds into the clip (one past its end is skipped).
 static const double kMeasuredAt[] = {1, 2};
+
+static CGImageRef blurredFoot(CGImageRef image) {
+    if (!image) return NULL;
+    CIImage *input = [CIImage imageWithCGImage:image];
+    CGRect extent = input.extent;
+    CGFloat radius = MAX(12, MIN(extent.size.width, extent.size.height) * 0.06);
+    CIImage *output = [[[input imageByClampingToExtent] imageByApplyingGaussianBlurWithSigma:radius]
+                       imageByCroppingToRect:extent];
+    static CIContext *context;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ context = [CIContext contextWithOptions:@{kCIContextCacheIntermediates: @NO}]; });
+    return [context createCGImage:output fromRect:extent];
+}
 
 CGFloat SGRPlayerClipDim(CGFloat luminance, BOOL contrast, BOOL lyrics) {
     // White is 1, so (1 + 0.05) / (L + 0.05) >= ratio puts the clip's luminance at `most` or under.
@@ -227,9 +241,11 @@ static UIBlurEffect *blurEffect(void) {
 
 - (void)playFile:(NSURL *)file poster:(UIImage *)poster {
     _aspect = poster.size.height / poster.size.width;
-    // The poster's last rows, stretched from the seam to the bottom: the clip goes on down in its own color.
+    // A blurred copy of the poster's last rows carries the clip's color below its edge without streaking.
     CGFloat rows = MAX(kFootRows, 1 / MAX(1, poster.size.height * poster.scale));
-    _foot.contents = (__bridge id)poster.CGImage;
+    CGImageRef foot = blurredFoot(poster.CGImage);
+    _foot.contents = foot ? (__bridge id)foot : (__bridge id)poster.CGImage;
+    if (foot) CGImageRelease(foot);
     _still.contents = (__bridge id)poster.CGImage;
     _foot.contentsRect = CGRectMake(0, 1 - rows, 1, rows);
     _player = [AVQueuePlayer new];

@@ -52,7 +52,7 @@ CGFloat SGMotionPixels(void);
 void SGMotionSongsWithISRC(NSString *isrc, void (^done)(NSArray *songs));
 
 // Where moving artwork comes from (MotionSources.m): the keys that are on, in the order they are asked,
-// Spotify's Canvas then Apple Music's animated cover unless the user changed it.
+// Apple Music's animated cover then Spotify's Canvas unless the user changed it.
 #define SGKeyMotionSources @"spotifyglass.motion.sources"
 NSArray<NSString *> *SGMotionSourceOrder(void);
 BOOL SGMotionAppleMusicOn(void);

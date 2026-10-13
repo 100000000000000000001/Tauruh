@@ -89,7 +89,10 @@ UIViewController *SGLyricsSettingsPage(void) {
     if (redesigned) {
         SGModRow *landscape = SGSwitchRow(@"Landscape lyrics", @"Show lyrics beside the player controls", SGRKeyLandscapeLyrics);
         landscape.changed = ^(BOOL on) { SGRPlayerLyricsOrientationChanged(); };
-        [sections addObject:SGSection(@"Display", @[landscape, SGLyricsWordTimingRow(), SGLyricsRomanisedRow(), SGLyricsDelayRow(),
+        [sections addObject:SGSection(@"Display", @[landscape,
+            SGOptionRow(@"Hide landscape controls automatically", @"Bring them back with a tap after a few seconds",
+                        SGRKeyLyricsLandscapeAutoHide),
+            SGLyricsWordTimingRow(), SGLyricsRomanisedRow(), SGLyricsDelayRow(),
             SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow(), SGLyricsMeaningMarkersRow()])];
         [sections addObject:SGSection(@"Translation", @[SGTranslateEverySongRow(), SGGeminiKeyRow(), SGSavedTranslationsRow()])];
     }
@@ -116,7 +119,6 @@ UIViewController *SGPlayerSettingsPage(void) {
     } else {
         [pages addObject:SGWithSymbol(SGPageRow(@"Now playing", ^UIViewController *{ return SGRNowPlayingBarSettingsPage(); }), @"rectangle.bottomthird.inset.filled")];
     }
-    [pages addObject:SGWithSymbol(SGPageRow(@"Lock screen widget", ^UIViewController *{ return SGLockScreenWidgetPage(); }), @"lock")];
     [sections addObject:SGSection(nil, pages)];
     [sections addObject:SGNotedSection(@"Lossless", @[
         SGOptionRow(@"Lossless files", @"Play matching FLAC or ALAC files instead of Spotify's stream", SGKeyLossless),

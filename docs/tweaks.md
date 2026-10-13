@@ -112,7 +112,7 @@ Shared:
                   player menu and the lock-screen star toggle that independently of the artist-name setting.
                   The Canvas lyrics switch stays visible even while full-screen artwork is off, so it can be
                   prepared before choosing Moving artwork or Every song.
-                  The sources are asked in the user's order (Spotify, then Apple Music until set, on the
+                  The sources are asked in the user's order (Apple Music, then Spotify Canvas until set, on the
                   shared Settings/SGOrderPage the lyrics sources use too). Spotify's URL comes off canvas.url
                   in the played track's metadata, which Spotify's core fills whatever
                   ios-feature-canvas.canvas_enabled says, and failing that from spotify.canvaz.cache with the
@@ -225,7 +225,8 @@ Redesigned:
                   sheet, and a sheet with no rows within 4 s is shown as it is. It opens on the rows the last
                   menu had, kept across launches, and moves to Spotify's as they come in, a tap meanwhile held
                   until they do. Its star-marked Canvas Lyrics switch is live, and Background Style offers
-                  the same five choices as Player settings and applies them immediately. Always on in the redesign.
+                  the same five choices as Player settings and applies them immediately. The Canvas field extends
+                  below the clip with a blurred poster bleed instead of stretched edge rows. Always on in the redesign.
                   Tested in the simulator against harness/playermenu/
                   With Sing on and its voice model downloaded (Mod Settings > Karaoke, Redesigned/Lyrics/SingSettings.m,
                   both applying at once), its microphone (Redesigned/Lyrics/SGRSingControl.m) sits in the
@@ -327,9 +328,15 @@ each with its own list of tabs. Lyrics, beside Player: the ordered list of lyric
 naming the source in the redesign, artist-name replacement on the lock screen (independent of Canvas lyrics),
 and glass lyrics in the native look; in the redesign also
 which of the lyrics, their pronunciation and their translation is set largest, Genius meaning marks (which can
-be hidden without losing the hold-on-a-line meaning sheet), and the translation's language.
-Player: Gestures, Blocked artists (with the count on the row) and Lock screen widget (its controls and, under Artwork, Animated lock screen, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls, with optional Canvas lyrics toggled from the redesigned player's ⋯ menu or the lock-screen star, a Sources page for their order, and a "Needs iOS 26" row below that), which work with either look;
-in the native look also Now playing bar (its device button and its flags), Queue & devices, and
+be hidden without losing the hold-on-a-line meaning sheet), the translation's language, and whether landscape
+lyrics controls hide automatically. Player: Gestures and Blocked artists (with the count on the row), which work
+with either look. The redesigned Player page also has independent Show Sing button and Show Translate button
+switches, the five background styles (Still, Colors, Fluid, Animated and Visualiser), and its volume controls.
+Lock Screen: Lock screen widget (its controls and, under Artwork, Animated lock screen, the track's Canvas or
+the album's Apple Music cover played behind the lock screen's controls, with optional Canvas lyrics toggled
+from the redesigned player's ⋯ menu or the lock-screen star, a Sources page for their order, and a "Needs iOS 26"
+row below that); Canvas lyrics and artist-name replacement remain independent settings.
+In the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
 buttons to hide); in the redesign instead Now Playing (its device button and moving background, the volume slider
@@ -351,7 +358,8 @@ four heights) and the Home flags, the parts of Home to hide including the DJ but
 playlist header, buttons and pills to hide, and the Library flags. Then Premium, ads & privacy
 (EeveeSpotify's Hide ads and Hide upsells, on by default, hiding the video carousel and social proof in Search, and
 an Ad and upsell flags page under them, every switch there forcing a flag Spotify ships on to off;
-Spoof Premium, on by default; Block telemetry; then what the ad
+Spoof Premium, on by default, with Spotify's premium-gated Jam entry-point flag enabled so its Jam control can
+appear alongside Queue where Spotify supports it; Block telemetry; then what the ad
 blocking and the telemetry blocking have stopped) and Labs (features Spotify built and did not ship,
 AI Chat (Martini) first). Last, All flags, Spotify's remote-config flags with a search field and an
 Auto / Off / On control per flag (a text field for the number and text ones), and Mod: Updates

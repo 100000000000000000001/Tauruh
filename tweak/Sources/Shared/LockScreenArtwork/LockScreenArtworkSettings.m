@@ -15,8 +15,8 @@ static void sayWhatIsMissing(void) {
 
 static NSArray<SGOrderItem *> *sources(void) {
     return @[
-        SGOrderItemMake(SGArtworkSourceSpotify, @"Spotify Canvas", @"The track's own clip"),
         SGOrderItemMake(SGArtworkSourceApple, @"Apple Music", @"The album's animated cover"),
+        SGOrderItemMake(SGArtworkSourceSpotify, @"Spotify Canvas", @"The track's own clip"),
     ];
 }
 

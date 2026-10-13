@@ -1108,7 +1108,7 @@ typedef struct {
     // The room the lines have (lineInsets), and the fade's edges on their way to it from _bandFrom.
     UIEdgeInsets _band, _bandFrom;
     CFTimeInterval _bandSince, _bandFor;
-    BOOL _keepsSing, _extrasHidden;
+    BOOL _keepsSing, _extrasHidden, _extrasEnabled;
     void (^_browsingBegan)(void);
 }
 
@@ -1122,6 +1122,7 @@ typedef struct {
     _lineGap = kLineGap;
     _blurPerLine = kBlurPerLine;
     _maxBlur = kMaxBlur;
+    _extrasEnabled = YES;
     _shown = [NSMutableDictionary dictionary];
     _sightArrangement = NSUIntegerMax;
     _fade = [CAGradientLayer layer];
@@ -1545,7 +1546,7 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
 // The button shows only for a song with a pronunciation or a translation to show, and its menu only
 // what the song has: a switch for each, reading what tapping it will do.
 - (void)offerExtras {
-    if (_compact) {   // the preview has no room for the button, and nothing to open
+    if (_compact || !_extrasEnabled) {   // the preview has no room for the button, and nothing to open
         _extras.hidden = YES;
         return;
     }
@@ -1872,6 +1873,13 @@ static BOOL lyricsAreForeign(NSArray<SGKaraokeLine *> *lines, NSString *language
     if (hidden) _extras.hidden = YES;
     else [self offerExtras];
     [self setNeedsLayout];
+}
+
+- (void)setExtrasEnabled:(BOOL)enabled {
+    if (_extrasEnabled == enabled) return;
+    _extrasEnabled = enabled;
+    if (!enabled) _extras.hidden = YES;
+    else [self offerExtras];
 }
 
 - (void)setShowing:(BOOL)showing {

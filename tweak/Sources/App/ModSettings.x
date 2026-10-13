@@ -248,6 +248,9 @@ static UIViewController *modSettingsPage(void) {
     }
     [sections addObjectsFromArray:@[
         SGSection(nil, parts),
+        SGSection(@"Lock Screen", @[
+            pageRow(@"Lock screen widget", @"lock.iphone", ^UIViewController *{ return SGLockScreenWidgetPage(); }),
+        ]),
         SGSection(nil, @[
             pageRow(@"Premium, ads & privacy", @"crown", ^UIViewController *{ return SGAdsSettingsPage(); }),
             pageRow(@"Labs", @"testtube.2", ^UIViewController *{ return SGLabsPage(); }),

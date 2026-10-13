@@ -594,3 +594,8 @@ void SGRSingControlDismiss(UIView *page) {
     SGRSingControl *control = objc_getAssociatedObject(page, &kControlKey);
     [control dismissControls];
 }
+
+void SGRSingControlRemoveForPage(UIView *page) {
+    SGRSingControl *control = page ? objc_getAssociatedObject(page, &kControlKey) : nil;
+    [control retireFrom:page];
+}

@@ -64,8 +64,12 @@ static __weak UIView *sg_titleElement;      // the arranged element view holding
 static __weak UIViewController *sg_player;  // NowPlayingViewController, whose units the controls are
 static BOOL sg_alone;                       // the lines have the player to themselves
 static BOOL sg_touching;                    // a finger is on the player, which holds the clock (SGRPlayerTouchWatcher)
+static BOOL sg_singHolding;                 // Sing's open capsule or explanation holds the controls up
 static NSTimer *sg_rest;
 static __weak UIGestureRecognizer *sg_wake; // on the player, on while alone: the tap that brings the controls back
+@class SGRPlayerLyricsOverlay;
+static void syncSingControl(SGRPlayerLyricsOverlay *overlay);
+static void restartRest(void);
 
 #pragma mark - the overlay
 
@@ -288,6 +292,9 @@ static void place(SGRPlayerLyricsOverlay *overlay, UIView *host, SGRLyricsLayout
     plate.center = CGPointMake(CGRectGetMidX(overlay.thumb.bounds), CGRectGetMidY(overlay.thumb.bounds));
     overlay.stage.bounds = (CGRect){CGPointZero, stage.size};
     overlay.stage.center = CGPointMake(CGRectGetMidX(stage), CGRectGetMidY(stage));
+    overlay.lyrics.frame = overlay.stage.bounds;
+    overlay.lyrics.extrasEnabled = SGEnabled(SGRKeyPlayerTranslateButton);
+    syncSingControl(overlay);
 }
 
 // Where the thumbnail's view has to go to land on `l.thumb`, as a transform about its own center: the
@@ -411,7 +418,7 @@ static BOOL coveredBySheet(void) {
 static BOOL mayCount(void) {
     SPTPlayerState *state = SGPlayerState();
     UIView *host = sg_host;
-    return SGEnabled(SGRKeyLyricsAutoHide) && sg_open && !sg_alone && !sg_touching && host.window && state && !state.isPaused
+    return SGEnabled(SGRKeyLyricsAutoHide) && sg_open && !sg_alone && !sg_touching && !sg_singHolding && host.window && state && !state.isPaused
         && !UIAccessibilityIsVoiceOverRunning()
         && UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
 }
@@ -432,6 +439,29 @@ static void restartRest(void) {
         if (mayRest()) setAlone(YES, YES);
         if (!sg_alone) restartRest();
     }];
+}
+
+static void singHolding(BOOL holding) {
+    if (holding == sg_singHolding) return;
+    sg_singHolding = holding;
+    if (holding) {
+        [sg_rest invalidate];
+        sg_rest = nil;
+    } else if (!sg_alone) {
+        restartRest();
+    }
+}
+
+static void syncSingControl(SGRPlayerLyricsOverlay *overlay) {
+    if (!overlay) return;
+    if (!SGEnabled(SGRKeyPlayerKaraokeButton)) {
+        SGRSingControlRemoveForPage(overlay.stage);
+        return;
+    }
+    __weak SGRPlayerLyricsOverlay *weakOverlay = overlay;
+    SGRSingControlForPage(overlay.stage, overlay.lyrics.frame, sg_alone, ^(BOOL holding) {
+        if (weakOverlay) singHolding(holding);
+    });
 }
 
 @interface SGRPlayerTouchWatcher : UIGestureRecognizer <UIGestureRecognizerDelegate>
@@ -623,6 +653,7 @@ static void setOpen(BOOL open, BOOL animated) {
     void (^settled)(BOOL) = ^(BOOL finished) {
         sg_moving = NO;
         if (sg_open) return;   // opened again while it was going away
+        SGRSingControlRemoveForPage(overlay.stage);
         SGRPlayerCoverList().alpha = 1;
         [overlay removeFromSuperview];
     };
@@ -829,6 +860,10 @@ static SGRPlayerLyricsWatcher *sg_watcher;
         setAlone(NO, NO);
         [sg_rest invalidate];
         sg_rest = nil;
+    }];
+    [NSNotificationCenter.defaultCenter addObserverForName:SGSingDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+        if (!sg_open || !sg_host) return;
+        syncSingControl(objc_getAssociatedObject(sg_host, &kOverlayKey));
     }];
     [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
         restartRest();

@@ -48,6 +48,9 @@ BOOL SGRPlayerLyricsOpen(void);
 void SGRPlayerToggleLyrics(void);
 void SGRPlayerLyricsChanged(void);
 #define SGRKeyLyricsAutoHide @"spotifyglass.redesign.lyrics.autoHide"
+#define SGRKeyLyricsLandscapeAutoHide @"spotifyglass.redesign.lyrics.landscapeAutoHide"
+#define SGRKeyPlayerKaraokeButton @"spotifyglass.redesign.player.karaokeButton"
+#define SGRKeyPlayerTranslateButton @"spotifyglass.redesign.player.translateButton"
 
 // The system volume slider below the player controls.
 #define SGRKeyPlayerVolume @"spotifyglass.redesign.player.volume"
