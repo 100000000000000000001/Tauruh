@@ -5,6 +5,7 @@
 #import "Settings/SGGlowSwitch.h"
 #import "Native/Home/Home.h"
 #import "Shared/AdBlock/AdBlock.h"
+#import "Shared/Player/PlayerSettings.h"
 #import "Redesigned/Album/Album.h"
 #import "Redesigned/Lyrics/Sing.h"
 #import "Shared/Sing/SGSingModel.h"
