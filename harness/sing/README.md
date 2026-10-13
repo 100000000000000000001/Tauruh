@@ -17,19 +17,20 @@ with a 30 ms level ramp and a 120 ms return to aligned original audio.
 
 `SGAudioSourceQueue.m` reads queue metadata only for the pinned Spotify 9.1.78 arm64 Mach-O UUID
 and verified callback/reader signatures. It neither reads private PCM nor calls private functions.
-The render consumer obtains samples through the existing AudioUnit source, pulling at most two
-render quanta when verified spare audio is available, leaving a 120 ms native reserve. Pending
-commands, stopping end markers and unstable metadata supply no extra budget. A known next track
-permits one end marker only when the pinned reader's flags prove it can continue into the
-following PCM. The original AudioUnit remains the sole consumer. A natural transition retains the
-worker and buffered samples; a bounded clock-marker queue moves the audible clock at the actual
-sample boundary. Explicit seek/skip, a different next-track identity and graph replacement
-invalidate the old generation. The metadata scan stops after verifying the prefix needed for the
-current pull and native reserve; it does not walk the rest of the buffered song on every render
-callback. An exhausted, non-null block is skipped as the verified native reader does on its next
-pull; an end marker requires the separate continuity checks above. Other binary layouts cannot
-attach Sing. Spotify 9.1.90's exact callback is retained only for a one-time in-app ABI probe;
-its queue is not enabled for read-ahead until its layout and boundary behavior are verified.
+For that verified source, the render consumer obtains samples through the existing AudioUnit source,
+pulling at most two render quanta when verified spare audio is available and leaving a 120 ms native
+reserve. Pending commands, stopping end markers and unstable metadata supply no extra budget. A
+known next track permits one end marker only when the pinned reader's flags prove it can continue
+into the following PCM.
+
+For an unverified source such as Spotify 9.1.90, Sing does not use guessed queue offsets: it pulls
+through the existing AudioUnit source and bounds read-ahead at the first chunk that the mixer marks
+silent. The original AudioUnit remains the sole consumer in both paths. A natural transition retains
+the worker and buffered samples; a bounded clock-marker queue moves the audible clock at a verified
+sample boundary. Explicit seek/skip, a different next-track identity and graph replacement invalidate
+the old generation. On unverified layouts, read-ahead is bounded by mixer silence, but next-track
+boundary detection remains dependent on the existing player/queue signals and requires device
+verification.
 
 The bounded eight-second timeline targets 5.5 seconds of original audio ahead, emits dry audio
 immediately, and fades in vocal reduction only when enough aligned future vocals are ready.
@@ -51,12 +52,13 @@ format failures stop Sing and keep the original audio playing.
 
 ## The model
 
-The app downloads the five files of Vitrine's `separator-ane.mlmodelc` from
-`https://huggingface.co/My-Name-Is-Jeff/vitrine-sing/resolve/main/separator-ane.mlmodelc/`,
-pinned by size and SHA-256 in `SGSingModel.m`. The Vitrine 6-bit Neural Engine export has the same
-two-second spectral contract as the earlier model: `spectrum` `[1, 2050, 201, 2]` in,
-`vocals_spectrum` out. Its Core ML schema uses Float16 input and output; the worker supplies the
-Float32 input accepted by the model and converts the Float16 output to Float32. The worker performs
+The Karaoke settings let the user choose Vitrine's full `separator-ane.mlmodelc` or smaller
+`separator-light.mlmodelc` (Mini-BS-RoFormer-18M). Each model's five files are downloaded from its
+matching folder at `https://huggingface.co/My-Name-Is-Jeff/vitrine-sing/resolve/main/`, pinned by
+size and SHA-256 in `SGSingModel.m`, and kept in separate installed and resumable-download folders.
+Both Vitrine exports use the same two-second spectral contract: `spectrum` `[1, 2050, 201, 2]` in,
+`vocals_spectrum` out. Their Core ML schemas use Float16 input and output; the worker supplies the
+Float32 input accepted by both models and converts the Float16 output to Float32. The worker performs
 the 2,048-point periodic-Hann STFT and its inverse with Accelerate, using reflected boundaries, a
 441-sample step and window-weight normalization (`SGStemSpectralDSP.swift`). Reusable FFT plans,
 the input tensor and the inverse accumulator belong to the separator's actor; model loading and
@@ -93,7 +95,8 @@ The C tests run the production packet queue, mixer, timeline and stream: wraparo
 pressure, 100,000 concurrent transfers, generation/track/format rejection, gain ramps, limiting,
 exact source order through buffering, aligned bypass and draining, cancellation before
 preparation, a worker outage, variable callback sizes, a depleted source queue and a source with no
-verified read-ahead, which must keep playing dry. Recovery requires the full ready-vocal reserve,
+verified queue prefix, which must keep playing dry, plus a mixer-silence fallback that retains only
+the sounding prefix of extra read-ahead. Recovery requires the full ready-vocal reserve,
 and a two-minute regression holds inference at 1.3 seconds, as observed on a warm phone, checking
 every original sample through preparation and every reduced sample after activation.
 
@@ -179,38 +182,40 @@ The app downloads Vitrine's pinned `separator-ane.mlmodelc` bundle instead.
 
 ## The model on the phone
 
-The model is not in the IPA. In the redesigned look, **Mod Settings → Karaoke**
-has Sing's switch, which puts the microphone in the player's lyrics and takes it away at once (off,
-Sing does no work), and the voice model's row: Not downloaded, Downloading 43 % · 86 of 201 MB with
-a bar under it and Cancel download, Checking…, Downloaded · 201 MB with Remove voice model, or
-Paused / Download failed, whose tap says why. Below iOS 18 the section is a "Needs iOS 18" row.
+The models are not in the IPA. In the redesigned look, **Mod Settings → Karaoke**
+has Sing's switch, the **Model size** choice (Best quality · 210 MB or Light · 31 MB), and the
+selected voice model's row: Not downloaded, Downloading with a progress bar and Cancel download,
+Checking…, Downloaded with Remove voice model, or Paused / Download failed, whose tap says why.
+Each model keeps its own installed files and partial download, so choosing one does not remove the
+other. Below iOS 18 the section is a "Needs iOS 18" row.
 
-`Shared/Sing/SGSingModel.m` downloads the five files of Vitrine's full `separator-ane.mlmodelc`
-one by one from `https://huggingface.co/My-Name-Is-Jeff/vitrine-sing/resolve/main/separator-ane.mlmodelc/<path>`
-(no archive: iOS has no public unzip) and pins each file's size and SHA-256 in its table; nothing the
-server says about them is trusted. It checks for free space first (the model plus 64 MB), asks before using a cellular or Low
+`Shared/Sing/SGSingModel.m` downloads each model's five files one by one (no archive: iOS has no
+public unzip) and pins each file's size and SHA-256; nothing the server says about them is trusted.
+It checks for free space first (the selected model plus 64 MB), asks before using a cellular or Low
 Data Mode network, and otherwise keeps off them and waits for Wi-Fi. The download runs in a
 background `URLSession`, so it goes on while Spotify is away; the app delegate is given
 `application:handleEventsForBackgroundURLSession:completionHandler:` for it (Spotify's has none), and
-a launch reconnects to a download left running by the session's identifier. Each file lands in
-`Library/Application Support/spoti.pw/Sing/Download-vitrine-ane/`, is hashed off the main thread and named there
-only if it is the pinned one; a file that is not is deleted and stops the download. Cancel keeps each
+a launch reconnects to a download left running by the session's identifier. Each file is hashed off
+the main thread and staged under the selected model's own folder only if it is the pinned one; a file
+that is not is deleted and stops the download. Cancel keeps each
 file's resume data, and Download goes on from it (a resume that fails starts that file over, once).
-Once every file is in, the staged `separator.mlmodelc` becomes
-`Library/Application Support/spoti.pw/Sing/separator.mlmodelc` in one rename, and the folder is
-excluded from the iCloud backup. Remove deletes the folder and drops the warm model. The controller
-loads the model from there; without it Sing is unavailable and the lyrics show no microphone.
+Once every file is in, the staged model becomes its installed folder in one rename, and the Sing
+folder is excluded from the iCloud backup. Remove deletes only the selected model's files and drops
+the warm model. The controller loads the selected model from there; without it Sing is unavailable
+and the lyrics show no microphone.
 
 ```sh
 python3 harness/sing/stage_model.py /path/to/vitrine/separator-ane.mlmodelc build/model-fixture
 python3 harness/sing/model_test.py build/model-fixture
 ```
 
-`stage_model.py` stages only the exact pinned Vitrine ANE bundle as a local fixture; it uploads
-nothing. `model_test.py` serves that folder on localhost and runs the production download code against it
-in a real background session on the Mac (ASan/UBSan): a corrupted `model.mil` rejected and deleted, a
-cancel at 100 MB resumed from where it stopped (the server sees the range), the install, a download
-left running by one process and picked up by the next, and removal.
+`stage_model.py` stages the exact pinned Vitrine full-model bundle as a local fixture; it uploads
+nothing. `model_test.py` serves that folder on localhost and runs the production download code against
+it in a real background session on the Mac (ASan/UBSan): a corrupted `model.mil` rejected and deleted,
+a cancel at 100 MB resumed from where it stopped (the server sees the range), the install, a download
+left running by one process and picked up by the next, and removal. The light-model descriptor and
+size choice are checked by that harness; a full light-bundle download still needs a matching local
+fixture and device verification.
 
 ## Model provenance
 

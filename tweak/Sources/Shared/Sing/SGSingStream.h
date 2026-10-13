@@ -4,12 +4,13 @@
 #include "Shared/Sing/SGSingTimeline.h"
 
 enum { SGSingStreamPacketFrames = 1024, SGSingStreamMaximumRenderFrames = 4096 };
+#define SGSingStreamReadUntilSilence UINT32_MAX
 typedef struct SGSingStream SGSingStream;
 typedef enum {
     SGSingStopNone, SGSingStopRequested, SGSingStopLateVocals,
     SGSingStopCapacity, SGSingStopSourceError
 } SGSingStopReason;
-typedef int32_t (*SGSingSourceRead)(void *context, uint32_t frames, float *stereo);
+typedef int32_t (*SGSingSourceRead)(void *context, uint32_t frames, float *stereo, uint32_t *sounding);
 
 SGSingStream *SGSingStreamCreate(SGAudioStamp origin, uint32_t windowFrames, uint32_t hopFrames, float level);
 void SGSingStreamDestroy(SGSingStream *stream);
@@ -31,7 +32,8 @@ SGSingStopReason SGSingStreamStopReason(const SGSingStream *stream);
 int32_t SGSingStreamSourceError(const SGSingStream *stream);
 int32_t SGSingStreamWorkerState(const SGSingStream *stream); // -1 stopped, 0 paused, 1 reading
 
-// Render endpoint. Never pulls source while paused or draining. Preparation emits aligned original audio; only verified available frames permit extra pulls.
+// Render endpoint. Never pulls source while paused or draining. Preparation emits aligned original audio;
+// read-ahead uses verified queue bounds or stops at the first mixer-silent chunk.
 int32_t SGSingStreamRender(SGSingStream *stream, uint32_t frames, float *stereo,
                           SGSingSourceRead source, void *context, uint32_t available);
 // Worker endpoint. Input holds SGSingStreamPacketFrames stereo frames; output holds one completed hop.

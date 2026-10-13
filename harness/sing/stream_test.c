@@ -13,16 +13,38 @@ static uint32_t seed = 41, budget;
 static bool sourceFails;
 static unsigned sourceCalls;
 static float sampleAt(uint64_t frame) { return .31f*sinf((float)(frame % rate)*.031f); }
-static int32_t source(void *context, uint32_t count, float *pcm) {
+static int32_t source(void *context, uint32_t count, float *pcm, uint32_t *sounding) {
     assert(context == &pulled && count <= budget);
     sourceCalls++;
     if (sourceFails) return -42;
+    if (sounding) *sounding = count;
     budget -= count;
     for (unsigned n=0;n<count;n++) {
         pcm[n*2] = sampleAt(pulled+n); pcm[n*2+1] = -.7f*pcm[n*2];
     }
     pulled += count;
     return 0;
+}
+typedef struct { uint32_t available; unsigned calls; } SilenceSource;
+static int32_t silenceSource(void *context, uint32_t count, float *pcm, uint32_t *sounding) {
+    SilenceSource *source = context;
+    source->calls++;
+    memset(pcm, 0, count * 2 * sizeof(float));
+    if (sounding) {
+        *sounding = source->available < count ? source->available : count;
+        source->available -= *sounding;
+    }
+    return 0;
+}
+static void mixerSilenceBoundsReadAhead(void) {
+    SilenceSource source = {.available = 123};
+    SGSingStream *stream = SGSingStreamCreate((SGAudioStamp){1,2,0,3,0},window,hop,.5f);
+    assert(stream);
+    assert(!SGSingStreamRender(stream, 441, output, silenceSource, &source, SGSingStreamReadUntilSilence));
+    assert(source.calls == 2);
+    assert(SGSingStreamCaptured(stream) == 441 + 123);
+    assert(SGSingStreamPresented(stream) == 441);
+    SGSingStreamDestroy(stream);
 }
 static unsigned scenario(bool ahead, bool stall, bool cancelEarly, float level, unsigned inferenceMilliseconds) {
     pulled = audible = workerFrames = nextWindow = 0;
@@ -173,6 +195,7 @@ static void coldPrefix(void) {
     SGSingStreamDestroy(s);
 }
 int main(void) {
+    mixerSilenceBoundsReadAhead();
     coldPrefix();
     failures();
     assert(scenario(true,false,false,1,800)>20);

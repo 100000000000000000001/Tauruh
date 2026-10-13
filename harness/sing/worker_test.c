@@ -59,8 +59,9 @@ static void report(void *context, int32_t status) {
     }
     if (status == SGStemFinished) atomic_store(&finished, true);
 }
-static int32_t source(void *context, uint32_t frames, float *pcm) {
+static int32_t source(void *context, uint32_t frames, float *pcm, uint32_t *sounding) {
     (void)context;
+    if (sounding) *sounding = frames;
     for (unsigned n = 0; n < frames; n++) {
         size_t at = (pulled+n) % fixtureFrames;
         pcm[n*2] = fixture[at]; pcm[n*2+1] = fixture[fixtureFrames+at];

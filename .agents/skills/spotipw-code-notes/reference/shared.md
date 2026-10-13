@@ -197,6 +197,8 @@
 > Graph changes wait off the render thread. A render callback makes one attempt and never waits.
 > This protects the source/bus pair and prevents disposing a source during a pull. Setters can
 > invoke a property listener synchronously, hence the per-thread nesting count.
+> Sing also bounds look-ahead by the source mixer's `OutputIsSilence` flag when Spotify's callback
+> ABI is not pinned; this path does not inspect decoder-queue memory.
 
 ## `Shared/Audio/SGAudioRingBuffer.h`
 
@@ -2107,8 +2109,8 @@
 > Spotify's current source during that interval, rather than muting its new audio.
 
 **`uint64_t captured = SGSingStreamCaptured(a->stream);`** (was L51)
-> The stream pulls at most two quanta and leaves 120 ms in Spotify's queue.
-> Counting any further ahead adds kernel reads to every audio callback for no gain.
+> A pinned source uses its verified queue prefix and reserve. Other callbacks use mixer silence as the
+> read-ahead boundary; the silence path does not guess a Spotify-private queue layout.
 
 **`atomic_fetch_add(&clockSequence, 1);`** (was L83)
 > A natural transition keeps its audio epoch. Publish track and position as one
@@ -2227,9 +2229,10 @@
 > The model host: a Hugging Face repository holding the compiled model's files at the paths below. A test
 > build serves them itself and keeps them somewhere of its own (harness/sing/model_test.m).
 
-**`static const struct { const char *path; int64_t size; const char *sha256; } kFiles[] = {`** (was L19)
-> The compiled model, file by file, as harness/sing/stage_model.py prints it for an export. Only these
-> files, at these sizes and with these hashes, ever become the model; the largest comes first.
+**`static const SGSingModelDescriptor kModels[] = {`**
+> Vitrine's full and light compiled exports. Each has its own pinned files, installed path and staging
+> directory, so selecting or removing one does not overwrite the other. The full model keeps the
+> original `separator.mlmodelc` install path for existing users.
 
 **`static BOOL sg_loaded, sg_installed, sg_want, sg_metered;`** (was L34)
 > Main thread. A file is done once it is checked and in the staging folder under its own name, and
@@ -2261,6 +2264,8 @@
 **file overview** (was L1)
 > One immutable playback generation. Create/retire off the audio thread, after its users stop.
 > The render endpoint owns the timeline; the worker only exchanges stamped PCM packets.
+> A verified source supplies a spare-frame budget; an unverified source uses the
+> `SGSingStreamReadUntilSilence` mode and retains only the sounding prefix of look-ahead reads.
 
 **`void SGSingStreamSetModelReady(SGSingStream *stream, bool ready);`** (was L20)
 > Disable before attaching a cold model; enable once Ready. The render owner seeds the worker

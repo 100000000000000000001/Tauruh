@@ -1,6 +1,12 @@
 #import <Foundation/Foundation.h>
 
 #define SGKeySingModelDownload @"spotifyglass.sing.modelDownload"
+#define SGKeySingModel @"spotifyglass.sing.model"
+
+typedef NS_ENUM(NSInteger, SGSingModelKind) {
+    SGSingModelFull,
+    SGSingModelLight,
+};
 
 typedef NS_ENUM(NSInteger, SGSingModelState) {
     SGSingModelMissing,       // not on this iPhone; SGSingModelReceived says how much a stopped download kept
@@ -11,12 +17,16 @@ typedef NS_ENUM(NSInteger, SGSingModelState) {
 
 // Posted as the state or the progress changes, the progress at most four times a second.
 extern NSNotificationName const SGSingModelDidChangeNotification;
+extern NSString *const SGSingModelDidChangeChoiceKey;
 
 SGSingModelState SGSingModelCurrentState(void);
+SGSingModelKind SGSingModelChosen(void);
+void SGSingModelChoose(SGSingModelKind kind);
 int64_t SGSingModelSize(void);       // all of it, as pinned
+NSString *SGSingModelSizeTextOf(SGSingModelKind kind);
 int64_t SGSingModelReceived(void);   // what of it is on this iPhone, checked or not
 NSString *SGSingModelFailure(void);  // why the last download stopped short, nil unless it did
-NSString *SGSingModelPath(void);     // the installed separator.mlmodelc, nil without one
+NSString *SGSingModelPath(void);     // the selected installed separator, nil without one
 NSString *SGSingModelBytesText(int64_t bytes);   // rounded MiB, in the units the rows use
 
 // What keeps a download from starting: too little free space, said with how much it needs. Nil when none.

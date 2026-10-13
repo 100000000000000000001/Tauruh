@@ -128,14 +128,20 @@ OSStatus SGAudioPipelinePull(UInt32 frames, AudioBufferList *data, const AudioTi
     return SGAudioPipelinePullOriginal(frames, data, outputTime);
 }
 OSStatus SGAudioPipelinePullOriginal(UInt32 frames, AudioBufferList *data, const AudioTimeStamp *outputTime) {
+    return SGAudioPipelinePullOriginalAvailable(frames, data, outputTime, NULL);
+}
+OSStatus SGAudioPipelinePullOriginalAvailable(UInt32 frames, AudioBufferList *data, const AudioTimeStamp *outputTime,
+                                             UInt32 *sounding) {
     AudioUnit source = atomic_load(&sourceUnit);
     if (!pulling || !source || !data) return kAudioUnitErr_NoConnection;
     if (!frames) return noErr;
+    if (sounding) *sounding = 0;
     if (data->mNumberBuffers != sourceChannels || frames > UINT32_MAX / sizeof(float)) return kAudio_ParamError;
     UInt32 chunk = atomic_load_explicit(&maximumFrames, memory_order_relaxed);
     for (UInt32 b = 0; b < data->mNumberBuffers; b++) {
         if (!data->mBuffers[b].mData || data->mBuffers[b].mNumberChannels != 1 ||
             data->mBuffers[b].mDataByteSize < frames * sizeof(float)) return kAudio_ParamError;
+        if (sounding) memset(data->mBuffers[b].mData, 0, frames * sizeof(float));
     }
     for (UInt32 done = 0; done < frames;) {
         UInt32 count = MIN(chunk, frames - done);
@@ -150,10 +156,13 @@ OSStatus SGAudioPipelinePullOriginal(UInt32 frames, AudioBufferList *data, const
         OSStatus status = AudioUnitRender(source, &flags, &time, atomic_load(&sourceBus), count, &part.list);
         sourceTime += count;
         if (status != noErr) return status;
-        if (flags & kAudioUnitRenderAction_OutputIsSilence)
+        if (flags & kAudioUnitRenderAction_OutputIsSilence) {
             for (UInt32 b = 0; b < data->mNumberBuffers; b++) memset(part.list.mBuffers[b].mData, 0, count * sizeof(float));
+            if (sounding) { *sounding = done; return noErr; }
+        }
         done += count;
     }
+    if (sounding) *sounding = frames;
     return noErr;
 }
 

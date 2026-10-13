@@ -6,6 +6,7 @@
 #import <Network/Network.h>
 
 NSNotificationName const SGSingModelDidChangeNotification = @"spotifyglass.singModelChanged";
+NSString *const SGSingModelDidChangeChoiceKey = @"choiceChanged";
 
 #ifndef SGSingModelBase
 #define SGSingModelBase @"https://huggingface.co/My-Name-Is-Jeff/vitrine-sing/resolve/main/"
@@ -14,21 +15,48 @@ NSNotificationName const SGSingModelDidChangeNotification = @"spotifyglass.singM
 #define SGSingModelRoot nil
 #endif
 
-static const struct { const char *path; int64_t size; const char *sha256; } kFiles[] = {
+typedef struct {
+    const char *path;
+    int64_t size;
+    const char *sha256;
+} SGSingModelFile;
+
+typedef struct {
+    const char *repoFolder;
+    const char *installedFolder;
+    const char *stagingFolder;
+    const char *stagedModelFolder;
+    const SGSingModelFile *files;
+} SGSingModelDescriptor;
+
+static const SGSingModelFile kFullFiles[] = {
     {"metadata.json", 2333, "101714d1a37ad29c70bf1705ec25ec99584c3cbce27f2245858ace06dacbfb44"},
     {"coremldata.bin", 388, "bcfd38a8b121681dfb9fdfe6f9d88ffb29068e0dd6d24d4012f4c3a7bdcbc81b"},
     {"analytics/coremldata.bin", 243, "55f78aab64f5b1250ce4d6016dff23aee43fb97feb77bbceab4e36b3d9ccffb3"},
     {"model.mil", 1346642, "957024c1075fe331f7ca3410b8bf5e2f83a58c61763caf154729829ce0a92d08"},
     {"weights/weight.bin", 209077208, "bb4a0effafb5121b9aaa5ea96371fa14d0d8dc30a5ae44a93e0c15a2f4077635"},
 };
-enum { kFileCount = sizeof kFiles / sizeof *kFiles };
+static const SGSingModelFile kLightFiles[] = {
+    {"metadata.json", 2383, "757200c870bd4c5e5b70130c9edbd60029bd81c779b504c57ddcd624597f30e9"},
+    {"coremldata.bin", 484, "e533e0c22c3f185e5b8871d2b897111e64420736daa7dc7c239206ca2519d428"},
+    {"analytics/coremldata.bin", 243, "205b1d1d16603c69b4abdfa54b29df71164a16ca4f16a1cf436e7e33ce0b1407"},
+    {"model.mil", 715945, "d3b62a7972344d1a8eec5de8a21130a19272738bce1135871d8bab098585a841"},
+    {"weights/weight.bin", 30040968, "ad460549f68898eab7fe946e9675efaa2551d37b93f73796958c73d4881897fc"},
+};
+enum { kFileCount = 5 };
+
+static const SGSingModelDescriptor kModels[] = {
+    {"separator-ane.mlmodelc", "separator.mlmodelc", "Download-vitrine-ane", "separator.mlmodelc", kFullFiles},
+    {"separator-light.mlmodelc", "separator-light.mlmodelc", "Download-vitrine-light", "separator-light.mlmodelc", kLightFiles},
+};
 
 static NSString *const kSessionIdentifier = @"spotifyglass.sing.model";
-static NSString *const kRepoFolder = @"separator-ane.mlmodelc";
+static NSString *const kDownloadKindKey = @"spotifyglass.sing.modelDownloadKind";
 static const int64_t kHeadroom = 64ll << 20;               // free space left over once the model is in
 static const NSTimeInterval kProgressInterval = 0.25;      // between two progress notifications
 
 static BOOL sg_loaded, sg_installed, sg_want, sg_metered;
+static SGSingModelKind sg_loadedKind;
 static NSString *sg_failure;
 static BOOL sg_done[kFileCount], sg_checking[kFileCount], sg_restarted[kFileCount], sg_fromResume[kFileCount];
 static int64_t sg_bytes[kFileCount];
@@ -41,8 +69,15 @@ static NSTimeInterval sg_lastPost;
 
 #pragma mark - the files
 
-static NSString *pathOf(int i) { return @(kFiles[i].path); }
-static NSString *repoPathOf(int i) { return [kRepoFolder stringByAppendingFormat:@"/%@", pathOf(i)]; }
+static SGSingModelKind chosenKind(void) {
+    return SGInt(SGKeySingModel, SGSingModelFull) == SGSingModelLight ? SGSingModelLight : SGSingModelFull;
+}
+static const SGSingModelDescriptor *model(void) { return &kModels[chosenKind()]; }
+static const SGSingModelFile *files(void) { return model()->files; }
+static const SGSingModelFile *filesOfKind(SGSingModelKind kind) { return kModels[kind == SGSingModelLight ? SGSingModelLight : SGSingModelFull].files; }
+static NSString *pathOf(int i) { return @(files()[i].path); }
+static NSString *repoPathOf(int i) { return [[NSString stringWithUTF8String:model()->repoFolder] stringByAppendingFormat:@"/%@", pathOf(i)]; }
+static NSString *downloadFolderName(void) { return @(model()->stagingFolder); }
 
 static NSURL *singFolder(void) {
     static NSURL *folder;
@@ -54,9 +89,9 @@ static NSURL *singFolder(void) {
     }
     return folder;
 }
-static NSURL *installedModel(void) { return [singFolder() URLByAppendingPathComponent:@"separator.mlmodelc" isDirectory:YES]; }
-static NSURL *staging(void) { return [singFolder() URLByAppendingPathComponent:@"Download-vitrine-ane" isDirectory:YES]; }
-static NSURL *stagedModel(void) { return [staging() URLByAppendingPathComponent:@"separator.mlmodelc" isDirectory:YES]; }
+static NSURL *installedModel(void) { return [singFolder() URLByAppendingPathComponent:@(model()->installedFolder) isDirectory:YES]; }
+static NSURL *staging(void) { return [singFolder() URLByAppendingPathComponent:downloadFolderName() isDirectory:YES]; }
+static NSURL *stagedModel(void) { return [staging() URLByAppendingPathComponent:@(model()->stagedModelFolder) isDirectory:YES]; }
 static NSURL *stagedFile(int i) { return [stagedModel() URLByAppendingPathComponent:pathOf(i)]; }
 // Where a file waits for its hash, and where a stopped download of it keeps what it needs to resume.
 static NSURL *arrivedFile(int i) { return [staging() URLByAppendingPathComponent:[NSString stringWithFormat:@"%d.part", i]]; }
@@ -104,15 +139,25 @@ static BOOL makeFolders(NSError **error) {
 }
 
 static void load(void) {
-    if (sg_loaded) return;
+    SGSingModelKind kind = chosenKind();
+    if (sg_loaded && sg_loadedKind == kind) return;
     sg_loaded = YES;
-    sg_tasks = [NSMutableDictionary dictionary];
+    sg_loadedKind = kind;
+    sg_want = NO;
+    sg_installed = NO;
+    sg_failure = nil;
+    memset(sg_done, 0, sizeof sg_done);
+    memset(sg_checking, 0, sizeof sg_checking);
+    memset(sg_restarted, 0, sizeof sg_restarted);
+    memset(sg_fromResume, 0, sizeof sg_fromResume);
+    memset(sg_bytes, 0, sizeof sg_bytes);
+    if (!sg_tasks) sg_tasks = [NSMutableDictionary dictionary];
     sg_installed = YES;
     for (int i = 0; i < kFileCount; i++)
-        sg_installed &= sizeAt([installedModel() URLByAppendingPathComponent:pathOf(i)]) == kFiles[i].size;
+        sg_installed &= sizeAt([installedModel() URLByAppendingPathComponent:pathOf(i)]) == files()[i].size;
     if (sg_installed) return;
     for (int i = 0; i < kFileCount; i++) {
-        sg_done[i] = sizeAt(stagedFile(i)) == kFiles[i].size;
+        sg_done[i] = sizeAt(stagedFile(i)) == files()[i].size;
         sg_bytes[i] = sg_done[i] ? 0 : [[NSDictionary dictionaryWithContentsOfURL:resumeFile(i)][@"bytes"] longLongValue];
     }
 }
@@ -122,6 +167,13 @@ static void post(BOOL progress) {
     if (progress && now - sg_lastPost < kProgressInterval) return;
     sg_lastPost = now;
     [NSNotificationCenter.defaultCenter postNotificationName:SGSingModelDidChangeNotification object:nil];
+}
+
+static void postChoice(void) {
+    sg_lastPost = NSProcessInfo.processInfo.systemUptime;
+    [NSNotificationCenter.defaultCenter postNotificationName:SGSingModelDidChangeNotification
+                                                      object:nil
+                                                    userInfo:@{SGSingModelDidChangeChoiceKey: @YES}];
 }
 
 #pragma mark - the download
@@ -140,23 +192,38 @@ static NSURLSession *session(void) {
     return sg_session;
 }
 
-static void keepResume(int i, NSData *data) {
-    if (!data) { sg_bytes[i] = 0; return; }
-    [@{@"data": data, @"bytes": @(sg_bytes[i]), @"metered": @(sg_metered)} writeToURL:resumeFile(i) error:nil];
+static void keepResume(int i, NSData *data, const SGSingModelDescriptor *downloadModel) {
+    if (!data) {
+        if (downloadModel == model()) sg_bytes[i] = 0;
+        return;
+    }
+    NSURL *resume = [singFolder() URLByAppendingPathComponent:
+        [NSString stringWithFormat:@"%s-%d.resume", downloadModel->stagingFolder, i]];
+    [@{@"data": data, @"bytes": @(sg_bytes[i]), @"metered": @(sg_metered)} writeToURL:resume error:nil];
 }
 
 // Stops every task: kept for a resume when `keep`, dropped otherwise.
 static void stopTasks(BOOL keep) {
     sg_want = NO;
     [NSUserDefaults.standardUserDefaults removeObjectForKey:SGKeySingModelDownload];
+    [NSUserDefaults.standardUserDefaults removeObjectForKey:kDownloadKindKey];
+    const SGSingModelDescriptor *downloadModel = model();
     NSUInteger epoch = sg_epoch;
     [sg_tasks enumerateKeysAndObjectsUsingBlock:^(NSNumber *key, NSURLSessionDownloadTask *task, BOOL *stop) {
         int i = key.intValue;
         if (!keep) { [task cancel]; return; }
+        int64_t received = sg_bytes[i];
+        BOOL metered = sg_metered;
         [task cancelByProducingResumeData:^(NSData *data) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (epoch != sg_epoch || sg_want) return;
-                keepResume(i, data);
+                if (!data) {
+                    if (downloadModel == model()) sg_bytes[i] = 0;
+                    return;
+                }
+                NSURL *resume = [singFolder() URLByAppendingPathComponent:
+                    [NSString stringWithFormat:@"%s-%d.resume", downloadModel->stagingFolder, i]];
+                [@{@"data": data, @"bytes": @(received), @"metered": @(metered)} writeToURL:resume error:nil];
                 post(NO);
             });
         }];
@@ -189,7 +256,7 @@ static void startFile(int i) {
         sg_bytes[i] = 0;
     }
     task.taskDescription = repoPathOf(i);
-    task.countOfBytesClientExpectsToReceive = kFiles[i].size;
+    task.countOfBytesClientExpectsToReceive = files()[i].size;
     sg_tasks[@(i)] = task;
     [task resume];
 }
@@ -203,6 +270,7 @@ static void startMissing(void) {
 static void installIfComplete(void) {
     if (!sg_want) return;
     for (int i = 0; i < kFileCount; i++) if (!sg_done[i]) return;
+    SGSingModelKind kind = chosenKind();
     NSUInteger epoch = sg_epoch;
     NSURL *staged = stagedModel(), *installed = installedModel(), *folder = staging();
     dispatch_async(disk(), ^{
@@ -215,11 +283,12 @@ static void installIfComplete(void) {
             [installed setResourceValue:@YES forKey:NSURLIsExcludedFromBackupKey error:nil];
         }
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (epoch != sg_epoch || !sg_want) return;
+            if (epoch != sg_epoch || kind != chosenKind() || !sg_want) return;
             if (!moved) { fail([NSString stringWithFormat:@"The voice model could not be put in place: %@", error.localizedDescription]); return; }
             SGLog(@"Sing voice model installed");
             sg_want = NO;
             [NSUserDefaults.standardUserDefaults removeObjectForKey:SGKeySingModelDownload];
+            [NSUserDefaults.standardUserDefaults removeObjectForKey:kDownloadKindKey];
             sg_installed = YES;
             memset(sg_done, 0, sizeof sg_done);
             memset(sg_bytes, 0, sizeof sg_bytes);
@@ -230,10 +299,11 @@ static void installIfComplete(void) {
 
 static void check(int i) {
     sg_checking[i] = YES;
+    SGSingModelKind kind = chosenKind();
     NSUInteger epoch = sg_epoch;
     NSURL *arrived = arrivedFile(i), *staged = stagedFile(i);
-    int64_t size = kFiles[i].size;
-    NSString *expected = @(kFiles[i].sha256);
+    int64_t size = files()[i].size;
+    NSString *expected = @(files()[i].sha256);
     dispatch_async(disk(), ^{
         NSFileManager *files = NSFileManager.defaultManager;
         BOOL right = sizeAt(arrived) == size && [sha256(arrived) isEqualToString:expected];
@@ -244,12 +314,12 @@ static void check(int i) {
         }
         if (!right) [files removeItemAtURL:arrived error:nil];
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (epoch != sg_epoch) return;
+            if (epoch != sg_epoch || kind != chosenKind()) return;
             sg_checking[i] = NO;
             sg_done[i] = right;
             sg_bytes[i] = 0;
             if (!right) {
-                SGLog(@"Sing voice model: %s did not match its pinned size and hash", kFiles[i].path);
+                SGLog(@"Sing voice model: %s did not match its pinned size and hash", files()[i].path);
                 if (sg_want) fail(@"A downloaded file didn't match Sing's voice model, so it wasn't kept.");
                 return;
             }
@@ -278,7 +348,7 @@ static int indexOf(NSURLSessionTask *task) {
  expectedTotalBytes:(int64_t)expected {
     int i = indexOf(task);
     if (i < 0 || sg_tasks[@(i)] != task) return;
-    SGLog(@"Sing voice model: %s resumed at %lld bytes", kFiles[i].path, offset);
+    SGLog(@"Sing voice model: %s resumed at %lld bytes", files()[i].path, offset);
     sg_bytes[i] = offset;
     post(YES);
 }
@@ -317,11 +387,11 @@ static int indexOf(NSURLSessionTask *task) {
     sg_rejected[i] = nil;
     if (!ours || !sg_want) { post(NO); return; }   // stopped here, which kept or dropped its resume itself
     if (error) {
-        keepResume(i, error.userInfo[NSURLSessionDownloadTaskResumeData]);
+        keepResume(i, error.userInfo[NSURLSessionDownloadTaskResumeData], model());
         BOOL cancelled = [error.domain isEqualToString:NSURLErrorDomain] && error.code == NSURLErrorCancelled;
         if (cancelled || (sg_fromResume[i] && !sg_restarted[i])) {
             if (!cancelled) sg_restarted[i] = YES;
-            SGLog(@"Sing voice model: %s starting again after %@", kFiles[i].path, error.localizedDescription);
+            SGLog(@"Sing voice model: %s starting again after %@", files()[i].path, error.localizedDescription);
             startFile(i);
             post(NO);
             return;
@@ -343,6 +413,19 @@ static int indexOf(NSURLSessionTask *task) {
 
 #pragma mark - the API
 
+SGSingModelKind SGSingModelChosen(void) { return chosenKind(); }
+
+void SGSingModelChoose(SGSingModelKind kind) {
+    if (kind != SGSingModelLight) kind = SGSingModelFull;
+    if (kind == chosenKind()) return;
+    load();
+    if (sg_want) SGSingModelCancel();
+    SGSetInt(SGKeySingModel, kind);
+    sg_loaded = NO;
+    load();
+    postChoice();
+}
+
 SGSingModelState SGSingModelCurrentState(void) {
     load();
     if (sg_installed) return SGSingModelInstalled;
@@ -352,16 +435,25 @@ SGSingModelState SGSingModelCurrentState(void) {
 
 int64_t SGSingModelSize(void) {
     int64_t total = 0;
-    for (int i = 0; i < kFileCount; i++) total += kFiles[i].size;
+    const SGSingModelFile *selectedFiles = files();
+    for (int i = 0; i < kFileCount; i++) total += selectedFiles[i].size;
     return total;
+}
+
+NSString *SGSingModelSizeTextOf(SGSingModelKind kind) {
+    int64_t total = 0;
+    const SGSingModelFile *selectedFiles = filesOfKind(kind);
+    for (int i = 0; i < kFileCount; i++) total += selectedFiles[i].size;
+    return [NSString stringWithFormat:@"%lld MB", (total + 500000) / 1000000];
 }
 
 int64_t SGSingModelReceived(void) {
     load();
     if (sg_installed) return SGSingModelSize();
     int64_t total = 0;
+    const SGSingModelFile *selectedFiles = files();
     for (int i = 0; i < kFileCount; i++)
-        total += sg_done[i] || sg_checking[i] ? kFiles[i].size : MAX(0, MIN(sg_bytes[i], kFiles[i].size));
+        total += sg_done[i] || sg_checking[i] ? selectedFiles[i].size : MAX(0, MIN(sg_bytes[i], selectedFiles[i].size));
     return total;
 }
 
@@ -421,6 +513,7 @@ void SGSingModelDownload(BOOL metered) {
     sg_failure = nil;
     memset(sg_restarted, 0, sizeof sg_restarted);
     SGSetInt(SGKeySingModelDownload, metered ? 2 : 1);
+    SGSetInt(kDownloadKindKey, chosenKind());
     startMissing();
     installIfComplete();
     post(NO);
@@ -446,8 +539,11 @@ void SGSingModelRemove(void) {
     memset(sg_bytes, 0, sizeof sg_bytes);
     // The warm model goes now; its files after anything already queued for them.
     SGStemWorkerPurge();
-    NSURL *folder = singFolder();
-    dispatch_async(disk(), ^{ [NSFileManager.defaultManager removeItemAtURL:folder error:nil]; });
+    NSURL *installed = installedModel(), *folder = staging();
+    dispatch_async(disk(), ^{
+        [NSFileManager.defaultManager removeItemAtURL:installed error:nil];
+        [NSFileManager.defaultManager removeItemAtURL:folder error:nil];
+    });
     post(NO);
 }
 
@@ -463,7 +559,19 @@ void SGSingModelReconnect(void) {
     load();
     NSInteger mode = SGInt(SGKeySingModelDownload, 0);
     if (!mode) return;
-    if (sg_installed) { [NSUserDefaults.standardUserDefaults removeObjectForKey:SGKeySingModelDownload]; return; }
+    if (SGInt(kDownloadKindKey, SGSingModelFull) != chosenKind()) {
+        [NSUserDefaults.standardUserDefaults removeObjectForKey:SGKeySingModelDownload];
+        [NSUserDefaults.standardUserDefaults removeObjectForKey:kDownloadKindKey];
+        [session() getAllTasksWithCompletionHandler:^(NSArray<__kindof NSURLSessionTask *> *tasks) {
+            for (NSURLSessionTask *task in tasks) [task cancel];
+        }];
+        return;
+    }
+    if (sg_installed) {
+        [NSUserDefaults.standardUserDefaults removeObjectForKey:SGKeySingModelDownload];
+        [NSUserDefaults.standardUserDefaults removeObjectForKey:kDownloadKindKey];
+        return;
+    }
     sg_want = YES;
     sg_metered = mode == 2;
     NSUInteger epoch = sg_epoch;

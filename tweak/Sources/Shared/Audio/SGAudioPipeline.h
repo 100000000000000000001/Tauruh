@@ -28,6 +28,9 @@ OSStatus SGAudioPipelinePull(UInt32 frames, AudioBufferList *data, const AudioTi
 typedef OSStatus (*SGAudioSourceProcessor)(void *context, UInt32 frames, AudioBufferList *data,
                                           const AudioTimeStamp *time);
 OSStatus SGAudioPipelinePullOriginal(UInt32 frames, AudioBufferList *data, const AudioTimeStamp *time);
+// When `sounding` is non-NULL, stops at the first source chunk marked silent and reports its prefix.
+OSStatus SGAudioPipelinePullOriginalAvailable(UInt32 frames, AudioBufferList *data, const AudioTimeStamp *time,
+                                             UInt32 *sounding);
 UInt32 SGAudioPipelineSourceAheadFrames(UInt32 maximumFrames);
 SGAudioSourcePrefix SGAudioPipelineSourcePrefix(UInt32 maximumFrames, bool continuous);
 bool SGAudioPipelineSourceCanReadAhead(void); // off-render; exact supported source callback

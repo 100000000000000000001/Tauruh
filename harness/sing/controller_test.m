@@ -78,7 +78,11 @@ OSStatus SGAudioPipelinePullOriginal(UInt32 frames, AudioBufferList *data, const
 static NSProcessInfoThermalState thermal(id self, SEL command) { return heat; }
 static void flush(void) { [NSRunLoop.mainRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]]; }
 static void report(unsigned job, int status) { jobs[job].status(jobs[job].context, status); flush(); }
-static int32_t source(void *context, uint32_t count, float *pcm) { memset(pcm, 0, count * 2 * sizeof(float)); return 0; }
+static int32_t source(void *context, uint32_t count, float *pcm, uint32_t *sounding) {
+    if (sounding) *sounding = count;
+    memset(pcm, 0, count * 2 * sizeof(float));
+    return 0;
+}
 int main(void) { @autoreleasepool {
     Class infoClass = object_getClass(NSProcessInfo.processInfo);
     Method getter = class_getInstanceMethod(infoClass, @selector(thermalState));

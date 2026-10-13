@@ -9,7 +9,7 @@
 // Clock markers waiting for the render side: a track boundary the source crossed, one per song.
 enum { kMarkers = 4 };
 static _Atomic uint64_t epoch = 1, clockEpoch, clockTrack, clockBits, clockSequence;
-static atomic_bool loggedMissingSource, loggedUnsupportedFormat, loggedUnverifiedQueue, loggedAttachRace;
+static atomic_bool loggedMissingSource, loggedUnsupportedFormat, loggedMixerReadAhead, loggedAttachRace;
 static uint64_t bitsOf(double value) { uint64_t bits; memcpy(&bits, &value, sizeof bits); return bits; }
 static double valueOf(uint64_t bits) { double value; memcpy(&value, &bits, sizeof value); return value; }
 struct SGSingAudio {
@@ -18,6 +18,7 @@ struct SGSingAudio {
     _Atomic uint64_t latencyBits;
     _Atomic uint64_t expectedTrack, prefetchedTrack, prefetchedFrame;
     uint64_t lastBoundary;
+    bool verifiedReadAhead;
     // Main produces clock markers, render consumes them when their PCM becomes audible.
     struct { uint64_t track, frame; } markers[kMarkers];
     atomic_uint markerHead, markerTail;
@@ -26,12 +27,12 @@ struct SGSingAudio {
     float planar[2][SGSingStreamMaximumRenderFrames];
     float mixed[2 * SGSingStreamMaximumRenderFrames];
 };
-static int32_t pullOriginal(void *context, uint32_t frames, float *stereo) {
+static int32_t pullOriginal(void *context, uint32_t frames, float *stereo, uint32_t *sounding) {
     SGSingAudio *a = context;
     struct { AudioBufferList list; AudioBuffer more; } data;
     data.list.mNumberBuffers = 2;
     for (unsigned c = 0; c < 2; c++) data.list.mBuffers[c] = (AudioBuffer){1, frames * sizeof(float), a->planar[c]};
-    OSStatus error = SGAudioPipelinePullOriginal(frames, &data.list, a->time);
+    OSStatus error = SGAudioPipelinePullOriginalAvailable(frames, &data.list, a->time, sounding);
     if (!error) for (uint32_t n = 0; n < frames; n++)
         for (unsigned c = 0; c < 2; c++) stereo[n*2+c] = a->planar[c][n];
     return error;
@@ -51,7 +52,9 @@ static OSStatus process(void *context, UInt32 frames, AudioBufferList *data, con
         uint64_t captured = SGSingStreamCaptured(a->stream);
         uint64_t expected = atomic_load(&a->expectedTrack), prefetched = atomic_load(&a->prefetchedTrack);
         bool continuous = expected && (!prefetched || captured <= atomic_load(&a->prefetchedFrame));
-        SGAudioSourcePrefix prefix = SGAudioPipelineSourcePrefix(count * 2 + SGSingReserveFrames, continuous);
+        SGAudioSourcePrefix prefix = a->verifiedReadAhead
+            ? SGAudioPipelineSourcePrefix(count * 2 + SGSingReserveFrames, continuous)
+            : (SGAudioSourcePrefix){SGSingStreamReadUntilSilence, UINT32_MAX};
         if (prefix.boundary != UINT32_MAX && captured + prefix.boundary != a->lastBoundary && !prefetched) {
             a->lastBoundary = captured + prefix.boundary;
             atomic_store(&a->prefetchedFrame, a->lastBoundary);
@@ -112,11 +115,9 @@ bool SGSingAudioAttach(SGSingAudio *a) {
                   (unsigned)format.mFormatFlags);
         return false;
     }
-    if (!SGAudioPipelineSourceCanReadAhead()) {
-        if (!atomic_exchange(&loggedUnverifiedQueue, true))
-            SGLog(@"Sing: Spotify's decoder-queue layout is not verified for this executable");
-        return false;
-    }
+    a->verifiedReadAhead = SGAudioPipelineSourceCanReadAhead();
+    if (!a->verifiedReadAhead && !atomic_exchange(&loggedMixerReadAhead, true))
+        SGLog(@"Sing: using mixer silence to bound read-ahead on this Spotify audio source");
     if (!SGAudioPipelineSetSourceProcessor(process, a)) {
         if (!atomic_exchange(&loggedAttachRace, true)) SGLog(@"Sing: the source graph changed while attaching");
         return false;

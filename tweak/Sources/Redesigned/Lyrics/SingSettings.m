@@ -18,9 +18,9 @@ static NSString *aboutSize(void) {
 }
 
 static NSString *footer(void) {
-    return [NSString stringWithFormat:@"Sing turns the vocals of the song playing down to sing over, from the microphone in its lyrics. "
-            "It works on iOS 18 or later. Its voice model, %@, is downloaded once and runs only on this iPhone. "
-            "The switch and the download apply straight away.", aboutSize()];
+    return @"Sing turns the vocals of the song playing down to sing over, from the microphone in its lyrics. "
+           "It works on iOS 18 or later. Choose the full model for the best separation (210 MB) or the light "
+           "model for a smaller download (31 MB). Each runs only on this iPhone. The switch and the download apply straight away.";
 }
 
 static void tell(NSString *title, NSString *message) {
@@ -112,6 +112,15 @@ static SGModSection *karaokeSection(void) {
     SGModRow *sing = SGOptionRow(@"Sing", @"The microphone in the lyrics", SGRKeySing);
     sing.changed = ^(BOOL on) { SGRSingApplySwitch(); };
 
+    NSArray<NSString *> *modelChoices = @[
+        [NSString stringWithFormat:@"Best quality · %@", SGSingModelSizeTextOf(SGSingModelFull)],
+        [NSString stringWithFormat:@"Light · %@", SGSingModelSizeTextOf(SGSingModelLight)],
+    ];
+    SGModRow *modelChoice = SGMenuRow(@"Model size", modelChoices,
+        ^NSString *{ return modelChoices[SGSingModelChosen()]; },
+        ^(NSInteger index) { SGSingModelChoose(index == SGSingModelLight ? SGSingModelLight : SGSingModelFull); });
+    modelChoice.refreshOn = SGSingModelDidChangeNotification;
+
     SGModRow *model = SGStatActionRow(@"Voice model", nil, ^NSString *{ return modelStatus(); }, ^{ explainModel(); });
     model.progress = ^double {
         return SGSingModelCurrentState() == SGSingModelDownloading ? (double)SGSingModelReceived() / SGSingModelSize() : -1;
@@ -135,7 +144,7 @@ static SGModSection *karaokeSection(void) {
     SGModRow *spatial = SGPageRow(@"Spatial voice", ^UIViewController *{ return SGSpatialVoiceSettingsPage(); });
     spatial.value = ^NSString *{ return SGSingSpatial() ? @"On" : @"Off"; };
     spatial.visible = ^BOOL { return SGSingSpatialAvailable(); };
-    return SGNotedSection(@"Karaoke", @[sing, model, download, cancel, remove, spatial], footer());
+    return SGNotedSection(@"Karaoke", @[sing, modelChoice, model, download, cancel, remove, spatial], footer());
 }
 
 @interface SGSpatialVoicePage : SGModPage

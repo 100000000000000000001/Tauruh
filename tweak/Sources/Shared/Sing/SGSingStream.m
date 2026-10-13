@@ -125,7 +125,8 @@ int32_t SGSingStreamRender(SGSingStream *s, uint32_t frames, float *pcm, SGSingS
     uint32_t minimum = queued < frames ? frames - (uint32_t)queued : 0;
     uint32_t wanted = frames;
     if (queued < target) wanted += target - queued < frames ? target - (uint32_t)queued : frames;
-    uint32_t spare = available > SGSingReserveFrames ? available - SGSingReserveFrames : 0;
+    uint32_t spare = available == SGSingStreamReadUntilSilence ? UINT32_MAX
+        : available > SGSingReserveFrames ? available - SGSingReserveFrames : 0;
     if (wanted > spare) wanted = spare;
     if (wanted < minimum) wanted = minimum;
     if (wanted > writable) wanted = writable;
@@ -135,20 +136,31 @@ int32_t SGSingStreamRender(SGSingStream *s, uint32_t frames, float *pcm, SGSingS
         for (uint32_t done = 0; done < wanted;) {
             uint32_t count = wanted - done;
             if (count > SGSingStreamPacketFrames) count = SGSingStreamPacketFrames;
-            int32_t error = source(context, count, s->source);
+            uint32_t required = done < minimum
+                ? (count < minimum - done ? count : minimum - done) : 0;
+            if (required && required < count) count = required;
+            bool readUntilSilence = available == SGSingStreamReadUntilSilence && !required;
+            uint32_t sounding = count;
+            int32_t error = source(context, count, s->source, readUntilSilence ? &sounding : NULL);
             if (error) {
                 atomic_store(&s->sourceError, error);
                 bypass(s, SGSingStopSourceError); SGSingTimelineBypass(s->timeline); publish(s);
                 return error; // a failed pull may have consumed input; never retry it
             }
+            if (sounding > count) {
+                atomic_store(&s->sourceError, -1);
+                bypass(s, SGSingStopSourceError); SGSingTimelineBypass(s->timeline); publish(s);
+                return -1;
+            }
             SGAudioStamp stamp = s->origin;
-            stamp.sourceFrame = s->captured; stamp.frames = count;
-            bool retained = SGSingTimelineCapture(s->timeline, stamp, s->source);
-            s->captured += count;
+            stamp.sourceFrame = s->captured; stamp.frames = readUntilSilence ? sounding : count;
+            bool retained = !stamp.frames || SGSingTimelineCapture(s->timeline, stamp, s->source);
+            s->captured += stamp.frames;
             if (!retained) {
                 bypass(s, SGSingStopCapacity); SGSingTimelineBypass(s->timeline);
                 break;
             }
+            if (readUntilSilence && sounding < count) break;
             done += count;
         }
     }
@@ -170,7 +182,7 @@ int32_t SGSingStreamRender(SGSingStream *s, uint32_t frames, float *pcm, SGSingS
     if (state == SGSingTimelineDraining) bypass(s, SGSingStopLateVocals);
     if (state == SGSingTimelineIdle && copied < frames) {
         // Delayed original first, then the next uncaptured source sample, even within one buffer.
-        int32_t error = source(context, frames - copied, pcm + copied * 2);
+        int32_t error = source(context, frames - copied, pcm + copied * 2, NULL);
         if (!error) s->presented += frames - copied;
         publish(s);
         return error;

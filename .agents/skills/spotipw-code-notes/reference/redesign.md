@@ -2236,10 +2236,10 @@
 
 **file overview** (was L1)
 > Mod Settings > Karaoke, in the redesign (App/ModSettings.x puts its row on the main page): Sing's switch and
-> its voice model. The switch puts the microphone in the player's lyrics and takes it away again at once; off, Sing
-> does no work at all. The model row reads out where the download is and moves along with it, over a bar
-> while it runs, and the row under it is what can be done next: download it, stop the download, or remove
-> the model. Below iOS 18, where the separator cannot run, the section is one row saying so.
+> its model-size choice (Vitrine's full or light export), download status and actions. The switch puts the
+> microphone in the player's lyrics and takes it away again at once; off, Sing does no work at all. Each
+> model keeps separate installed and resumable-download files. Below iOS 18, where the separator cannot
+> run, the section is one row saying so.
 
 ## `Redesigned/Navbar/Navbar.h`
 

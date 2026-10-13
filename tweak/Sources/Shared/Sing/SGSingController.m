@@ -469,9 +469,13 @@ static void workerStatus(void *context, int32_t status) {
     NSString *model = SGSingModelPath();
     if (model == _model || [model isEqualToString:_model]) return;
     _model = model;
-    if (!model) {
+    BOOL choiceChanged = [note.userInfo[SGSingModelDidChangeChoiceKey] boolValue];
+    if (!model && !choiceChanged) {
         _wanted = NO; _blockedTrack = nil; _waitingForCommand = NO;
         [self stop:NO unload:YES];
+    } else {
+        [self stop:NO unload:YES];
+        [self reconcile];
     }
     [self updateAvailability];
 }

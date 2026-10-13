@@ -109,8 +109,16 @@ int main(int argc, char **argv) { @autoreleasepool {
     NSString *mode = argc > 1 ? @(argv[1]) : @"all";
     if ([mode isEqualToString:@"all"]) {
         [NSUserDefaults.standardUserDefaults removeObjectForKey:SGKeySingModelDownload];
+        [NSUserDefaults.standardUserDefaults removeObjectForKey:SGKeySingModel];
         assert(SGSingModelCurrentState() == SGSingModelMissing && SGSingModelSize() == 210426814);
         assert([SGSingModelBytesText(SGSingModelSize()) isEqualToString:@"201 MB"]);
+        assert([SGSingModelSizeTextOf(SGSingModelFull) isEqualToString:@"210 MB"]);
+        assert([SGSingModelSizeTextOf(SGSingModelLight) isEqualToString:@"31 MB"]);
+        SGSingModelChoose(SGSingModelLight);
+        assert(SGSingModelChosen() == SGSingModelLight && SGSingModelCurrentState() == SGSingModelMissing);
+        assert(SGSingModelSize() == 30760023);
+        SGSingModelChoose(SGSingModelFull);
+        assert(SGSingModelChosen() == SGSingModelFull && SGSingModelSize() == 210426814);
         corrupted();
         cancelAndResume();
         removeAll();
