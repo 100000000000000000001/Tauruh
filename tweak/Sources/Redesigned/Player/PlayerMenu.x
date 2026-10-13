@@ -2,6 +2,7 @@
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Shared/Player/SpeedPitch.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Player.h"
 #import "SGRPlayerMenu.h"
 
@@ -492,6 +493,40 @@ static SGRPlayerMenuItem *speedAndPitchItem(void) {
     return item;
 }
 
+static SGRPlayerMenuItem *canvasLyricsItem(SGRPlayerMenuTakeover *takeover) {
+    __weak SGRPlayerMenuTakeover *weak = takeover;
+    SGRPlayerMenuItem *item = [SGRPlayerMenuItem itemWithTitle:@"Canvas Lyrics" image:symbol(@"star") action:^{
+        BOOL enabled = !SGLockScreenCanvasLyricsEnabled();
+        SGLockScreenCanvasLyricsSetEnabled(enabled);
+        [weak.card setSubtitle:enabled ? @"On" : @"Off" forKey:@"spotifyglass.canvasLyrics"];
+    }];
+    item.key = @"spotifyglass.canvasLyrics";
+    item.subtitle = SGLockScreenCanvasLyricsEnabled() ? @"On" : @"Off";
+    return item;
+}
+
+static SGRPlayerMenuItem *backgroundStyleItem(SGRPlayerMenuTakeover *takeover) {
+    NSArray<NSString *> *names = SGRPlayerBackgroundNames();
+    SGRPlayerBackgroundKind current = SGRPlayerBackground();
+    __weak SGRPlayerMenuTakeover *weak = takeover;
+    SGRPlayerMenuItem *item = [SGRPlayerMenuItem itemWithTitle:@"Background Style"
+                                                         image:symbol(@"circle.lefthalf.filled") action:nil];
+    item.key = @"spotifyglass.playerBackground";
+    item.subtitle = names[(NSUInteger)current];
+    NSMutableArray<SGRPlayerMenuItem *> *choices = [NSMutableArray arrayWithCapacity:names.count];
+    for (NSUInteger index = 0; index < names.count; index++) {
+        SGRPlayerBackgroundKind kind = (SGRPlayerBackgroundKind)index;
+        SGRPlayerMenuItem *choice = [SGRPlayerMenuItem itemWithTitle:names[index] image:nil action:^{
+            SGRPlayerMenuSetBackground(kind);
+            [weak.card setSubtitle:SGRPlayerBackgroundNames()[(NSUInteger)kind] forKey:@"spotifyglass.playerBackground"];
+        }];
+        choice.key = [NSString stringWithFormat:@"spotifyglass.playerBackground.%lu", (unsigned long)index];
+        [choices addObject:choice];
+    }
+    item.children = choices;
+    return item;
+}
+
 static NSArray<SGRPlayerMenuSection *> *sectionsFor(SGRPlayerMenuTakeover *t, NSArray<SGRPlayerMenuSpotifyRow *> *rows) {
     NSMutableArray<SGRPlayerMenuItem *> *tiles = [NSMutableArray array], *main = [NSMutableArray array],
                                   *feedback = [NSMutableArray array], *more = [NSMutableArray array],
@@ -517,6 +552,8 @@ static NSArray<SGRPlayerMenuSection *> *sectionsFor(SGRPlayerMenuTakeover *t, NS
         [tiles removeLastObject];
     }
     [main addObject:speedAndPitchItem()];
+    [main addObject:canvasLyricsItem(t)];
+    [main addObject:backgroundStyleItem(t)];
     if (more.count == 1) {
         [feedback addObject:more.firstObject];
     } else if (more.count) {

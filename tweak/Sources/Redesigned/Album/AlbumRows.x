@@ -115,10 +115,8 @@ static void applyHairline(UIView *row) {
     [CATransaction commit];
 }
 
-static void applyRow(UIView *cell, UIView *page) {
+static void applyRow(UIView *cell, UIView *page, UIView *row) {
     clearSurface(cell);
-    UIView *row = SGRFindByIdentifier(cell, @"Components.UI.RetrievalRow*", &kRowKey);
-    if (!row) return;
     if (SGRRevealWaitsFor(page, SGRRevealList) && SGRRevealShowsText(row)) SGRRevealMark(page, SGRRevealList);
     // The row, and every box the element framework wraps it in on the way back up to the cell.
     for (UIView *v = row; v; v = v.superview) {
@@ -140,27 +138,19 @@ static void applyRow(UIView *cell, UIView *page) {
     applyHairline(row);
 }
 
-static BOOL isTrackContent(UIView *content) {
-    static NSMutableDictionary<id, NSNumber *> *answers;
-    if (!answers) answers = [NSMutableDictionary dictionary];
-    Class cls = object_getClass(content);
-    if (!cls) return NO;
-    NSNumber *answer = answers[(id<NSCopying>)cls];
-    if (!answer) {
-        answer = @([NSStringFromClass(cls) containsString:@"RetrievalListStructuredData"]);
-        answers[(id<NSCopying>)cls] = answer;
-    }
-    return answer.boolValue;
+static UIView *trackRowInCell(UIView *cell) {
+    return SGRFindByIdentifier(cell, @"Components.UI.RetrievalRow*", &kRowKey);
 }
 
 %hook _TtC12Element_List18CollectionViewCell
 - (UICollectionViewLayoutAttributes *)preferredLayoutAttributesFittingAttributes:(UICollectionViewLayoutAttributes *)layoutAttributes {
     UICollectionViewLayoutAttributes *attributes = %orig;
     UICollectionViewCell *cell = (UICollectionViewCell *)self;
-    if (!isTrackContent(cell.contentView.subviews.firstObject)) return attributes;
+    UIView *row = trackRowInCell(cell);
+    if (!row) return attributes;
     UIView *page = SGRAlbumPageOf(cell);
     if (!page) return attributes;
-    applyRow(cell, page);
+    applyRow(cell, page, row);
     [cell.contentView setNeedsLayout];
     [cell.contentView layoutIfNeeded];
     return %orig(attributes);
@@ -169,9 +159,10 @@ static BOOL isTrackContent(UIView *content) {
 - (void)layoutSubviews {
     %orig;
     UICollectionViewCell *cell = (UICollectionViewCell *)self;
-    if (!isTrackContent(cell.contentView.subviews.firstObject)) return;
+    UIView *row = trackRowInCell(cell);
+    if (!row) return;
     UIView *page = SGRAlbumPageOf(cell);
-    if (page) applyRow(cell, page);
+    if (page) applyRow(cell, page, row);
 }
 %end
 

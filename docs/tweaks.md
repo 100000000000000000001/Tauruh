@@ -134,7 +134,9 @@ Shared:
                   run speed and pitch, audio effects, then music haptics. Graph changes and disposal exclude active pulls;
                   the render thread never waits for them. Unsupported formats retain Spotify's connection. The PCM
                   packet queue is bounded and generation-stamped. Sing's source read-ahead reads guarded queue metadata
-                  for the verified Spotify binary; PCM still comes through its AudioUnit. Boundary tests are in harness/audio/ and harness/sing/
+                  for the verified Spotify binary; PCM still comes through its AudioUnit. A one-time [spotifyglass]
+                  Sing diagnostic identifies a missing source unit, unsupported format, unverified read-ahead layout,
+                  or graph change when attachment fails. Boundary tests are in harness/audio/ and harness/sing/
     Sing/         the local Core ML separator, source-domain audio adapter, worker and player lifecycle, from iOS 18. Core ML
                   uses Vitrine's Neural Engine model in the foreground and its warm CPU model in the background. The audible
                   clock follows emitted source samples while delayed audio drains. Model loading overlaps source capture;
@@ -148,7 +150,7 @@ Shared:
                   Spatial voice can place the vocals relative to head motion, with distance, room, and instrument
                   width controls under Karaoke; it stays off until enabled and yields to spatial audio on the route.
     Player/       the player's open and close announced (PlayerEvents.x), what the player is doing read through
-                  one hook for every feature that wants it (PlayerState.x), the lock screen widget's flags, and in the
+                  one hook for every feature that wants it (PlayerState.x), the Lock Screen flags, and in the
                   more button's menu Speed and pitch: both done to Spotify's audio by Apple's time and pitch unit, put
                   between its mixer and its RemoteIO unit through Audio/SGAudioPipeline's connection
                   (SpeedPitchMenu.x, SpeedPitch.x, SGTimePitch.m). With Pitch follows speed on (the default, stored) the pitch
@@ -217,16 +219,17 @@ Redesigned:
     Player/       the redesigned full screen player (Player.h lists its files); its ⋯ opens a menu the way the
                   Music app draws one (PlayerMenu.x, SGRPlayerMenu.m): a pane of glass grown out of the button,
                   Add to playlist, Add to Queue and Share as three tiles across its top, groups of rows under
-                  them, Speed and pitch opening onto Shared/Player's sliders in place, everything else Spotify
+                  them, Speed and pitch opening onto Shared/Player's sliders in place, then the star-marked Canvas
+                  Lyrics switch and Background Style's five choices (Still, Colors, Fluid, Animated and Visualiser),
+                  everything else Spotify
                   offers under More, and Remove from this playlist last in red. What is in it and what each row
                   does stay Spotify's: its own sheet still opens, out of sight, and the menu is read off its
                   table, each row placed by the number Spotify's ListRow carries as its identifier and fired
                   through that ListRow; a page Spotify pushes onto the sheet (Share's destinations) shows the
                   sheet, and a sheet with no rows within 4 s is shown as it is. It opens on the rows the last
                   menu had, kept across launches, and moves to Spotify's as they come in, a tap meanwhile held
-                  until they do. Its star-marked Canvas Lyrics switch is live, and Background Style offers
-                  the same five choices as Player settings and applies them immediately. The Canvas field extends
-                  below the clip with a blurred poster bleed instead of stretched edge rows. Always on in the redesign.
+                  until they do. The Canvas field extends below the clip with a blurred poster bleed instead of
+                  stretched edge rows. Always on in the redesign.
                   Tested in the simulator against harness/playermenu/
                   With Sing on and its voice model downloaded (Mod Settings > Karaoke, Redesigned/Lyrics/SingSettings.m,
                   both applying at once), its microphone (Redesigned/Lyrics/SGRSingControl.m) sits in the
@@ -276,7 +279,9 @@ Redesigned:
                   everything the server sends is dropped -- more by the artist, videos, concerts, merch, you might also
                   like, and whatever it adds next -- but the album's own line and its copyright (Album.h lists its
                   files). A podcast's episode page is the same template, so it is given the same field, and what it
-                  paints over it is taken off. Laid out on the Mac against harness/album/
+                  paints over it is taken off. Its track-list rows use their RetrievalRow identifiers for the three
+                  options to hide album artists, all track artists or explicit tags. Laid out on the Mac against
+                  harness/album/
     Artist/       the artist's photo dissolving into the black page, with its actions pinned above the scrolling
                   header; Spotify's own three-dot menu stays in use on this page. Music-video rows and their headings
                   are dropped; the page list invalidates cached row positions when pagination changes section counts
@@ -310,6 +315,11 @@ and Live Activity. The root page in `App/ModSettings.x` holds the Appearance car
     make log        # stream [spotifyglass] log lines from the phone
     make flags      # regenerate the flag table from the IPA
 
+Without a Mac or USB log streaming, open **Mod Settings → Mod → Device logs** in Spotify.
+The page shows the recent local diagnostic log, refreshes when pulled down, and provides Copy and
+Share actions. The file is kept in the app's Application Support directory and capped at 256 KiB;
+logs are not shared unless the user explicitly chooses Copy or Share.
+
 ## Mod Settings
 
 Mod Settings, opened by holding Home on the tab bar or from the first row of the side drawer and the
@@ -324,18 +334,19 @@ The pages show only what the stored look has: a page opened after flipping the s
 what the restart will bring. In the redesign Karaoke comes next, on a card of its own: Sing's switch and its
 voice model's download (Redesigned/Lyrics/SingSettings.m), with Off, On, No model or the download's percentage
                 beside the row, "Needs iOS 18" below iOS 18. Then a card of parts. Navbar: the tab editor of the stored look,
-each with its own list of tabs. Lyrics, beside Player: the ordered list of lyrics sources, lyrics for every track,
+each with its own list of tabs. Player: Gestures and Blocked artists (with the count on the row), which work
+with either look. The redesigned Player page also has independent Show Sing button and Show Translate button
+switches, the five background styles (Still, Colors, Fluid, Animated and Visualiser), and its volume controls.
+Lyrics: the ordered list of lyrics sources, lyrics for every track,
 naming the source in the redesign, artist-name replacement on the lock screen (independent of Canvas lyrics),
 and glass lyrics in the native look; in the redesign also
 which of the lyrics, their pronunciation and their translation is set largest, Genius meaning marks (which can
 be hidden without losing the hold-on-a-line meaning sheet), the translation's language, and whether landscape
-lyrics controls hide automatically. Player: Gestures and Blocked artists (with the count on the row), which work
-with either look. The redesigned Player page also has independent Show Sing button and Show Translate button
-switches, the five background styles (Still, Colors, Fluid, Animated and Visualiser), and its volume controls.
-Lock Screen: Lock screen widget (its controls and, under Artwork, Animated lock screen, the track's Canvas or
-the album's Apple Music cover played behind the lock screen's controls, with optional Canvas lyrics toggled
-from the redesigned player's ⋯ menu or the lock-screen star, a Sources page for their order, and a "Needs iOS 26"
-row below that); Canvas lyrics and artist-name replacement remain independent settings.
+lyrics controls auto-hide (on by default, under Lyrics > Display). Lock Screen: its controls and, under Artwork,
+Animated lock screen, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls,
+with optional Canvas lyrics toggled from the redesigned player's ⋯ menu or the lock-screen star, a Sources page for
+their order, and a "Needs iOS 26" row below that; Canvas lyrics and artist-name replacement remain independent.
+Audio effects follows Lock Screen, which appears between Lyrics and Audio effects on the root page.
 In the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player

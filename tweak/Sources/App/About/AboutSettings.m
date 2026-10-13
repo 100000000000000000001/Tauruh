@@ -44,6 +44,7 @@ UIViewController *SGAboutPage(void) {
     [sections addObjectsFromArray:@[
         SGSection(nil, @[
             withSymbol(SGPageRow(@"Licenses", ^UIViewController *{ return SGLicensesPage(); }), @"doc.text"),
+            withSymbol(SGPageRow(@"Device logs", ^UIViewController *{ return SGDeviceLogsPage(); }), @"list.bullet.rectangle"),
             withSymbol(SGActionRow(@"Welcome tour", nil, ^{ SGShowOnboarding(); }), @"map"),
         ]),
         SGSection(nil, @[

@@ -225,6 +225,7 @@ static UIViewController *modSettingsPage(void) {
         pageRow(@"Navbar", @"dock.rectangle", ^UIViewController *{ return SGNavbarPage(); }),
         pageRow(@"Player", @"play.circle", ^UIViewController *{ return SGPlayerSettingsPage(); }),
         pageRow(@"Lyrics", @"quote.bubble", ^UIViewController *{ return SGLyricsSettingsPage(); }),
+        pageRow(@"Lock Screen", @"lock.iphone", ^UIViewController *{ return SGLockScreenSettingsPage(); }),
         audioEffects,
         pageRow(@"Vibrations", @"iphone.radiowaves.left.and.right", ^UIViewController *{ return SGVibrationsSettingsPage(); }),
     ]];
@@ -249,9 +250,6 @@ static UIViewController *modSettingsPage(void) {
     }
     [sections addObjectsFromArray:@[
         SGSection(nil, parts),
-        SGSection(@"Lock Screen", @[
-            pageRow(@"Lock screen widget", @"lock.iphone", ^UIViewController *{ return SGLockScreenWidgetPage(); }),
-        ]),
         SGSection(nil, @[
             pageRow(@"Premium, ads & privacy", @"crown", ^UIViewController *{ return SGAdsSettingsPage(); }),
             pageRow(@"Labs", @"testtube.2", ^UIViewController *{ return SGLabsPage(); }),

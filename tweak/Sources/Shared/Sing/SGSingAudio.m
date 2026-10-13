@@ -1,5 +1,6 @@
 #include "SGSingAudio.h"
 #include "Shared/Audio/SGAudioPipeline.h"
+#include "Core/SGLog.h"
 #include <stdlib.h>
 #include <stdatomic.h>
 #include <string.h>
@@ -8,6 +9,7 @@
 // Clock markers waiting for the render side: a track boundary the source crossed, one per song.
 enum { kMarkers = 4 };
 static _Atomic uint64_t epoch = 1, clockEpoch, clockTrack, clockBits, clockSequence;
+static atomic_bool loggedMissingSource, loggedUnsupportedFormat, loggedUnverifiedQueue, loggedAttachRace;
 static uint64_t bitsOf(double value) { uint64_t bits; memcpy(&bits, &value, sizeof bits); return bits; }
 static double valueOf(uint64_t bits) { double value; memcpy(&value, &bits, sizeof value); return value; }
 struct SGSingAudio {
@@ -96,10 +98,30 @@ SGSingAudio *SGSingAudioCreate(SGAudioStamp origin, uint32_t window, uint32_t ho
 SGSingStream *SGSingAudioStream(SGSingAudio *a) { return a ? a->stream : NULL; }
 bool SGSingAudioAttach(SGSingAudio *a) {
     AudioStreamBasicDescription format = {0};
-    if (!a || a->epoch != atomic_load(&epoch) || !SGAudioPipelineSourceFormat(&format) || format.mSampleRate != SGSingSampleRate || format.mChannelsPerFrame != 2 ||
+    if (!a || a->epoch != atomic_load(&epoch)) return false;
+    if (!SGAudioPipelineSourceFormat(&format)) {
+        if (!atomic_exchange(&loggedMissingSource, true)) SGLog(@"Sing: Spotify's source audio unit is not connected yet");
+        return false;
+    }
+    if (format.mSampleRate != SGSingSampleRate || format.mChannelsPerFrame != 2 ||
         format.mFormatID != kAudioFormatLinearPCM || format.mBitsPerChannel != 32 || format.mBytesPerFrame != sizeof(float) ||
-        !(format.mFormatFlags & kAudioFormatFlagIsFloat) || !(format.mFormatFlags & kAudioFormatFlagIsNonInterleaved)) return false;
-    return SGAudioPipelineSourceCanReadAhead() && SGAudioPipelineSetSourceProcessor(process, a);
+        !(format.mFormatFlags & kAudioFormatFlagIsFloat) || !(format.mFormatFlags & kAudioFormatFlagIsNonInterleaved)) {
+        if (!atomic_exchange(&loggedUnsupportedFormat, true))
+            SGLog(@"Sing: source format is %.0f Hz, %u channel(s), %u-bit, flags 0x%x",
+                  format.mSampleRate, (unsigned)format.mChannelsPerFrame, (unsigned)format.mBitsPerChannel,
+                  (unsigned)format.mFormatFlags);
+        return false;
+    }
+    if (!SGAudioPipelineSourceCanReadAhead()) {
+        if (!atomic_exchange(&loggedUnverifiedQueue, true))
+            SGLog(@"Sing: Spotify's local decoder queue does not match the verified 9.1.78 read-ahead layout");
+        return false;
+    }
+    if (!SGAudioPipelineSetSourceProcessor(process, a)) {
+        if (!atomic_exchange(&loggedAttachRace, true)) SGLog(@"Sing: the source graph changed while attaching");
+        return false;
+    }
+    return true;
 }
 void SGSingAudioDetach(SGSingAudio *a) {
     if (a && SGAudioPipelineClearSourceProcessor(a)) {

@@ -4,8 +4,8 @@
 // ContextMenu_InternalImpl.ContextMenuViewController under its own class name -- whose table rows are
 // ListRow-like controls carrying the item's number as their accessibility identifier, as 9.1.78's do
 // (trees/continuous/1.txt:648). The table has no didSelectRowAtIndexPath:, like Spotify's binder; a row
-// fires through its control. Share (9) pushes a page onto the sheet, Lyrics (28) turns itself on in place,
-// every other row dismisses the sheet, as Spotify's do. Speed and pitch are stubs that log.
+// fires through its control. Share (9) pushes a page onto the sheet and Lyrics (28) turns itself on in place.
+// Speed and pitch, Canvas Lyrics, and Background Style are harness stubs.
 //
 //     THEOS=$HOME/theos ./build.sh && xcrun simctl install <udid> build/PlayerMenuHarness.app
 //     xcrun simctl launch --console-pty <udid> com.vojta.playermenuharness [scenario] [loading|slow|stuck]
@@ -13,12 +13,14 @@
 // Scenarios, each starting with a tap on the ⋯ at 1 s: hold (nothing more), more (opens More at 3 s),
 // speed (opens Speed and pitch at 3 s), follow (opens it, then turns pitch following speed on at 4.5 s and
 // off at 9 s: the panel folds its pitch slider away and back, the card with it), tile (Add to playlist at 3 s), share (Share at 3 s: Spotify's page
-// is pushed and its sheet shown), lyrics (More, then Lyrics: the row reads On), outside (a tap beside the
+// is pushed and its sheet shown), lyrics (More, then Lyrics: the row reads On), canvas (toggle Canvas Lyrics),
+// background (choose Visualiser), outside (a tap beside the
 // card at 3 s), pending (Add to playlist tapped before Spotify's rows are in: fired once they are with
 // `loading`, Spotify's sheet shown 4 s after the tap with `stuck`). `loading` hands the sheet its rows 1.5 s
 // after it is up, `slow` 7 s after, later than the card once waited; `stuck` never does. The card opens on
 // the rows of the run before, which the harness keeps in its defaults like the phone does.
 #import <UIKit/UIKit.h>
+#import "Redesigned/Player/Player.h"
 
 #pragma mark - what the hooks call and the harness does not build
 
@@ -40,6 +42,19 @@ void SGSetPlayerPitchFollowsSpeed(BOOL follows) {
     NSLog(@"[harness] pitch follows speed %d", follows);
 }
 UIColor *SGRAccentColor(void) { return nil; }
+static BOOL sg_canvasLyrics;
+BOOL SGLockScreenCanvasLyricsEnabled(void) { return sg_canvasLyrics; }
+void SGLockScreenCanvasLyricsSetEnabled(BOOL enabled) {
+    sg_canvasLyrics = enabled;
+    NSLog(@"[harness] Canvas Lyrics %@", enabled ? @"on" : @"off");
+}
+static SGRPlayerBackgroundKind sg_background = SGRPlayerBackgroundStill;
+SGRPlayerBackgroundKind SGRPlayerBackground(void) { return sg_background; }
+NSArray<NSString *> *SGRPlayerBackgroundNames(void) { return @[@"Still", @"Colors", @"Fluid", @"Animated", @"Visualiser"]; }
+void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind) {
+    sg_background = kind;
+    NSLog(@"[harness] Background Style %@", SGRPlayerBackgroundNames()[(NSUInteger)kind]);
+}
 
 static BOOL argument(NSString *name) {
     return [NSProcessInfo.processInfo.arguments containsObject:name];
@@ -452,6 +467,13 @@ static void dump(UIView *view, int depth, NSMutableString *out) {
         after(3, ^{ tap(window, @"More"); });
         after(4, ^{ tap(window, @"Lyrics"); });
         after(5, ^{ report(window, @"after Lyrics"); });
+    } else if (argument(@"canvas")) {
+        after(3, ^{ tap(window, @"Canvas Lyrics"); });
+        after(4, ^{ report(window, @"after Canvas Lyrics"); });
+    } else if (argument(@"background")) {
+        after(3, ^{ tap(window, @"Background Style"); });
+        after(4, ^{ tap(window, @"Visualiser"); });
+        after(5, ^{ report(window, @"after Background Style"); });
     } else if (argument(@"pending")) {
         // With `loading`: Add to playlist tapped on the last menu's rows before Spotify's are in.
         after(2.1, ^{ tap(window, @"Add to playlist"); });
