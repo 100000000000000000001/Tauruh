@@ -305,14 +305,14 @@ static void check(int i) {
     int64_t size = files()[i].size;
     NSString *expected = @(files()[i].sha256);
     dispatch_async(disk(), ^{
-        NSFileManager *files = NSFileManager.defaultManager;
+        NSFileManager *manager = NSFileManager.defaultManager;
         BOOL right = sizeAt(arrived) == size && [sha256(arrived) isEqualToString:expected];
         if (right) {
-            [files createDirectoryAtURL:staged.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nil];
-            [files removeItemAtURL:staged error:nil];
-            right = [files moveItemAtURL:arrived toURL:staged error:nil];
+            [manager createDirectoryAtURL:staged.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nil];
+            [manager removeItemAtURL:staged error:nil];
+            right = [manager moveItemAtURL:arrived toURL:staged error:nil];
         }
-        if (!right) [files removeItemAtURL:arrived error:nil];
+        if (!right) [manager removeItemAtURL:arrived error:nil];
         dispatch_async(dispatch_get_main_queue(), ^{
             if (epoch != sg_epoch || kind != chosenKind()) return;
             sg_checking[i] = NO;
