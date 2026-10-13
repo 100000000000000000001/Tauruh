@@ -16,9 +16,9 @@
       "tintColor": "0A4B00",
       "versions": [
         {
-          "version": "0.50.1",
+          "version": "0.60.0",
           "date": "2026-10-08T22:17:09Z",
-          "downloadURL": "https://github.com/samj-exe/taurus/releases/download/v0.50.1/Taurus-0.50.1.ipa",
+          "downloadURL": "https://github.com/samj-exe/taurus/releases/download/v0.60.0/Taurus-0.60.0.ipa",
           "size": 132877139,
           "minOSVersion": "16.1"
         }
