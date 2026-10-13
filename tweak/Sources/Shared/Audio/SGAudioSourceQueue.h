@@ -5,6 +5,7 @@
 
 void SGAudioSourceQueueInitialize(void); // off-render, before registering source callbacks
 bool SGAudioSourceQueueSupported(AURenderCallbackStruct callback);
+bool SGAudioSourceQueueProbeRequired(AURenderCallbackStruct callback);
 void SGAudioSourceQueueProbe(AURenderCallbackStruct callback); // diagnostics only; never enables an unverified ABI
 typedef struct {
     UInt32 frames;

@@ -112,6 +112,9 @@ int main(void) {
     sg_sourceSpotify90 = true;
     callback.inputProc = (AURenderCallback)(sg_sourceImage + 0x6d0b080);
     callback.inputProcRefCon = context;
+    assert(SGAudioSourceQueueProbeRequired(callback));
+    AURenderCallbackStruct otherCallback = {(AURenderCallback)(sg_sourceImage + 0x6d0b084), context};
+    assert(!SGAudioSourceQueueProbeRequired(otherCallback));
     uint32_t channels = 2, active = 0;
     memcpy((char *)context + 0x6c, &channels, sizeof channels);
     memcpy((char *)context + 0x9c, &active, sizeof active);

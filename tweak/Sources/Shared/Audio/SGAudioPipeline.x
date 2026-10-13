@@ -321,13 +321,15 @@ static OSStatus setProperty(AudioUnit unit, AudioUnitPropertyID property, AudioU
         element == 0 && data && size >= sizeof(AURenderCallbackStruct)) {
         AURenderCallbackStruct callback = *(const AURenderCallbackStruct *)data;
         bool supported = SGAudioSourceQueueSupported(callback);
+        bool probeRequired = SGAudioSourceQueueProbeRequired(callback);
         if (unit == atomic_load(&sourceUnit)) replaceSourceProcessor(NULL, NULL);
         unsigned slot = 8;
         for (unsigned i = 0; i < 8; i++) if (sourceCallbacks[i].unit == unit) { slot = i; break; }
-        if (supported && slot == 8) for (unsigned i = 0; i < 8; i++) if (!sourceCallbacks[i].unit) { slot = i; break; }
+        if ((supported || probeRequired) && slot == 8)
+            for (unsigned i = 0; i < 8; i++) if (!sourceCallbacks[i].unit) { slot = i; break; }
         if (slot != 8) {
             sourceCallbacks[slot].callback = callback;
-            sourceCallbacks[slot].unit = supported ? unit : NULL;
+            sourceCallbacks[slot].unit = supported || probeRequired ? unit : NULL;
         }
     }
     endChange();

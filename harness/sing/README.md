@@ -28,7 +28,8 @@ invalidate the old generation. The metadata scan stops after verifying the prefi
 current pull and native reserve; it does not walk the rest of the buffered song on every render
 callback. An exhausted, non-null block is skipped as the verified native reader does on its next
 pull; an end marker requires the separate continuity checks above. Other binary layouts cannot
-attach Sing.
+attach Sing. Spotify 9.1.90's exact callback is retained only for a one-time in-app ABI probe;
+its queue is not enabled for read-ahead until its layout and boundary behavior are verified.
 
 The bounded eight-second timeline targets 5.5 seconds of original audio ahead, emits dry audio
 immediately, and fades in vocal reduction only when enough aligned future vocals are ready.

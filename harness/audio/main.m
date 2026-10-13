@@ -29,6 +29,7 @@ static OSStatus renderError;
 static bool renderSilence, refuseCallback;
 static bool reentrantChange;
 static uint64_t naturalBoundary = UINT64_MAX;
+static unsigned sourceQueueProbeCalls;
 static OSStatus (*reboundSet)(AudioUnit, AudioUnitPropertyID, AudioUnitScope, AudioUnitElement, const void *, UInt32);
 
 AudioComponent AudioComponentInstanceGetComponent(AudioComponentInstance instance) { return (AudioComponent)instance; }
@@ -93,8 +94,14 @@ BOOL SGRebindImport(const char *symbol, void *replacement, void **original) {
 // Decoder metadata is a separate guarded-reader test. Here control the spare PCM budget.
 static OSStatus nativeSource(void *c, AudioUnitRenderActionFlags *f, const AudioTimeStamp *t,
                              UInt32 b, UInt32 n, AudioBufferList *d) { return noErr; }
+static OSStatus probeSource(void *c, AudioUnitRenderActionFlags *f, const AudioTimeStamp *t,
+                            UInt32 b, UInt32 n, AudioBufferList *d) { return noErr; }
 void SGAudioSourceQueueInitialize(void) {}
 bool SGAudioSourceQueueSupported(AURenderCallbackStruct callback) { return callback.inputProc == nativeSource; }
+bool SGAudioSourceQueueProbeRequired(AURenderCallbackStruct callback) { return callback.inputProc == probeSource; }
+void SGAudioSourceQueueProbe(AURenderCallbackStruct callback) {
+    if (SGAudioSourceQueueProbeRequired(callback)) sourceQueueProbeCalls++;
+}
 UInt32 SGAudioSourceQueueFrames(AURenderCallbackStruct callback, UInt32 maximumFrames) { return SGAudioSourceQueueSupported(callback) ? MIN(44100, maximumFrames) : 0; }
 SGAudioSourcePrefix SGAudioSourceQueuePrefix(AURenderCallbackStruct callback, UInt32 maximumFrames, bool continuous) {
     UInt32 frames = SGAudioSourceQueueFrames(callback, maximumFrames);
@@ -231,6 +238,11 @@ int main(void) {
         AURenderCallbackStruct native = {nativeSource, &source};
         assert(!setProperty(unit(&source), kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &native, sizeof native));
         connect(&source, &output, 7);
+        assert(SGAudioPipelineSourceCanReadAhead());
+        AURenderCallbackStruct probe = {probeSource, &source};
+        assert(!setProperty(unit(&source), kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &probe, sizeof probe));
+        assert(!SGAudioPipelineSourceCanReadAhead() && sourceQueueProbeCalls == 1);
+        assert(!setProperty(unit(&source), kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &native, sizeof native));
         assert(SGAudioPipelineSourceCanReadAhead());
         assert(SGAudioPipelineSourceAheadFrames(44100) == 0); // never expose queue metadata off-render
         assert(SGAudioPipelineTapped());

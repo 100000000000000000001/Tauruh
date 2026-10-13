@@ -50,7 +50,7 @@ void SGAudioSourceQueueInitialize(void) {
     }
 }
 void SGAudioSourceQueueProbe(AURenderCallbackStruct callback) {
-    if (!sg_sourceSpotify90 || (uintptr_t)callback.inputProc != sg_sourceImage + 0x6d0b080 ||
+    if (!SGAudioSourceQueueProbeRequired(callback) ||
         atomic_exchange(&sg_sourceProbeLogged, true)) return;
 
     uintptr_t context = (uintptr_t)callback.inputProcRefCon;
@@ -92,6 +92,9 @@ void SGAudioSourceQueueProbe(AURenderCallbackStruct callback) {
     SGLog(@"Sing ABI probe legacy-offset candidate node readable=%d block=%p next=%p remaining=%llu",
           nodeReadable, (void *)(uintptr_t)node[0], (void *)(uintptr_t)node[4],
           (unsigned long long)remaining);
+}
+bool SGAudioSourceQueueProbeRequired(AURenderCallbackStruct callback) {
+    return sg_sourceSpotify90 && (uintptr_t)callback.inputProc == sg_sourceImage + 0x6d0b080;
 }
 bool SGAudioSourceQueueSupported(AURenderCallbackStruct callback) {
     uint64_t instruction;
