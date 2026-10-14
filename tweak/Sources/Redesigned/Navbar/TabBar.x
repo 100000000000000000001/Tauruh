@@ -30,7 +30,6 @@ static void syncBar(UIView *stockBar);
 static BOOL sg_minimized;
 static __weak UIView *sg_compactSource;
 static NSUInteger sg_minimizeRequest;
-static const CGFloat kCompactBarWidth = 88;
 
 BOOL SGRTabBarMinimized(void) {
     return sg_minimized;
@@ -584,7 +583,8 @@ static void syncBar(UIView *stockBar) {
     CGFloat height = MAX(bounds.size.height, glassHeight(bar, stockBar));
     CGRect frame = CGRectMake(0, CGRectGetMaxY(bounds) - height, width, height);
     if (!CGRectEqualToRect(host.frame, frame)) host.frame = frame;
-    CGRect barFrame = compact ? CGRectMake(0, 0, kCompactBarWidth, host.bounds.size.height) : host.bounds;
+    CGFloat compactWidth = host.bounds.size.height;
+    CGRect barFrame = compact ? CGRectMake(0, 0, compactWidth, host.bounds.size.height) : host.bounds;
     if (!CGRectEqualToRect(bar.frame, barFrame)) bar.frame = barFrame;
     CGAffineTransform hostTransform = sg_minimized && !compact
         ? CGAffineTransformMakeTranslation(0, host.bounds.size.height) : CGAffineTransformIdentity;

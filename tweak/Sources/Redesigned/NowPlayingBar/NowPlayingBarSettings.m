@@ -4,9 +4,13 @@
 #import "Redesigned/Player/Player.h"
 
 UIViewController *SGRNowPlayingBarSettingsPage(void) {
+    SGModRow *roundedArtwork = SGOptionRow(@"Rounded-square album art", @"Use rounded corners instead of a circle",
+                                          SGRKeyNowPlayingRoundedArtwork);
+    roundedArtwork.changed = ^(BOOL on) { SGRNowPlayingBarRefresh(); };
     return [[SGModPage alloc] initWithTitle:@"Now playing" intro:SGRestartNote sections:@[
         SGSection(nil, @[
             SGHideRow(@"Hide the device button", nil, SGRHideBarConnect),
+            roundedArtwork,
         ]),
         SGSection(nil, @[
             SGSwitchRow(@"Moving background", nil, SGRKeyPlayerMotion),

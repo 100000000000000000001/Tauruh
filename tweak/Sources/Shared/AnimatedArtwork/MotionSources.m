@@ -15,14 +15,14 @@ static NSString *const kCanvas = @"canvas", *const kAppleMusic = @"applemusic";
 
 static NSArray<SGSource *> *allSources(void) {
     return @[
-        [SGSource sourceWithKey:kAppleMusic name:@"Apple Music" detail:@"The album's animated cover"],
         [SGSource sourceWithKey:kCanvas name:@"Spotify Canvas" detail:@"The track's own looping video"],
+        [SGSource sourceWithKey:kAppleMusic name:@"Apple Music" detail:@"The album's animated cover"],
     ];
 }
 
 NSArray<NSString *> *SGMotionSourceOrder(void) {
     id stored = [NSUserDefaults.standardUserDefaults arrayForKey:SGKeyMotionSources];
-    NSArray *keys = [stored isKindOfClass:NSArray.class] ? stored : @[kAppleMusic, kCanvas];
+    NSArray *keys = [stored isKindOfClass:NSArray.class] ? stored : @[kCanvas, kAppleMusic];
     NSMutableArray<NSString *> *order = [NSMutableArray array];
     for (id key in keys) {
         if (([key isEqual:kCanvas] || [key isEqual:kAppleMusic]) && ![order containsObject:key]) [order addObject:key];

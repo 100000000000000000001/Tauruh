@@ -19,7 +19,7 @@ SGLockArtwork SGLockScreenArtwork(void) {
                 SGSetInt(SGKeyFullScreenArtwork, SGFlag(SGKeyLegacyLockScreenArtwork, YES)
                          ? SGLockArtworkMotion : SGLockArtworkOff);
             }
-            if (![store objectForKey:SGKeyMotionSources]) {
+            if (![store objectForKey:SGKeyMotionSources] && [store objectForKey:SGKeyLockScreenArtworkSources]) {
                 NSArray<NSString *> *legacy = SGArtworkOrder();
                 if (legacy.count) [store setObject:legacy forKey:SGKeyMotionSources];
             }

@@ -128,13 +128,11 @@ static void restyleCardContent(UIView *card) {
         CGSize size = v.bounds.size;
         BOOL square = size.width >= 36 && size.width <= 48 && fabs(size.width - size.height) < 1;
         if (!square || v.layer.cornerRadius <= 0) return;
-        if (v.layer.cornerRadius >= size.width / 2) {
-            if (!sg_cardArtwork) sg_cardArtwork = v;
-            return;
-        }
+        CGFloat artworkRadius = SGFlag(SGRKeyNowPlayingRoundedArtwork, NO)
+            ? MIN(9, size.width * 0.22) : size.width / 2;
         UIView *outer = v;
         for (UIView *u = v; u && u != card && CGSizeEqualToSize(u.bounds.size, size); u = u.superview) {
-            roundView(u, size.width / 2);
+            roundView(u, artworkRadius);
             u.clipsToBounds = YES;
             outer = u;
         }
@@ -187,6 +185,10 @@ static void styleNowPlayingBar(UIViewController *container) {
         SGLog(@"now playing card %@ at %@ (bar %@, container %@)", card.class, NSStringFromCGRect(frame),
               NSStringFromCGRect(bar.frame), NSStringFromCGRect(container.view.bounds));
     });
+}
+
+void SGRNowPlayingBarRefresh(void) {
+    if (sg_barContainer) styleNowPlayingBar(sg_barContainer);
 }
 
 %hook _TtC18NowPlaying_BarImpl36NowPlayingBarContainerViewController

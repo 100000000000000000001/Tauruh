@@ -114,7 +114,7 @@ Shared:
                   prepared before choosing Moving artwork or Every song.
                   In Every song mode, Fallback album art size controls the square cover shown over the blurred
                   fallback when no moving artwork or lyrics clip is available; 50% is the original size.
-                  The sources are asked in the user's order (Apple Music, then Spotify Canvas until set, on the
+                  The sources are asked in the user's order (Spotify Canvas, then Apple Music until set, on the
                   shared Settings/SGOrderPage the lyrics sources use too). Spotify's URL comes off canvas.url
                   in the played track's metadata, which Spotify's core fills whatever
                   ios-feature-canvas.canvas_enabled says, and failing that from spotify.canvaz.cache with the
@@ -352,9 +352,9 @@ Audio effects follows Lock Screen, which appears between Lyrics and Audio effect
 In the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
-buttons to hide); in the redesign instead Now Playing (its device button and moving background, an optional volume slider off by default, with its thumb hidden
-if enabled). Then Vibrations
-under either look, a card for
+buttons to hide); in the redesign instead Now Playing (its device button, moving background, an optional
+volume slider off by default with its thumb hidden if enabled, and rounded-square mini-player art, off by default).
+Vibrations follows under either look, a card for
 Controls (on until switched off) and one for Music Haptics (off until switched on, with an ⓘ saying it
 follows the sound this iPhone plays while Spotify is open), each opening out while its switch is on:
 Controls into its Strength (10 to 100%, a tap at the new strength with each step), Music Haptics into its
@@ -400,7 +400,8 @@ never lights up as the tab you are on. Hide labels, on the same page, leaves the
 icons alone and applies straight away too. Spotify tabs can be hidden with their switches or removed from
 the editor; Use Spotify's order restores them. Compact player and tabs is on by default: while scroll-minimization
 is active, the glass bar narrows to the current tab and the wider mini-player fills the remaining row; it
-can be switched off independently. The minimized tab is vertically aligned to the mini-player card.
+can be switched off independently. Its compact footprint stays square so the tab's glass button remains
+round, and it is vertically aligned to the mini-player card.
 
 ## Adding a feature
 
