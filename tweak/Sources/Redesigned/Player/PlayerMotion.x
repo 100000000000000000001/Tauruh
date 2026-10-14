@@ -1,6 +1,6 @@
 // Player redesign: Animated artwork, the track's Canvas or Apple Music's animated cover behind the player,
-// the way the Music app draws it. The clip runs edge to edge from the top, sharp to near its foot, where
-// it dissolves into its own last rows drawn on down to the bottom of the field, so it ends in its own
+// the way the Music app draws it. The clip is centered in the visible player height, sharp to near its foot,
+// where it dissolves into its own last rows drawn on down to the bottom of the field, so it ends in its own
 // color rather than on the Fluid field. A blur comes in from the seam (from above the controls for a
 // Canvas as tall as the screen) and lies under the controls; behind the lyrics the whole clip is blurred.
 // The player's square cover goes while a clip plays, so a track without one keeps its cover over Fluid
@@ -155,6 +155,7 @@ static UIBlurEffect *blurEffect(void) {
     self.userInteractionEnabled = NO;
     self.accessibilityElementsHidden = YES;
     _picture = [[UIView alloc] initWithFrame:frame];
+    _picture.clipsToBounds = YES;
     [self addSubview:_picture];
     _foot = [CALayer layer];
     _foot.contentsGravity = kCAGravityResize;
@@ -222,14 +223,15 @@ static UIBlurEffect *blurEffect(void) {
     CGFloat screen = _screenHeight > 0 ? _screenHeight : total;
     CGFloat height = round(width * _aspect);
     if (_aspect > kCanvasAspect) height = MAX(height, screen);
-    CGFloat seam = round(height * kFootFrom), blurFrom = MIN(seam, round(screen * kBlurByControls));
+    CGFloat top = round((screen - height) / 2);
+    CGFloat seam = top + round(height * kFootFrom), blurFrom = MIN(seam, round(screen * kBlurByControls));
     _picture.frame = bounds;
     _seamBlur.frame = bounds;
     _seamBlur.maskView.frame = bounds;
     _lyricsBlur.frame = bounds;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
-    _still.frame = CGRectMake(0, 0, width, height);
+    _still.frame = CGRectMake(0, top, width, height);
     _clip.frame = _still.bounds;
     _clipMask.frame = _still.bounds;
     _foot.frame = CGRectMake(0, seam, width, MAX(0, total - seam));

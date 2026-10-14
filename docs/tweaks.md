@@ -231,7 +231,7 @@ Redesigned:
                   sheet, and a sheet with no rows within 4 s is shown as it is. It opens on the rows the last
                   menu had, kept across launches, and moves to Spotify's as they come in, a tap meanwhile held
                   until they do. The Canvas field extends below the clip with a blurred poster bleed instead of
-                  stretched edge rows. Always on in the redesign.
+                  stretched edge rows; the clip is centered within the visible player height. Always on in the redesign.
                   Tested in the simulator against harness/playermenu/
                   With Sing on and its voice model downloaded (Mod Settings > Karaoke, Redesigned/Lyrics/SingSettings.m,
                   both applying at once), its microphone (Redesigned/Lyrics/SGRSingControl.m) sits in the
@@ -399,8 +399,8 @@ starts the order over. A tab of the mod's own opens its link through Spotify's l
 never lights up as the tab you are on. Hide labels, on the same page, leaves the glass bar with its
 icons alone and applies straight away too. Spotify tabs can be hidden with their switches or removed from
 the editor; Use Spotify's order restores them. Compact player and tabs is on by default: while scroll-minimization
-is active, the glass bar narrows to the current tab and the mini-player shares its row; it can be switched
-off independently. The minimized tab is vertically aligned to the mini-player card.
+is active, the glass bar narrows to the current tab and the wider mini-player fills the remaining row; it
+can be switched off independently. The minimized tab is vertically aligned to the mini-player card.
 
 ## Adding a feature
 
