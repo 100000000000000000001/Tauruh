@@ -30,7 +30,7 @@ static void syncBar(UIView *stockBar);
 static BOOL sg_minimized;
 static __weak UIView *sg_compactSource;
 static NSUInteger sg_minimizeRequest;
-static const CGFloat kCompactBarWidth = 72;
+static const CGFloat kCompactBarWidth = 88;
 
 BOOL SGRTabBarMinimized(void) {
     return sg_minimized;
@@ -604,7 +604,7 @@ CGRect SGRTabBarInlineSlot(UIView *host, CGFloat height) {
     CGRect whole = [stockBar convertRect:stockBar.bounds toView:host];
     CGRect leading = [bar convertRect:bar.bounds toView:host];
     CGFloat left = CGRectGetMaxX(leading);
-    CGFloat right = CGRectGetMaxX(whole) - 4;
+    CGFloat right = CGRectGetMaxX(whole) - 12;
     CGRect slot = CGRectMake(left, CGRectGetMidY(whole) - height / 2, right - left, height);
     CGRect inWindow = [host convertRect:slot toView:bar.window];
     if (slot.size.width < 100 || CGRectGetMinY(inWindow) < 0
