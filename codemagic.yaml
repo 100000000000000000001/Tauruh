@@ -19,9 +19,10 @@ workflows:
           curl -Lo decrypted.ipa https://files.catbox.moe/qa5eyg.ipa
       - name: Generate Flag Table
         script: |
-          if [ -n "$SG_FLAG_LIST" ]; then
-            echo "$SG_FLAG_LIST" | base64 -d | gunzip > tweak/Sources/Shared/Flags/SGFlagList.m
-          fi
+          set -euo pipefail
+          python3 scripts/extract-flags.py decrypted.ipa
+          grep -q '^const SGFlagDef SGFlagTable\[\] = {' tweak/Sources/Shared/Flags/SGFlagList.m
+          grep -q '^const NSUInteger SGFlagCount =' tweak/Sources/Shared/Flags/SGFlagList.m
       - name: Build Tweak (.deb)
         script: |
           env -u MAKELEVEL gmake -C tweak clean package
