@@ -6,11 +6,13 @@
 // Whether a page's scroll hides the glass bar. On unless set; read once at launch.
 #define SGRKeyNavbarMinimize @"spotifyglass.redesign.navbar.minimize"
 #define SGRKeyNavbarProfilePhoto @"spotifyglass.redesign.navbar.profilePhoto"
+#define SGRKeyNavbarCompact @"spotifyglass.redesign.navbar.compact"
 
 extern NSString *const SGRNavbarID;      // NSString, the entry's identity
 extern NSString *const SGRNavbarTitle;   // NSString, the name in the settings list and under the icon
 extern NSString *const SGRNavbarURI;     // NSString, the mod's own tabs only: what a tap opens
 extern NSString *const SGRNavbarIcon;    // NSString, an SPTEncoreIcon class method such as "podcasts"
+extern NSString *const SGRNavbarIconSet; // NSString, SGTabIconSetSymbols when the icon is an SF Symbol
 extern NSString *const SGRNavbarHidden;  // NSNumber
 NSArray<NSDictionary *> *SGRNavbarLayout(void);
 void SGRSetNavbarLayout(NSArray<NSDictionary *> *layout);
@@ -26,6 +28,10 @@ void SGRLogTabBarRow(UIView *tabBar);
 void SGRRefreshTabBar(void);
 void SGRNavbarSetProfilePhotoVisible(UIView *face);
 void SGRNavbarRefreshProfilePhotos(void);
+// Called by the compact tab bar when its host row changes size.
+void SGRNowPlayingBarFollowTabBar(void);
+// The mini-player slot alongside the compact tab item, in `host` coordinates.
+CGRect SGRTabBarInlineSlot(UIView *host, CGFloat height);
 
 UIViewController *SGRNavbarSettingsPage(void);   // the tab editor, in Mod Settings
 UIViewController *SGRNavbarEditorPage(void);     // the tab editor alone, for the welcome tour

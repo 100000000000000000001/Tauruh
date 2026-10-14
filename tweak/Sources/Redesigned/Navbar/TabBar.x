@@ -3,6 +3,7 @@
 #import "Redesigned/Kit/SGRTokens.h"
 #import "Settings/SGPage.h"
 #import "Headers/SPTEncoreIconView.h"
+#import "Shared/Navigation/TabIcons.h"
 #import <objc/message.h>
 
 static char kBarKey, kHostKey;
@@ -14,6 +15,7 @@ static CGFloat sg_room, sg_glassHeight;   // see "room for the glass bar"
 @property (nonatomic, copy) NSArray<UIView *> *sources;
 @property (nonatomic, weak) UILongPressGestureRecognizer *hold;
 @property (nonatomic) BOOL holding;
+@property (nonatomic, weak) UITabBarItem *shown;
 @end
 
 static void syncBar(UIView *stockBar);
@@ -22,6 +24,9 @@ static void syncBar(UIView *stockBar);
 
 // TabBarMinimize.x decides this from a page's scroll; the host is slid down out of the way.
 static BOOL sg_minimized;
+static __weak UIView *sg_compactSource;
+static NSUInteger sg_minimizeRequest;
+static const CGFloat kCompactBarWidth = 104;
 
 BOOL SGRTabBarMinimized(void) {
     return sg_minimized;
@@ -30,17 +35,24 @@ BOOL SGRTabBarMinimized(void) {
 void SGRSetTabBarMinimized(BOOL minimized, BOOL animated) {
     if (sg_minimized == minimized) return;
     sg_minimized = minimized;
+    NSUInteger request = ++sg_minimizeRequest;
     UIView *stockBar = sg_stockBar;
-    UIView *host = stockBar ? objc_getAssociatedObject(stockBar, &kHostKey) : nil;
-    if (!host) return;
+    if (!stockBar) return;
     void (^apply)(void) = ^{
-        host.transform = minimized ? CGAffineTransformMakeTranslation(0, host.bounds.size.height) : CGAffineTransformIdentity;
+        if (request != sg_minimizeRequest) return;
+        syncBar(stockBar);
+        UIView *host = objc_getAssociatedObject(stockBar, &kHostKey);
+        [host layoutIfNeeded];
+        SGRNowPlayingBarFollowTabBar();
     };
     if (!animated) {
         [UIView performWithoutAnimation:apply];
-        return;
+    } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (request != sg_minimizeRequest) return;
+            [UIView animateWithDuration:0.32 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:apply completion:nil];
+        });
     }
-    [UIView animateWithDuration:0.28 delay:0 options:UIViewAnimationOptionCurveEaseInOut animations:apply completion:nil];
 }
 
 #pragma mark - reading Spotify's items
@@ -114,7 +126,39 @@ static id encoreIconOf(UIView *view) {
     return type && type[0] == '@' ? object_getIvar(view, ivar) : nil;
 }
 
+static NSString *titleOf(UIView *source) {
+    NSString *title = labelIn(source).text;
+    if ([NSStringFromClass(source.class) isEqualToString:@"SGRTabItemView"]) return title;
+    for (NSDictionary *entry in SGRNavbarLayout()) {
+        if ([entry[SGRNavbarID] isEqualToString:title] && !entry[SGRNavbarURI])
+            return entry[SGRNavbarTitle] ?: title;
+    }
+    return title;
+}
+
 static UIImage *glyphOf(UIView *item, BOOL active) {
+    NSString *sourceTitle = labelIn(item).text;
+    if (![NSStringFromClass(item.class) isEqualToString:@"SGRTabItemView"]) {
+        for (NSDictionary *entry in SGRNavbarLayout()) {
+            if ([entry[SGRNavbarID] isEqualToString:sourceTitle] && !entry[SGRNavbarURI] && [entry[SGRNavbarIcon] isKindOfClass:NSString.class]) {
+                static NSCache<NSString *, UIImage *> *customCache;
+                if (!customCache) customCache = [NSCache new];
+                NSString *name = [NSString stringWithFormat:@"%@:%@", entry[SGRNavbarIconSet] ?: @"encore", entry[SGRNavbarIcon]];
+                UIImage *image = [customCache objectForKey:name];
+                if (image) return image;
+                UIView *custom = SGTabIconView(entry[SGRNavbarIcon], [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols], UIColor.whiteColor);
+                CGSize customSize = CGSizeMake(24, 24);
+                custom.translatesAutoresizingMaskIntoConstraints = YES;
+                custom.frame = (CGRect){CGPointZero, customSize};
+                UIView *holder = [[UIView alloc] initWithFrame:(CGRect){CGPointZero, customSize}];
+                [holder addSubview:custom];
+                [custom layoutIfNeeded];
+                image = renderLayer(custom.layer, customSize);
+                if (image) [customCache setObject:image forKey:name];
+                return image;
+            }
+        }
+    }
     UIView *live = iconIn(item);
     if (!live) return nil;
     CGSize size = live.bounds.size;
@@ -139,7 +183,16 @@ static UIImage *glyphOf(UIView *item, BOOL active) {
         }
     }
     // Tabs of the mod's own draw a UIImageView, or an icon Encore would not draw off screen.
-    return size.width >= 2 ? renderLayer(live.layer, size) : nil;
+    if (size.width < 2) return nil;
+    static NSCache<NSString *, UIImage *> *customItemCache;
+    if (!customItemCache) customItemCache = [NSCache new];
+    NSString *key = [NSString stringWithFormat:@"%@:%@", NSStringFromClass(item.class),
+                     item.accessibilityIdentifier ?: NSStringFromCGSize(size)];
+    UIImage *cached = [customItemCache objectForKey:key];
+    if (cached) return cached;
+    UIImage *image = renderLayer(live.layer, size);
+    if (image) [customItemCache setObject:image forKey:key];
+    return image;
 }
 
 #pragma mark - passing a tap on
@@ -192,8 +245,22 @@ static void forwardTap(UIView *item) {
 - (void)tabBar:(UITabBar *)tabBar didSelectItem:(UITabBarItem *)item {
     NSUInteger index = [self.items indexOfObject:item];
     if (index == NSNotFound || index >= self.sources.count) return;
+    BOOL again = item == self.shown;
+    self.shown = item;
+    if (sg_minimized && SGFlag(SGRKeyNavbarCompact, YES) && (again || self.sources.count == 1)) {
+        SGRSetTabBarMinimized(NO, YES);
+        return;
+    }
     // Home tapped while on Home pops Spotify's stack, which would take Mod Settings straight off it.
-    if (!self.holding) forwardTap(self.sources[index]);
+    UIView *source = self.sources[index];
+    sg_compactSource = source;
+    if (!self.holding) {
+        SEL open = NSSelectorFromString(@"open");
+        if ([NSStringFromClass(source.class) isEqualToString:@"SGRTabItemView"] && [source respondsToSelector:open])
+            ((void (*)(id, SEL))objc_msgSend)(source, open);
+        else
+            forwardTap(source);
+    }
     // Spotify repaints its labels a moment later; a tap it did not take snaps the selection back.
     UIView *stockBar = self.stockBar;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -378,14 +445,23 @@ static void syncBar(UIView *stockBar) {
     }
     stockBar.superview.layer.backgroundColor = NULL;
 
-    NSArray<UIView *> *sources = tabItems(stockBar);
+    NSArray<UIView *> *allSources = tabItems(stockBar);
+    if (!allSources.count) return;
+    UIView *activeSource = nil;
+    for (UIView *source in allSources) {
+        if (isActive(source)) { activeSource = source; break; }
+    }
+    if (activeSource) sg_compactSource = activeSource;
+    if (![allSources containsObject:sg_compactSource]) sg_compactSource = allSources.firstObject;
+    BOOL compact = sg_minimized && SGFlag(SGRKeyNavbarCompact, YES);
+    NSArray<UIView *> *sources = compact ? (sg_compactSource ? @[sg_compactSource] : @[]) : allSources;
     if (!sources.count) return;
     // An item with no title is drawn by UIKit as its glyph alone, centred, on a bar of the same height.
     BOOL hideLabels = SGFlag(SGRKeyNavbarHideLabels, YES);
 
     if (![sources isEqualToArray:bar.sources]) {
         NSMutableArray<UITabBarItem *> *items = [NSMutableArray array];
-        for (UIView *source in sources) [items addObject:[[UITabBarItem alloc] initWithTitle:hideLabels ? nil : labelIn(source).text image:nil tag:items.count]];
+        for (UIView *source in sources) [items addObject:[[UITabBarItem alloc] initWithTitle:hideLabels ? nil : titleOf(source) image:nil tag:items.count]];
         bar.sources = sources;
         [bar setItems:items animated:NO];
         NSMutableString *out = [NSMutableString stringWithString:@"tab bar icons"];
@@ -404,12 +480,12 @@ static void syncBar(UIView *stockBar) {
     BOOL missing = NO;
     for (NSUInteger i = 0; i < sources.count; i++) {
         UITabBarItem *item = bar.items[i];
-        if (!item.image) item.image = glyphOf(sources[i], NO);
-        if (!item.selectedImage || item.selectedImage == item.image) item.selectedImage = glyphOf(sources[i], YES);
+        item.image = glyphOf(sources[i], NO);
+        item.selectedImage = glyphOf(sources[i], YES);
         missing |= !item.image || !item.selectedImage;
-        NSString *title = hideLabels ? nil : labelIn(sources[i]).text;
-        if (hideLabels ? item.title != nil : title.length && ![title isEqualToString:item.title]) item.title = title;
-        if (!selected && isActive(sources[i])) selected = item;
+        NSString *title = hideLabels ? nil : titleOf(sources[i]);
+        if (hideLabels ? item.title != nil : ![title isEqualToString:item.title]) item.title = title;
+        if (!selected && (isActive(sources[i]) || (compact && sources[i] == sg_compactSource))) selected = item;
     }
     if (selected && bar.selectedItem != selected) bar.selectedItem = selected;
     // An icon view Spotify has not built yet is looked for again shortly, not on the next touch.
@@ -425,11 +501,32 @@ static void syncBar(UIView *stockBar) {
     CGFloat height = MAX(bounds.size.height, glassHeight(bar, stockBar));
     CGRect frame = CGRectMake(0, CGRectGetMaxY(bounds) - height, width, height);
     if (!CGRectEqualToRect(host.frame, frame)) host.frame = frame;
-    if (!CGRectEqualToRect(bar.frame, host.bounds)) bar.frame = host.bounds;
+    CGRect barFrame = compact ? CGRectMake(0, 0, kCompactBarWidth, host.bounds.size.height) : host.bounds;
+    if (!CGRectEqualToRect(bar.frame, barFrame)) bar.frame = barFrame;
+    CGAffineTransform hostTransform = sg_minimized && !compact
+        ? CGAffineTransformMakeTranslation(0, host.bounds.size.height) : CGAffineTransformIdentity;
+    if (!CGAffineTransformEqualToTransform(host.transform, hostTransform)) host.transform = hostTransform;
     if (host.superview != stockBar) [stockBar addSubview:host];
     else if (stockBar.subviews.lastObject != host) [stockBar bringSubviewToFront:host];
     logBarOnce(bar);
     makeRoom(containerOf(stockBar));
+    if (compact) SGRNowPlayingBarFollowTabBar();
+}
+
+CGRect SGRTabBarInlineSlot(UIView *host, CGFloat height) {
+    UIView *stockBar = sg_stockBar;
+    UITabBar *bar = stockBar ? objc_getAssociatedObject(stockBar, &kBarKey) : nil;
+    if (!sg_minimized || !SGFlag(SGRKeyNavbarCompact, YES) || !host || !bar.window
+        || stockBar.hidden || stockBar.alpha < 0.01) return CGRectNull;
+    CGRect whole = [stockBar convertRect:stockBar.bounds toView:host];
+    CGRect leading = [bar convertRect:bar.bounds toView:host];
+    CGFloat left = CGRectGetMaxX(leading) + 8;
+    CGFloat right = CGRectGetMaxX(whole) - 12;
+    CGRect slot = CGRectMake(left, CGRectGetMidY(whole) - height / 2, right - left, height);
+    CGRect inWindow = [host convertRect:slot toView:bar.window];
+    if (slot.size.width < 100 || CGRectGetMinY(inWindow) < 0
+        || CGRectGetMaxY(inWindow) > CGRectGetMaxY(bar.window.bounds)) return CGRectNull;
+    return slot;
 }
 
 #pragma mark - hooks

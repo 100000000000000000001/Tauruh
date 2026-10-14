@@ -2,6 +2,7 @@
 #import "Navbar.h"
 #import "Headers/SPTEncoreIconView.h"
 #import "Shared/Navigation/Links.h"
+#import "Shared/Navigation/TabIcons.h"
 #import <objc/message.h>
 #import <objc/runtime.h>
 
@@ -25,7 +26,7 @@ void SGRNavbarSetProfilePhotoVisible(UIView *face) {
     if (!face) return;
     if (!sg_profilePhotos) sg_profilePhotos = [NSHashTable weakObjectsHashTable];
     [sg_profilePhotos addObject:face];
-    if (SGEnabled(SGRKeyNavbarProfilePhoto)) {
+    if (SGFlag(SGRKeyNavbarProfilePhoto, YES)) {
         face.alpha = 1;
         face.userInteractionEnabled = YES;
         face.accessibilityElementsHidden = NO;
@@ -44,24 +45,8 @@ static UIColor *itemColor(void) { return [UIColor colorWithWhite:0xB3 / 255.0 al
 
 #pragma mark - the mod's own items
 
-static UIView *iconView(NSString *name) {
-    Class icon = NSClassFromString(@"SPTEncoreIcon");
-    Class view = NSClassFromString(@"SPTEncoreIconView");
-    SEL glyphSel = NSSelectorFromString(name.length ? name : @"star");
-    if (icon && view && [icon respondsToSelector:glyphSel]) {
-        id (*glyphFor)(id, SEL) = (id (*)(id, SEL))objc_msgSend;
-        id glyph = glyphFor(icon, glyphSel);
-        SPTEncoreIconView *encore = glyph ? [[view alloc] initWithIcon:glyph] : nil;
-        if (encore) {
-            [encore setForegroundColor:itemColor()];
-            return encore;
-        }
-    }
-    UIImage *image = [UIImage systemImageNamed:@"star.fill" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:19 weight:UIImageSymbolWeightSemibold]];
-    UIImageView *fallback = [[UIImageView alloc] initWithImage:image];
-    fallback.tintColor = itemColor();
-    fallback.contentMode = UIViewContentModeCenter;
-    return fallback;
+static UIView *iconView(NSDictionary *entry) {
+    return SGTabIconView(entry[SGRNavbarIcon], [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols], itemColor());
 }
 
 @interface SGRTabItemView : UIControl
@@ -89,12 +74,14 @@ static UIView *iconView(NSString *name) {
 
 - (void)applyEntry:(NSDictionary *)entry {
     self.uri = entry[SGRNavbarURI];
+    self.accessibilityIdentifier = [NSString stringWithFormat:@"%@:%@:%@", entry[SGRNavbarIconSet] ?: @"encore",
+                                    entry[SGRNavbarIcon] ?: @"star", entry[SGRNavbarTitle] ?: @""];
     _title.text = entry[SGRNavbarTitle];
-    NSString *name = entry[SGRNavbarIcon] ?: @"star";
+    NSString *name = [NSString stringWithFormat:@"%@ %@", entry[SGRNavbarIconSet] ?: @"encore", entry[SGRNavbarIcon] ?: @"star"];
     if ([name isEqualToString:_iconName]) return;
     [_icon removeFromSuperview];
     _iconName = [name copy];
-    _icon = iconView(name);
+    _icon = iconView(entry);
     // Encore's views lay themselves out from constraints; this one is placed by frame.
     _icon.translatesAutoresizingMaskIntoConstraints = YES;
     [self addSubview:_icon];
