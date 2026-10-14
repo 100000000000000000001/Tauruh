@@ -170,11 +170,13 @@ void SGRComposeTabBar(UIView *tabBar) {
     NSMutableArray<UIView *> *wanted = [NSMutableArray array];
     NSMutableSet<NSString *> *placed = [NSMutableSet set];
     NSMutableSet<NSString *> *keep = [NSMutableSet set];
+    NSSet<NSString *> *removed = [NSSet setWithArray:SGRNavbarRemovedStock()];
 
     if (SGEnabled(SGRKeyNavbar)) {
         for (NSDictionary *entry in SGRNavbarLayout()) {
             NSString *ident = entry[SGRNavbarID];
             if (![ident isKindOfClass:NSString.class] || [placed containsObject:ident]) continue;
+            if (!entry[SGRNavbarURI] && [removed containsObject:ident]) continue;
             [placed addObject:ident];
             BOOL hidden = [entry[SGRNavbarHidden] boolValue];
             if (entry[SGRNavbarURI]) {
@@ -192,6 +194,10 @@ void SGRComposeTabBar(UIView *tabBar) {
     }
     for (NSString *ident in sg_stockOrder) {
         UIView *item = stockViews[ident];
+        if ([removed containsObject:ident]) {
+            item.hidden = YES;
+            continue;
+        }
         if (!item || [wanted containsObject:item]) continue;
         item.hidden = NO;
         [wanted addObject:item];

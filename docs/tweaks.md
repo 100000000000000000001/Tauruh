@@ -352,8 +352,8 @@ Audio effects follows Lock Screen, which appears between Lyrics and Audio effect
 In the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
-buttons to hide); in the redesign instead Now Playing (its device button and moving background, the volume slider
-visible by default with its thumb hidden by default, each independently switchable). Then Vibrations
+buttons to hide); in the redesign instead Now Playing (its device button and moving background, an optional volume slider off by default, with its thumb hidden
+if enabled). Then Vibrations
 under either look, a card for
 Controls (on until switched off) and one for Music Haptics (off until switched on, with an ⓘ saying it
 follows the sound this iPhone plays while Spotify is open), each opening out while its switch is on:
@@ -389,14 +389,15 @@ forced and take no touch. `Redesigned/Kit/SGRGlassDesign.x` holds the list; what
 registers in `Core/SGFlagForce.h`. A change shows after Spotify restarts.
 
 The tab editor on the Navbar page is the exception and applies as soon as the bar lays out again. It lists the tabs in the order
-the bar shows them: drag to reorder, use each row's switch to hide or show it, and tap a row to edit its name and icon.
+the bar shows them: drag to reorder, use each row's switch to hide or show it, swipe to remove it, and tap a row to edit its name and icon.
 That works for Spotify's own tabs as well as tabs of the mod's own; icons can be Encore glyphs or SF Symbols.
 Apple Music tab icons, off by default, uses Apple-style SF Symbols for built-in tabs unless that tab has a custom icon.
 Add a tab puts a page of Spotify's or any `spotify:` link on the bar. Spotify's own tabs are kept by the
-name under their icon, so they can be hidden but never removed, and switching the app's language
+name under their icon, so removing one hides it until Use Spotify's order restores it; switching the app's language
 starts the order over. A tab of the mod's own opens its link through Spotify's link dispatcher, so it
 never lights up as the tab you are on. Hide labels, on the same page, leaves the glass bar with its
-icons alone and applies straight away too. Compact player and tabs is on by default: while scroll-minimization
+icons alone and applies straight away too. Spotify tabs can be hidden with their switches or removed from
+the editor; Use Spotify's order restores them. Compact player and tabs is on by default: while scroll-minimization
 is active, the glass bar narrows to the current tab and the mini-player shares its row; it can be switched
 off independently.
 

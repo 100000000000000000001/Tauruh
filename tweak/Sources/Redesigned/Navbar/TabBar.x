@@ -14,8 +14,11 @@ static CGFloat sg_room, sg_glassHeight;   // see "room for the glass bar"
 @property (nonatomic, weak) UIView *stockBar;
 @property (nonatomic, copy) NSArray<UIView *> *sources;
 @property (nonatomic, weak) UILongPressGestureRecognizer *hold;
+@property (nonatomic, weak) UITapGestureRecognizer *tabTap;
 @property (nonatomic) BOOL holding;
 @property (nonatomic, weak) UITabBarItem *shown;
+- (UITabBarItem *)itemAt:(CGPoint)point;
+- (void)tabTapped:(UITapGestureRecognizer *)tap;
 @end
 
 static void syncBar(UIView *stockBar);
@@ -173,8 +176,15 @@ static UIImage *glyphOf(UIView *item, BOOL active) {
     NSString *sourceTitle = labelIn(item).text;
     if (![NSStringFromClass(item.class) isEqualToString:@"SGRTabItemView"]) {
         for (NSDictionary *entry in SGRNavbarLayout()) {
-            if ([entry[SGRNavbarID] isEqualToString:sourceTitle] && !entry[SGRNavbarURI] && [entry[SGRNavbarIcon] isKindOfClass:NSString.class]) {
-                return customGlyph(entry[SGRNavbarIcon], [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols]);
+            NSString *icon = entry[SGRNavbarIcon];
+            NSString *defaultIcon = SGRNavbarDefaultIcon(entry[SGRNavbarID]);
+            BOOL customIcon = [entry[SGRNavbarCustomIcon] boolValue]
+                || (icon.length && ![icon isEqualToString:@"star"]
+                    && (!defaultIcon || ![icon isEqualToString:defaultIcon]))
+                || entry[SGRNavbarIconSet] != nil;
+            if ([entry[SGRNavbarID] isEqualToString:sourceTitle] && !entry[SGRNavbarURI]
+                && customIcon && [icon isKindOfClass:NSString.class]) {
+                return customGlyph(icon, [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols]);
             }
         }
         if (SGFlag(SGRKeyNavbarAppleIcons, NO)) {
@@ -270,25 +280,40 @@ static void forwardTap(UIView *item) {
     if (index == NSNotFound || index >= self.sources.count) return;
     BOOL again = item == self.shown;
     self.shown = item;
-    if (sg_minimized && SGFlag(SGRKeyNavbarCompact, YES) && (again || self.sources.count == 1)) {
-        SGRSetTabBarMinimized(NO, YES);
-        return;
-    }
-    // Home tapped while on Home pops Spotify's stack, which would take Mod Settings straight off it.
     UIView *source = self.sources[index];
     sg_compactSource = source;
-    if (!self.holding) {
-        SEL open = NSSelectorFromString(@"open");
-        if ([NSStringFromClass(source.class) isEqualToString:@"SGRTabItemView"] && [source respondsToSelector:open])
-            ((void (*)(id, SEL))objc_msgSend)(source, open);
-        else
-            forwardTap(source);
+    BOOL expand = sg_minimized && SGFlag(SGRKeyNavbarCompact, YES) && (again || self.sources.count == 1);
+    if (!self.holding && !expand && ![source respondsToSelector:NSSelectorFromString(@"open")])
+        // Home tapped while on Home pops Spotify's stack, which would take Mod Settings straight off it.
+        forwardTap(source);
+    if (expand) {
+        SGRSetTabBarMinimized(NO, YES);
+        return;
     }
     // Spotify repaints its labels a moment later; a tap it did not take snaps the selection back.
     UIView *stockBar = self.stockBar;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         if (stockBar) syncBar(stockBar);
     });
+}
+
+- (void)tabTapped:(UITapGestureRecognizer *)tap {
+    if (tap.state != UIGestureRecognizerStateEnded || self.holding) return;
+    CGPoint point = [tap locationInView:self];
+    if (!self.items.count || self.items.count != self.sources.count || self.bounds.size.width <= 0) return;
+    CGFloat width = self.bounds.size.width / self.items.count;
+    NSUInteger index = MIN((NSUInteger)MAX(0, floor(point.x / width)), self.items.count - 1);
+    if (self.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft)
+        index = self.items.count - 1 - index;
+    UIView *source = self.sources[index];
+    SEL open = NSSelectorFromString(@"open");
+    if ([source respondsToSelector:open]) {
+        sg_compactSource = source;
+        UITabBarItem *item = self.items[index];
+        self.shown = item;
+        self.selectedItem = item;
+        ((void (*)(id, SEL))objc_msgSend)(source, open);
+    }
 }
 
 - (UITabBarItem *)itemAt:(CGPoint)point {
@@ -312,6 +337,7 @@ static void forwardTap(UIView *item) {
 
 // UIView asks itself this for its own recognizers too, so only the hold is answered here.
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)recognizer {
+    if (recognizer == self.tabTap) return YES;
     if (recognizer != self.hold) return [super gestureRecognizerShouldBegin:recognizer];
     NSUInteger index = [self.items indexOfObject:[self itemAt:[recognizer locationInView:self]]];
     return index < self.sources.count && isHome(self.sources[index], self.stockBar);
@@ -452,6 +478,11 @@ static void syncBar(UIView *stockBar) {
         hold.delegate = bar;
         [bar addGestureRecognizer:hold];
         bar.hold = hold;
+        UITapGestureRecognizer *tabTap = [[UITapGestureRecognizer alloc] initWithTarget:bar action:@selector(tabTapped:)];
+        tabTap.delegate = bar;
+        tabTap.cancelsTouchesInView = NO;
+        [bar addGestureRecognizer:tabTap];
+        bar.tabTap = tabTap;
         objc_setAssociatedObject(stockBar, &kBarKey, bar, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         SGRTabBarHost *host = [SGRTabBarHost new];
         [host addSubview:bar];

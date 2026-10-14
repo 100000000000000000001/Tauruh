@@ -14,12 +14,16 @@ extern NSString *const SGRNavbarTitle;   // NSString, the name in the settings l
 extern NSString *const SGRNavbarURI;     // NSString, the mod's own tabs only: what a tap opens
 extern NSString *const SGRNavbarIcon;    // NSString, an SPTEncoreIcon class method such as "podcasts"
 extern NSString *const SGRNavbarIconSet; // NSString, SGTabIconSetSymbols when the icon is an SF Symbol
-extern NSString *const SGRNavbarHidden;  // NSNumber
+extern NSString *const SGRNavbarCustomIcon; // NSNumber, whether a stock tab has a custom glyph
+extern NSString *const SGRNavbarHidden;   // NSNumber
 NSArray<NSDictionary *> *SGRNavbarLayout(void);
 void SGRSetNavbarLayout(NSArray<NSDictionary *> *layout);
+NSString *SGRNavbarDefaultIcon(NSString *stockID);
 // Spotify's own tabs in Spotify's order, as Navbar.x last saw them on the bar.
 NSArray<NSString *> *SGRNavbarStock(void);
 void SGRSetNavbarStock(NSArray<NSString *> *stock);
+NSArray<NSString *> *SGRNavbarRemovedStock(void);
+void SGRSetNavbarRemovedStock(NSArray<NSString *> *stock);
 NSURL *SGRNavbarTabURL(NSString *uri);
 
 // Navbar.x, called from the tab bar's layout passes in TabBar.x.

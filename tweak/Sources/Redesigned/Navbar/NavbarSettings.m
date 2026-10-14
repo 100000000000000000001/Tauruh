@@ -29,16 +29,19 @@ static NSArray<NSDictionary *> *tabPresets(void) {
 
 static NSMutableArray<NSMutableDictionary *> *navbarEntries(void) {
     NSArray<NSString *> *stock = SGRNavbarStock();
+    NSSet<NSString *> *removed = [NSSet setWithArray:SGRNavbarRemovedStock()];
     NSMutableArray<NSMutableDictionary *> *entries = [NSMutableArray array];
     NSMutableSet<NSString *> *seen = [NSMutableSet set];
     for (NSDictionary *entry in SGRNavbarLayout()) {
         NSString *ident = entry[SGRNavbarID];
         if (![ident isKindOfClass:NSString.class] || [seen containsObject:ident]) continue;
+        if (!entry[SGRNavbarURI] && [removed containsObject:ident]) continue;
         if (!entry[SGRNavbarURI] && ![stock containsObject:ident]) continue;
         [seen addObject:ident];
         [entries addObject:[entry mutableCopy]];
     }
     for (NSString *ident in stock) {
+        if ([removed containsObject:ident]) continue;
         if ([seen containsObject:ident]) continue;
         [entries addObject:[@{SGRNavbarID: ident, SGRNavbarTitle: ident} mutableCopy]];
     }
@@ -81,7 +84,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
     [super viewDidLoad];
     self.tableView.allowsSelectionDuringEditing = YES;
     self.tableView.editing = YES;
-    _intro = SGNote(@"Drag to reorder. Tap a tab to change its name or icon; use its switch to show or hide it.");
+    _intro = SGNote(@"Drag to reorder. Tap a tab to change its name or icon; use its switch to show or hide it, or swipe to remove it.");
     self.tableView.tableHeaderView = _intro;
     _entries = navbarEntries();
 }
@@ -195,10 +198,9 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
     return path.section == SGRNavbarSectionTabs;
 }
 
-// Spotify's own tabs stay on the list to be switched back on; only the mod's own can go.
 - (UITableViewCellEditingStyle)tableView:(UITableView *)table editingStyleForRowAtIndexPath:(NSIndexPath *)path {
     if (path.section != SGRNavbarSectionTabs) return UITableViewCellEditingStyleNone;
-    return _entries[(NSUInteger)path.row][SGRNavbarURI] ? UITableViewCellEditingStyleDelete : UITableViewCellEditingStyleNone;
+    return UITableViewCellEditingStyleDelete;
 }
 
 - (NSIndexPath *)tableView:(UITableView *)table targetIndexPathForMoveFromRowAtIndexPath:(NSIndexPath *)from toProposedIndexPath:(NSIndexPath *)to {
@@ -214,6 +216,13 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 
 - (void)tableView:(UITableView *)table commitEditingStyle:(UITableViewCellEditingStyle)style forRowAtIndexPath:(NSIndexPath *)path {
     if (style != UITableViewCellEditingStyleDelete) return;
+    NSMutableDictionary *entry = _entries[(NSUInteger)path.row];
+    NSString *uri = entry[SGRNavbarURI];
+    if (!uri) {
+        NSMutableSet<NSString *> *removed = [NSMutableSet setWithArray:SGRNavbarRemovedStock()];
+        [removed addObject:entry[SGRNavbarID]];
+        SGRSetNavbarRemovedStock(removed.allObjects);
+    }
     [_entries removeObjectAtIndex:(NSUInteger)path.row];
     [self save];
     [table deleteRowsAtIndexPaths:@[path] withRowAnimation:UITableViewRowAnimationAutomatic];
@@ -281,13 +290,8 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
     }
 
     NSString *title = entry[SGRNavbarTitle] ?: ident;
-    NSString *icon = entry[SGRNavbarIcon] ?: @"star";
-    for (NSDictionary *preset in tabPresets()) {
-        if ([preset[SGRNavbarTitle] isEqualToString:ident]) {
-            if (!entry[SGRNavbarIcon]) icon = preset[SGRNavbarIcon];
-            break;
-        }
-    }
+    NSString *defaultIcon = SGRNavbarDefaultIcon(ident);
+    NSString *icon = entry[SGRNavbarIcon] ?: defaultIcon ?: @"star";
     NSMutableDictionary *tab = [@{SGTabTitle: title, SGTabURI: @"spotify:home", SGTabIcon: icon} mutableCopy];
     if (entry[SGRNavbarIconSet]) tab[SGTabIconSet] = entry[SGRNavbarIconSet];
     __weak typeof(self) weakSelf = self;
@@ -300,9 +304,24 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
         }
         if (!current) return;
         current[SGRNavbarTitle] = edited[SGTabTitle];
-        current[SGRNavbarIcon] = edited[SGTabIcon];
-        if (edited[SGTabIconSet]) current[SGRNavbarIconSet] = edited[SGTabIconSet];
-        else [current removeObjectForKey:SGRNavbarIconSet];
+        NSString *editedIcon = edited[SGTabIcon];
+        NSString *editedIconSet = edited[SGTabIconSet];
+        BOOL customIcon = [current[SGRNavbarCustomIcon] boolValue]
+            || (current[SGRNavbarIcon] && ![current[SGRNavbarIcon] isEqualToString:@"star"]
+                && (!defaultIcon || ![current[SGRNavbarIcon] isEqualToString:defaultIcon]))
+            || current[SGRNavbarIconSet] != nil;
+        customIcon = customIcon || editedIconSet != nil
+            || (defaultIcon ? ![editedIcon isEqualToString:defaultIcon] : ![editedIcon isEqualToString:@"star"]);
+        if (customIcon) {
+            current[SGRNavbarIcon] = editedIcon;
+            current[SGRNavbarCustomIcon] = @YES;
+            if (editedIconSet) current[SGRNavbarIconSet] = editedIconSet;
+            else [current removeObjectForKey:SGRNavbarIconSet];
+        } else {
+            [current removeObjectForKey:SGRNavbarIcon];
+            [current removeObjectForKey:SGRNavbarCustomIcon];
+            [current removeObjectForKey:SGRNavbarIconSet];
+        }
         [page save];
         [page.tableView reloadData];
     });
@@ -328,11 +347,12 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 
 - (void)reset {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Use Spotify's order"
-                                                                  message:@"Every tab of Spotify's comes back where Spotify put it, and the tabs you added go."
+                                                                  message:@"Every Spotify tab comes back in Spotify's order, and the tabs you added go."
                                                            preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"Reset" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
         SGRSetNavbarLayout(@[]);
+        SGRSetNavbarRemovedStock(@[]);
         SGRRefreshTabBar();
         self->_entries = navbarEntries();
         [self.tableView reloadData];

@@ -326,6 +326,7 @@ static SGModRow *fluidSlider(NSString *title, SGRFluidSetting setting, NSString 
 }
 
 UIViewController *SGRPlayerSettingsPage(NSArray *more) {
+    SGRPlayerVolumeOn();
     SGRPlayerShowcase *showcase = [[SGRPlayerShowcase alloc] initWithFrame:CGRectMake(0, 0, 320, kCardMinHeight)];
     UISegmentedControl *backgrounds = [[UISegmentedControl alloc] initWithItems:SGRPlayerBackgroundNames()];
     backgrounds.selectedSegmentIndex = SGRPlayerBackground();
@@ -356,9 +357,9 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         SGNotedSection(@"Controls", @[
                        SGOptionRow(@"Show Sing button", @"Karaoke control in the player lyrics", SGRKeyPlayerKaraokeButton),
                        SGOptionRow(@"Show Translate button", @"Pronunciation and translation in the player lyrics", SGRKeyPlayerTranslateButton),
-                       SGOptionRow(@"Hide volume slider", nil, SGRKeyHidePlayerVolume),
+                       SGOptionRow(@"Show volume slider", @"Off by default", SGRKeyPlayerVolume),
                        SGSwitchRow(@"Hide volume slider thumb", @"Keep the slider usable without the white dot", SGRKeyHidePlayerVolumeThumb),
-                       SGOptionRow(@"Match time slider", @"Use the same full-width track style as song progress", SGRKeyPlayerVolumeMatchSlider),
+                       SGOptionRow(@"Match time slider", @"Align its width and track with song progress", SGRKeyPlayerVolumeMatchSlider),
                        SGOptionRow(@"Follow the cover", nil, SGRKeyPlayerFollowsCover)],
                        @"The volume slider controls this iPhone, or the speaker while Spotify plays on another device. "
                        @"Hiding its thumb leaves the slider interactive. "

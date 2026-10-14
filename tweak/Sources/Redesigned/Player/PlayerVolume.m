@@ -105,8 +105,7 @@ static UIImageView *glyph(NSString *symbol) {
 
 @end
 
-static char kVolumeKey, kPlayKey;
-static NSString *const kVolumeDefaultMigration = @"spotifyglass.redesign.player.volumeDefaultMigration";
+static char kVolumeKey, kPlayKey, kProgressSliderKey;
 
 // Read at launch, as the player's other switches are: the footer asks on every layout pass.
 BOOL SGRPlayerVolumeOn(void) {
@@ -114,15 +113,12 @@ BOOL SGRPlayerVolumeOn(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
-        if (![defaults boolForKey:kVolumeDefaultMigration]) {
-            id legacy = [defaults objectForKey:SGRKeyPlayerVolume];
-            id hidden = [defaults objectForKey:SGRKeyHidePlayerVolume];
-            // The earlier hide-by-default implementation persisted its default as a user choice.
-            if (!legacy && [hidden boolValue]) [defaults removeObjectForKey:SGRKeyHidePlayerVolume];
-            [defaults setBool:YES forKey:kVolumeDefaultMigration];
-        }
+        id shown = [defaults objectForKey:SGRKeyPlayerVolume];
         id hidden = [defaults objectForKey:SGRKeyHidePlayerVolume];
-        on = hidden ? ![hidden boolValue] : SGFlag(SGRKeyPlayerVolume, YES);
+        if (!shown && hidden) [defaults setBool:![hidden boolValue] forKey:SGRKeyPlayerVolume];
+        [defaults removeObjectForKey:SGRKeyHidePlayerVolume];
+        shown = [defaults objectForKey:SGRKeyPlayerVolume];
+        on = shown ? [shown boolValue] : hidden ? ![hidden boolValue] : SGFlag(SGRKeyPlayerVolume, NO);
     });
     return on;
 }
@@ -147,8 +143,17 @@ BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat 
                          : controls.center.y + controls.transform.ty + kButtonsHalf;
     CGFloat below = [row convertPoint:CGPointMake(CGRectGetMidX(row.bounds), CGRectGetMidY(row.bounds)) toView:stack].y - kGlyphsHalf;
     CGFloat height = kRowHeight, room = below - above;
-    CGFloat inset = volume.matchTimeSlider ? 0 : margin;
+    CGFloat inset = margin;
     CGRect frame = CGRectMake(inset, round((above + below - height) / 2), MAX(0, stack.bounds.size.width - 2 * inset), height);
+    if (volume.matchTimeSlider) {
+        UIView *player = stack.superview;
+        UISlider *progress = (UISlider *)SGRFindByIdentifier(player, @"SPTNowPlayingSliderV2", &kProgressSliderKey);
+        if ([progress isKindOfClass:UISlider.class]) {
+            CGRect progressFrame = [progress convertRect:progress.bounds toView:stack];
+            frame.origin.x = CGRectGetMinX(progressFrame);
+            frame.size.width = CGRectGetWidth(progressFrame);
+        }
+    }
     if (!CGRectEqualToRect(volume.frame, frame)) volume.frame = frame;
     // The lyrics fade the stack's views by their alpha and bring back only the ones they faded.
     // The track and thumb are 14pt of the row's 34: it fits with the glyphs' and buttons' own clearance around it.
