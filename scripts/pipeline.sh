@@ -69,7 +69,7 @@ echo "==> Taurus $MOD_VERSION on Spotify $SPOTIFY_VERSION -> $OUT"
 # The flag table is generated rather than committed, so it always matches the IPA being built.
 if [ ! -f "$ROOT/tweak/Sources/Shared/Flags/SGFlagList.m" ]; then
   echo "==> extracting the flag table (once, about 40 s)"
-  "$ROOT/scripts/extract-flags.py" "$IN"
+  python3 "$ROOT/scripts/extract-flags.py" "$IN"
 fi
 
 echo "==> building tweak"
@@ -92,7 +92,7 @@ FILES=("$TWEAK_DEB")
 if xcrun --sdk iphoneos --find swiftc >/dev/null 2>&1; then
   EXT_DIR="$ROOT/out/extension"
   unzip -p "$IN" "${APP_DIR}Info.plist" > "$ROOT/out/.info.plist"
-  "$ROOT/scripts/build-extension.sh" "$ROOT/out/.info.plist" "$EXT_DIR"
+  bash "$ROOT/scripts/build-extension.sh" "$ROOT/out/.info.plist" "$EXT_DIR"
   rm -f "$ROOT/out/.info.plist"
   FILES+=("$EXT_DIR/SpotifyGlassLiveActivity.appex")
 else
@@ -121,7 +121,7 @@ WIDGET_BIN="${APP_DIR}PlugIns/WidgetExtension.appex/WidgetExtension"
 if unzip -l "$OUT" "$WIDGET_BIN" >/dev/null 2>&1; then
   PATCH="$(mktemp -d)"
   unzip -q "$OUT" "$WIDGET_BIN" -d "$PATCH"
-  "$ROOT/scripts/insert-dylib.py" "$PATCH/$WIDGET_BIN" @rpath/SpotifyGlassAppGroups.dylib
+  python3 "$ROOT/scripts/insert-dylib.py" "$PATCH/$WIDGET_BIN" @rpath/SpotifyGlassAppGroups.dylib
   # Fakesigned again with its own entitlements, the way cyan -s left it, for TrollStore.
   ldid -e "$PATCH/$WIDGET_BIN" > "$PATCH/ents.plist"
   ldid -S"$PATCH/ents.plist" "$PATCH/$WIDGET_BIN"
@@ -134,13 +134,13 @@ fi
 
 echo "==> adding the alternate app icons"
 # A failure leaves the IPA as it was, without them; Mod > App icon then does not show.
-"$ROOT/scripts/app-icons.sh" "$OUT" || echo "    the app icons failed: building without them"
+bash "$ROOT/scripts/app-icons.sh" "$OUT" || echo "    the app icons failed: building without them"
 
 if [ -n "${EXT_DIR:-}" ]; then
   echo "==> adding the Live Activity intents to Spotify's App Intents metadata"
-  "$ROOT/scripts/merge-appintents.py" "$OUT" "$APP_DIR" "$EXT_DIR/app/Metadata.appintents"
+  python3 "$ROOT/scripts/merge-appintents.py" "$OUT" "$APP_DIR" "$EXT_DIR/app/Metadata.appintents"
 fi
 
 echo "==> done: $OUT"
-[ "$INSTALL" = 1 ] && exec "$ROOT/scripts/install.sh" "$OUT"
+[ "$INSTALL" = 1 ] && exec bash "$ROOT/scripts/install.sh" "$OUT"
 exit 0
