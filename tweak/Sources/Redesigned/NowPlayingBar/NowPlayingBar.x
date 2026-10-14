@@ -120,6 +120,7 @@ void SGRNowPlayingBarFollowTabBar(void) {
     placeInlineBar(container);
     [container.view setNeedsLayout];
     [container.view layoutIfNeeded];
+    SGRAlignCompactTabBarToNowPlayingCard();
 }
 
 static void restyleCardContent(UIView *card) {
@@ -179,6 +180,7 @@ static void styleNowPlayingBar(UIViewController *container) {
     sg_cardGlass = glass;
     glass.frame = frame;
     SGShapeGlass(glass, radius, NO);
+    SGRAlignCompactTabBarToNowPlayingCard();
 
     static dispatch_once_t once;
     dispatch_once(&once, ^{
