@@ -20,6 +20,7 @@ static const CGFloat kButtonsHalf = 24, kGlyphsHalf = 14;
 static const CGFloat kTrackAbove = 2;
 
 @interface SGRVolumeRow : UIView
+@property (nonatomic) BOOL matchTimeSlider;
 @end
 
 @implementation SGRVolumeRow {
@@ -90,9 +91,12 @@ static UIImageView *glyph(NSString *symbol) {
     [super layoutSubviews];
     CGRect bounds = self.bounds;
     CGFloat side = kRowHeight, middle = CGRectGetMidY(bounds), glyphs = middle - kTrackAbove;
+    _quiet.alpha = _loud.alpha = self.matchTimeSlider ? 0 : 1;
+    _quiet.accessibilityElementsHidden = _loud.accessibilityElementsHidden = self.matchTimeSlider;
     _quiet.frame = CGRectMake(0, glyphs - side / 2, side / 2 + kGlyphSize / 2, side);
     _loud.frame = CGRectMake(CGRectGetMaxX(bounds) - side / 2 - kGlyphSize, glyphs - side / 2, side / 2 + kGlyphSize, side);
-    CGFloat left = CGRectGetMaxX(_quiet.frame) + kGlyphGap, right = CGRectGetMinX(_loud.frame) - kGlyphGap;
+    CGFloat left = self.matchTimeSlider ? 0 : CGRectGetMaxX(_quiet.frame) + kGlyphGap;
+    CGFloat right = self.matchTimeSlider ? bounds.size.width : CGRectGetMinX(_loud.frame) - kGlyphGap;
     // MPVolumeView draws its slider at the top of its bounds, not in the middle: it gets the slider's own height,
     // centered, so the track lines up with the glyphs (it sat 9pt above them).
     CGFloat sliderHeight = MIN(side, [_volume sizeThatFits:CGSizeMake(MAX(0, right - left), side)].height ?: side);
@@ -133,6 +137,7 @@ BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat 
         volume = [SGRVolumeRow new];
         objc_setAssociatedObject(stack, &kVolumeKey, volume, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+    volume.matchTimeSlider = SGEnabled(SGRKeyPlayerVolumeMatchSlider);
     if (volume.superview != stack) [stack addSubview:volume];
     // Halfway between the play button's bottom and the footer glyphs' top, each where it is drawn (convertRect: takes
     // the moves' transforms in): the controls' unit reaches above its buttons, so its own middle sat the row 16pt high.
@@ -142,7 +147,8 @@ BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat 
                          : controls.center.y + controls.transform.ty + kButtonsHalf;
     CGFloat below = [row convertPoint:CGPointMake(CGRectGetMidX(row.bounds), CGRectGetMidY(row.bounds)) toView:stack].y - kGlyphsHalf;
     CGFloat height = kRowHeight, room = below - above;
-    CGRect frame = CGRectMake(margin, round((above + below - height) / 2), MAX(0, stack.bounds.size.width - 2 * margin), height);
+    CGFloat inset = volume.matchTimeSlider ? 0 : margin;
+    CGRect frame = CGRectMake(inset, round((above + below - height) / 2), MAX(0, stack.bounds.size.width - 2 * inset), height);
     if (!CGRectEqualToRect(volume.frame, frame)) volume.frame = frame;
     // The lyrics fade the stack's views by their alpha and bring back only the ones they faded.
     // The track and thumb are 14pt of the row's 34: it fits with the glyphs' and buttons' own clearance around it.

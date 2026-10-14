@@ -177,7 +177,12 @@ static void refreshArtistLyrics(void) {
 }
 
 static BOOL artistLyricsOn(void) {
-    return SGFlag(SGKeyLockScreenLyrics, NO);
+    BOOL enabled = SGFlag(SGKeyLockScreenLyrics, NO);
+    if (enabled && SGLockScreenCanvasLyricsEnabled() && SGEnabled(SGKeyLockScreenExclusiveLyrics)) {
+        SGSetEnabled(SGKeyLockScreenLyrics, NO);
+        return NO;
+    }
+    return enabled;
 }
 
 %hook MPNowPlayingInfoCenter

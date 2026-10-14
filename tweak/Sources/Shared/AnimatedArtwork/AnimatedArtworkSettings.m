@@ -5,6 +5,7 @@
 #import "Settings/SGPageStyle.h"
 #import "AnimatedArtwork.h"
 #import "Shared/LockScreenArtwork/LockScreenArtwork.h"
+#import "Shared/LockScreenLyrics/LockScreenLyrics.h"
 
 SGLockArtwork SGLockScreenArtwork(void) {
     if (@available(iOS 26.0, *)) {
@@ -29,11 +30,16 @@ SGLockArtwork SGLockScreenArtwork(void) {
 }
 
 BOOL SGLockScreenCanvasLyricsEnabled(void) {
-    return SGHidden(SGKeyLockScreenCanvasLyrics);
+    BOOL canvas = SGHidden(SGKeyLockScreenCanvasLyrics);
+    if (canvas && SGFlag(SGKeyLockScreenLyrics, NO) && SGEnabled(SGKeyLockScreenExclusiveLyrics)) {
+        SGSetEnabled(SGKeyLockScreenLyrics, NO);
+    }
+    return canvas;
 }
 
 void SGLockScreenCanvasLyricsSetEnabled(BOOL enabled) {
     SGSetEnabled(SGKeyLockScreenCanvasLyrics, enabled);
+    if (enabled && SGEnabled(SGKeyLockScreenExclusiveLyrics)) SGSetEnabled(SGKeyLockScreenLyrics, NO);
 }
 
 NSArray *SGLockScreenMotionRows(void) {
@@ -44,6 +50,12 @@ NSArray *SGLockScreenMotionRows(void) {
         style.visible = ^BOOL { return SGLockScreenArtwork() == SGLockArtworkLyrics; };
         SGModRow *canvasLyrics = SGOptionRow(@"Canvas lyrics", @"Show synced lines over the moving artwork",
                                              SGKeyLockScreenCanvasLyrics);
+        canvasLyrics.changed = ^(BOOL on) { SGLockScreenCanvasLyricsSetEnabled(on); };
+        SGModRow *exclusiveLyrics = SGSwitchRow(@"Automatically switch lyric styles",
+            @"Turn off artist-name lyrics when Canvas lyrics turn on, and vice versa", SGKeyLockScreenExclusiveLyrics);
+        exclusiveLyrics.changed = ^(BOOL on) {
+            if (on) (void)SGLockScreenCanvasLyricsEnabled();
+        };
         SGModRow *star = SGOptionRow(@"Switch with the star", @"Use the lock-screen favorite star to toggle Canvas lyrics",
                                      SGKeyLockScreenStar);
         SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Moving artwork, up to about 7 MB a song", SGKeyMotionLowData);
@@ -56,6 +68,7 @@ NSArray *SGLockScreenMotionRows(void) {
                         SGKeyFullScreenArtwork, @[@"Off", @"Moving artwork", @"Lyrics", @"Every song"], SGLockArtworkOff),
             style,
             canvasLyrics,
+            exclusiveLyrics,
             star,
             sources,
             lowData,

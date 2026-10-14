@@ -224,8 +224,8 @@ static SGRSingLook lookOf(SGSingState state) {
     _fill.userInteractionEnabled = NO;
     _fill.backgroundColor = [UIColor colorWithWhite:1 alpha:kFillWhite];
     _slider = [SGRVocalSlider new];
-    _slider.accessibilityLabel = @"Vocal volume";
-    _slider.accessibilityHint = @"Original vocals at the top, 20 percent at the bottom";
+    _slider.accessibilityLabel = @"Stem balance";
+    _slider.accessibilityHint = @"Background at the bottom, the full track in the middle, vocals at the top";
     _slider.accessibilityIdentifier = @"sing.vocalLevel";
     [_slider addTarget:self action:@selector(changed) forControlEvents:UIControlEventValueChanged];
     // The capsule draws on and off itself: a custom button, so UIKit adds no highlight or selected look.
@@ -288,17 +288,20 @@ static SGRSingLook lookOf(SGSingState state) {
 - (void)describe {
     SGSingState state = _shown;
     SGRSingLook look = lookOf(state);
-    BOOL original = _slider.value >= 1;
-    _slider.accessibilityValue = original ? @"Original" : [NSString stringWithFormat:@"%.0f percent", _slider.value * 100];
+    NSString *balance = _slider.value < 0.005f ? @"Background only"
+        : _slider.value > 0.995f ? @"Vocals only"
+        : fabsf(_slider.value - 0.5f) < 0.005f ? @"Full track"
+        : [NSString stringWithFormat:@"%.0f percent", _slider.value * 100];
+    _slider.accessibilityValue = balance;
     _button.accessibilityLabel = @"Sing";
     _button.accessibilityValue = state == SGSingPreparing ? @"Preparing Sing" : state == SGSingRecovering ? @"Restoring Sing"
         : state == SGSingDraining ? @"Turning Sing off" : state == SGSingFailed ? @"Sing stopped"
-        : look.on ? (original ? @"On, original vocals" : [NSString stringWithFormat:@"On, %.0f percent vocals", _slider.value * 100])
+        : look.on ? [@"On, " stringByAppendingString:balance]
         : @"Off";
     _button.accessibilityHint = state == SGSingPreparing ? @"Tap to cancel." : state == SGSingDraining ? @"Tap to turn Sing back on."
         : state == SGSingFailed ? @"Tap to hear why Sing stopped."
-        : look.on ? (_expanded ? @"Tap to turn Sing off. Drag to adjust the vocals." : @"Tap for the vocal volume.")
-        : @"Turns the song's vocals down on this iPhone.";
+        : look.on ? (_expanded ? @"Tap to turn Sing off. Drag between the background, full track and vocals." : @"Tap to balance the song's stems.")
+        : @"Separates the background and vocals on this iPhone.";
     _button.accessibilityTraits = UIAccessibilityTraitButton | (look.on ? UIAccessibilityTraitSelected : 0);
     // Off from wherever the button is, without opening the capsule first.
     __weak typeof(self) weak = self;

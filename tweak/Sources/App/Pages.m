@@ -92,6 +92,8 @@ UIViewController *SGLyricsSettingsPage(void) {
         [sections addObject:SGSection(@"Display", @[landscape,
             SGSwitchRow(@"Auto-hide landscape controls", @"Bring them back with a tap after a few seconds",
                         SGRKeyLyricsLandscapeAutoHide),
+            SGSwitchRow(@"Auto-hide portrait controls", @"Bring them back with a tap after a few seconds",
+                        SGRKeyLyricsAutoHide),
             SGLyricsWordTimingRow(), SGLyricsRomanisedRow(), SGLyricsDelayRow(),
             SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow(), SGLyricsMeaningMarkersRow()])];
         [sections addObject:SGSection(@"Translation", @[SGTranslateEverySongRow(), SGGeminiKeyRow(), SGSavedTranslationsRow()])];

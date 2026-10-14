@@ -7,6 +7,7 @@
 #import "Shared/AdBlock/AdBlock.h"
 #import "Shared/Player/PlayerSettings.h"
 #import "Redesigned/Album/Album.h"
+#import "Redesigned/Artist/Artist.h"
 #import "Redesigned/Lyrics/Sing.h"
 #import "Shared/Sing/SGSingModel.h"
 #import "Shared/Flags/Flags.h"
@@ -238,7 +239,10 @@ static UIViewController *modSettingsPage(void) {
         pageRow(@"AirPods gestures", @"airpods.pro", ^UIViewController *{ return SGHeadGesturesSettingsPage(); }),
         pageRow(@"Listening stats", @"chart.bar", ^UIViewController *{ return SGListeningStatsPage(); }),
     ]];
-    if (SGRedesignedUIStored()) [parts addObject:pageRow(@"Albums", @"square.stack", ^UIViewController *{ return SGRAlbumSettingsPage(); })];
+    if (SGRedesignedUIStored()) {
+        [parts addObject:pageRow(@"Albums", @"square.stack", ^UIViewController *{ return SGRAlbumSettingsPage(); })];
+        [parts addObject:pageRow(@"Artists", @"person.2", ^UIViewController *{ return SGRArtistSettingsPage(); })];
+    }
     else [parts addObject:pageRow(@"Home & Library", @"house", ^UIViewController *{ return SGHomeSettingsPage(); })];
     [parts addObject:pageRow(@"Misc", @"ellipsis.circle", ^UIViewController *{ return miscSettingsPage(); })];
     // Sing's microphone is the redesigned player's, so Karaoke is the redesign's; its row follows a download.

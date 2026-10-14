@@ -1,5 +1,9 @@
 #import <UIKit/UIKit.h>
 
+// Apple Music's artist logo in place of the name where one is available.
+#define SGRKeyArtistLogo @"spotifyglass.redesign.artist.logo"
+UIViewController *SGRArtistSettingsPage(void);
+
 // The artist page `view` is on, or nil: the TemplateView with the identifier creator-page.
 UIView *SGRArtistPageOf(UIView *view);
 

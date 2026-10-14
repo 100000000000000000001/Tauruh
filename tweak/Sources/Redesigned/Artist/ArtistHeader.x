@@ -1,5 +1,7 @@
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Redesigned/Kit/SGRHeaderInfo.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Artist.h"
 
 static const CGFloat kDissolve = 0.46, kTopScrim = 140, kTopScrimAlpha = 0.28;
@@ -10,6 +12,7 @@ static const CGFloat kBar = 100, kFade = 150;
 
 static char kInfoKey, kHeroKey, kHeroHeightKey, kContainerHeightKey, kRowWatchedKey;
 static char kTitleKey, kMetaKey, kShuffleKey, kPlayKey, kFollowKey, kArtworkKey, kBarKey, kMoreKey, kMoreButtonKey;
+static char kLogoNameKey;
 
 #pragma mark - Spotify's views
 
@@ -27,6 +30,20 @@ static void setFrame(UIView *view, CGRect frame) {
 static NSString *trimmed(NSString *text) {
     NSString *clean = [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
     return clean.length ? clean : nil;
+}
+
+static void showLogo(SGRHeaderInfo *info, NSString *name) {
+    if (!name.length || !SGEnabled(SGRKeyArtistLogo) ||
+        [objc_getAssociatedObject(info, &kLogoNameKey) isEqualToString:name]) return;
+    objc_setAssociatedObject(info, &kLogoNameKey, name, OBJC_ASSOCIATION_COPY_NONATOMIC);
+    __weak SGRHeaderInfo *weakInfo = info;
+    CGFloat pixels = UIScreen.mainScreen.bounds.size.width * UIScreen.mainScreen.scale;
+    SGMotionArtistLogo(name, pixels, ^(UIImage *logo) {
+        SGRHeaderInfo *shown = weakInfo;
+        if (!shown || ![objc_getAssociatedObject(shown, &kLogoNameKey) isEqualToString:name]) return;
+        [shown showTitleImage:logo];
+        if (logo) SGLog(@"redesign artist: Apple Music's logo for %@", name);
+    });
 }
 
 static NSString *firstText(UIView *root) {
@@ -229,6 +246,7 @@ static void applyHeader(UIView *header) {
     UIView *listeners = SGRFindByIdentifier(header, @"Components.Header.UI.Metadata", &kMetaKey);
     NSString *name = firstText(title) ?: firstText(bar), *listening = firstText(listeners);
     [info showTitle:name creator:nil length:listening about:nil];
+    showLogo(info, name);
 
     UIView *shuffle = SGRFindByIdentifier(header, @"Components.UI.ShuffleButton", &kShuffleKey);
     UIView *play = SGRFindByIdentifier(header, @"header-play-button", &kPlayKey);

@@ -5,6 +5,7 @@
 #define SGRKeyNavbarHideLabels @"spotifyglass.redesign.navbar.hideLabels"
 // Whether a page's scroll hides the glass bar. On unless set; read once at launch.
 #define SGRKeyNavbarMinimize @"spotifyglass.redesign.navbar.minimize"
+#define SGRKeyNavbarProfilePhoto @"spotifyglass.redesign.navbar.profilePhoto"
 
 extern NSString *const SGRNavbarID;      // NSString, the entry's identity
 extern NSString *const SGRNavbarTitle;   // NSString, the name in the settings list and under the icon
@@ -23,6 +24,8 @@ void SGRComposeTabBar(UIView *tabBar);
 void SGRLogTabBarRow(UIView *tabBar);
 // Lays the bar out again after the Navbar page changes something, so it does not wait for a touch.
 void SGRRefreshTabBar(void);
+void SGRNavbarSetProfilePhotoVisible(UIView *face);
+void SGRNavbarRefreshProfilePhotos(void);
 
 UIViewController *SGRNavbarSettingsPage(void);   // the tab editor, in Mod Settings
 UIViewController *SGRNavbarEditorPage(void);     // the tab editor alone, for the welcome tour

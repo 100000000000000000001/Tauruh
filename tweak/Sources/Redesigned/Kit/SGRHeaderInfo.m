@@ -9,6 +9,7 @@ const CGFloat SGRHeaderInfoTitleRise = 56;
 
 // The text kSide in from the edges; Play at least kPlayWidth wide, the Music app's; the gaps between.
 static const CGFloat kSide = 20, kPlayWidth = 148, kRowSpacing = 16, kRowAbove = 16, kAboutAbove = 14;
+static const CGFloat kLogoWidthShare = 0.8, kLogoMaxHeight = 64;
 
 static UILabel *infoLabel(UIView *parent, UIFont *font, UIColor *color, NSInteger lines, NSTextAlignment alignment) {
     UILabel *label = [UILabel new];
@@ -31,6 +32,8 @@ static BOOL setText(UILabel *label, NSString *text) {
 
 @implementation SGRHeaderInfo {
     UILabel *_title, *_creator, *_length, *_about;
+    UIImageView *_logo;
+    UIImage *_titleImage;
     SGRMirrorButton *_shuffle, *_trailing;
     SGRPlayCapsule *_play;
     __weak UIView *_creatorLink;
@@ -76,6 +79,54 @@ static BOOL setText(UILabel *label, NSString *text) {
     changed |= setText(_about, about);
     if (changed) [self setNeedsLayout];
     return changed;
+}
+
+- (void)showTitleImage:(UIImage *)image {
+    if (_titleImage == image) return;
+    if (!_logo) {
+        _logo = [UIImageView new];
+        _logo.contentMode = UIViewContentModeScaleAspectFit;
+        _logo.isAccessibilityElement = YES;
+        _logo.accessibilityTraits = UIAccessibilityTraitHeader;
+        _logo.alpha = 0;
+        [self addSubview:_logo];
+    }
+    _titleImage = image;
+    _title.accessibilityElementsHidden = image != nil;
+    if (image) {
+        if (!_logo.image) [UIView performWithoutAnimation:^{ self->_logo.frame = self->_title.frame; }];
+        _logo.image = image;
+        _logo.hidden = NO;
+    }
+    [self setNeedsLayout];
+    void (^fade)(void) = ^{
+        self->_logo.alpha = image ? 1 : 0;
+        self->_title.alpha = image ? 0 : 1;
+    };
+    void (^faded)(BOOL) = ^(BOOL finished) {
+        if (self->_titleImage) return;
+        self->_logo.image = nil;
+        self->_logo.hidden = YES;
+    };
+    if (!self.window) {
+        fade();
+        faded(YES);
+        return;
+    }
+    SGRAnimate(SGRMotionFade, fade, faded);
+    SGRAnimateLayout(self, ^{ [self layoutIfNeeded]; }, nil);
+}
+
+- (CGFloat)sgr_gapAfter:(UILabel *)label {
+    return label == _title && _titleImage ? 8 : (label == _creator ? 4 : 2);
+}
+
+- (CGSize)sgr_sizeOf:(UILabel *)label width:(CGFloat)text {
+    if (label != _title || !_titleImage) return [label sizeThatFits:CGSizeMake(text, CGFLOAT_MAX)];
+    CGSize image = _titleImage.size;
+    if (image.width <= 0 || image.height <= 0) return CGSizeZero;
+    CGFloat scale = MIN(text * kLogoWidthShare / image.width, kLogoMaxHeight / image.height);
+    return CGSizeMake(round(image.width * scale), round(image.height * scale));
 }
 
 - (void)showCreatorLink:(UIView *)control {
@@ -143,8 +194,8 @@ static BOOL setText(UILabel *label, NSString *text) {
     UILabel *previous = nil;
     for (UILabel *label in @[_title, _creator, _length]) {
         if (label.hidden) continue;
-        if (previous) height += previous == _creator ? 4 : 2;
-        height += ceil([label sizeThatFits:CGSizeMake(text, CGFLOAT_MAX)].height);
+        if (previous) height += [self sgr_gapAfter:previous];
+        height += ceil([self sgr_sizeOf:label width:text].height);
         previous = label;
     }
     if (previous) height += kRowAbove;
@@ -161,9 +212,14 @@ static BOOL setText(UILabel *label, NSString *text) {
     UILabel *previous = nil;
     for (UILabel *label in @[_title, _creator, _length]) {
         if (label.hidden) continue;
-        if (previous) y += previous == _creator ? 4 : 2;
-        CGFloat height = ceil([label sizeThatFits:CGSizeMake(text, CGFLOAT_MAX)].height);
+        if (previous) y += [self sgr_gapAfter:previous];
+        CGSize size = [self sgr_sizeOf:label width:text];
+        CGFloat height = ceil(size.height);
         label.frame = CGRectMake(kSide, y, text, height);
+        if (label == _title && _titleImage) {
+            _logo.frame = CGRectMake(round((width - size.width) / 2), y, size.width, height);
+            _logo.accessibilityLabel = _title.text;
+        }
         y += height;
         previous = label;
     }

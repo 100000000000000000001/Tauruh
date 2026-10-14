@@ -3,12 +3,14 @@
 #import "Headers/SPTEncoreIconView.h"
 #import "Shared/Navigation/Links.h"
 #import <objc/message.h>
+#import <objc/runtime.h>
 
 static const CGFloat kIconSize = 24;
 static const CGFloat kIconTop = 12.5;
 static const CGFloat kLabelTop = 35;
 static const CGFloat kLabelHeight = 14;
 static char kCustomKey, kOrderKey;
+static NSHashTable<UIView *> *sg_profilePhotos;
 
 static CGRect sg_iconBox = {{0, kIconTop}, {kIconSize, kIconSize}};
 static CGRect sg_labelBox = {{0, kLabelTop}, {0, kLabelHeight}};
@@ -18,6 +20,25 @@ static __weak UIView *sg_navbarRoot;
 static __weak UIStackView *sg_row;
 static UIFont *sg_tabFont;
 static NSMutableArray<NSString *> *sg_stockOrder;
+
+void SGRNavbarSetProfilePhotoVisible(UIView *face) {
+    if (!face) return;
+    if (!sg_profilePhotos) sg_profilePhotos = [NSHashTable weakObjectsHashTable];
+    [sg_profilePhotos addObject:face];
+    if (SGEnabled(SGRKeyNavbarProfilePhoto)) {
+        face.alpha = 1;
+        face.userInteractionEnabled = YES;
+        face.accessibilityElementsHidden = NO;
+    } else {
+        face.alpha = 0;
+        face.userInteractionEnabled = NO;
+        face.accessibilityElementsHidden = YES;
+    }
+}
+
+void SGRNavbarRefreshProfilePhotos(void) {
+    for (UIView *face in sg_profilePhotos.allObjects) SGRNavbarSetProfilePhotoVisible(face);
+}
 
 static UIColor *itemColor(void) { return [UIColor colorWithWhite:0xB3 / 255.0 alpha:1]; }
 

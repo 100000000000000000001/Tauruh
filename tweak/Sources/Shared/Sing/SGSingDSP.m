@@ -5,7 +5,7 @@ static const double kLevelRampSeconds = 0.030, kBypassRampSeconds = 0.120;
 static const float kVoiceWidth = 0.5f, kVoiceDelay = 0.00065f, kVoiceShadow = 0.35f;
 static const float kTau = 6.28318530718f, kPiQuarter = 0.78539816339f, kSqrtTwo = 1.41421356237f;
 
-static float gain(float level) { float value = SGSingClampLevel(level); return value * value; }
+static float gain(float level) { return SGSingClampLevel(level); }
 static void ramp(SGSingMixer *m, float to, double seconds) {
     m->targetGain = to;
     m->remaining = (uint32_t)fmax(1, m->sampleRate * seconds);
@@ -20,7 +20,7 @@ void SGSingMixerSetLevel(SGSingMixer *m, float level) {
     float target = gain(level);
     if (target != m->targetGain) ramp(m, target, kLevelRampSeconds);
 }
-void SGSingMixerBypass(SGSingMixer *m) { ramp(m, 1, kBypassRampSeconds); }
+void SGSingMixerBypass(SGSingMixer *m) { ramp(m, 0.5f, kBypassRampSeconds); }
 void SGSingMixerSetVoiceAngle(SGSingMixer *m, float radians) {
     m->targetVoiceAngle = isfinite(radians) ? remainderf(radians, kTau) : 0;
 }
@@ -55,8 +55,11 @@ void SGSingMixerProcess(SGSingMixer *m, const float *original, const float *voca
         float vocalLeft = isfinite(vocals[at]) ? vocals[at] : 0;
         float vocalRight = isfinite(vocals[at + 1]) ? vocals[at + 1] : 0;
         if (!spatial) {
-            out[at] = fmaxf(-1, fminf(1, left - (1 - m->gain) * vocalLeft));
-            out[at + 1] = fmaxf(-1, fminf(1, right - (1 - m->gain) * vocalRight));
+            float instrumentMix = m->gain <= 0.5f ? 1 : 2 * (1 - m->gain);
+            float voiceMix = m->gain < 0.5f ? 2 * m->gain : 1;
+            float instrumentalLeft = left - vocalLeft, instrumentalRight = right - vocalRight;
+            out[at] = fmaxf(-1, fminf(1, instrumentMix * instrumentalLeft + voiceMix * vocalLeft));
+            out[at + 1] = fmaxf(-1, fminf(1, instrumentMix * instrumentalRight + voiceMix * vocalRight));
             m->roomSend = 0;
             continue;
         }
@@ -84,13 +87,15 @@ void SGSingMixerProcess(SGSingMixer *m, const float *original, const float *voca
 
         float instrumentalLeft = left - vocalLeft;
         float instrumentalRight = right - vocalRight;
+        float instrumentMix = m->gain <= 0.5f ? 1 : 2 * (1 - m->gain);
+        float voiceMix = m->gain < 0.5f ? 2 * m->gain : 1;
         float instrumentalSide = (instrumentalLeft - instrumentalRight) * 0.5f;
         instrumentalLeft += (m->width - 1) * instrumentalSide;
         instrumentalRight -= (m->width - 1) * instrumentalSide;
         float placedLeft = gainLeft * m->shadowLeft + side;
         float placedRight = gainRight * m->shadowRight - side;
-        m->roomSend = m->gain * m->sendGain * middle;
-        out[at] = fmaxf(-1, fminf(1, instrumentalLeft + m->gain * m->directGain * placedLeft));
-        out[at + 1] = fmaxf(-1, fminf(1, instrumentalRight + m->gain * m->directGain * placedRight));
+        m->roomSend = voiceMix * m->sendGain * middle;
+        out[at] = fmaxf(-1, fminf(1, instrumentMix * instrumentalLeft + voiceMix * m->directGain * placedLeft));
+        out[at + 1] = fmaxf(-1, fminf(1, instrumentMix * instrumentalRight + voiceMix * m->directGain * placedRight));
     }
 }

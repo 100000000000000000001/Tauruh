@@ -358,6 +358,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
                        SGOptionRow(@"Show Translate button", @"Pronunciation and translation in the player lyrics", SGRKeyPlayerTranslateButton),
                        SGOptionRow(@"Hide volume slider", nil, SGRKeyHidePlayerVolume),
                        SGSwitchRow(@"Hide volume slider thumb", @"Keep the slider usable without the white dot", SGRKeyHidePlayerVolumeThumb),
+                       SGOptionRow(@"Match time slider", @"Use the same full-width track style as song progress", SGRKeyPlayerVolumeMatchSlider),
                        SGOptionRow(@"Follow the cover", nil, SGRKeyPlayerFollowsCover)],
                        @"The volume slider controls this iPhone, or the speaker while Spotify plays on another device. "
                        @"Hiding its thumb leaves the slider interactive. "
