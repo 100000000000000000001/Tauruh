@@ -291,9 +291,9 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 
     NSString *title = entry[SGRNavbarTitle] ?: ident;
     NSString *defaultIcon = SGRNavbarDefaultIcon(ident);
-    NSString *icon = entry[SGRNavbarIcon] ?: defaultIcon ?: @"star";
+    NSString *icon = SGRNavbarEntryHasCustomIcon(entry) ? entry[SGRNavbarIcon] : (defaultIcon ?: @"star");
     NSMutableDictionary *tab = [@{SGTabTitle: title, SGTabURI: @"spotify:home", SGTabIcon: icon} mutableCopy];
-    if (entry[SGRNavbarIconSet]) tab[SGTabIconSet] = entry[SGRNavbarIconSet];
+    if (SGRNavbarEntryHasCustomIcon(entry) && entry[SGRNavbarIconSet]) tab[SGTabIconSet] = entry[SGRNavbarIconSet];
     __weak typeof(self) weakSelf = self;
     SGPresentEditTabAppearanceSheet(self, tab, ^(NSDictionary *edited) {
         typeof(self) page = weakSelf;
@@ -306,10 +306,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
         current[SGRNavbarTitle] = edited[SGTabTitle];
         NSString *editedIcon = edited[SGTabIcon];
         NSString *editedIconSet = edited[SGTabIconSet];
-        BOOL customIcon = [current[SGRNavbarCustomIcon] boolValue]
-            || (current[SGRNavbarIcon] && ![current[SGRNavbarIcon] isEqualToString:@"star"]
-                && (!defaultIcon || ![current[SGRNavbarIcon] isEqualToString:defaultIcon]))
-            || current[SGRNavbarIconSet] != nil;
+        BOOL customIcon = SGRNavbarEntryHasCustomIcon(current);
         customIcon = customIcon || editedIconSet != nil
             || (defaultIcon ? ![editedIcon isEqualToString:defaultIcon] : ![editedIcon isEqualToString:@"star"]);
         if (customIcon) {

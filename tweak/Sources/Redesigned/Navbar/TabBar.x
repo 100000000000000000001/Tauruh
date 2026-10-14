@@ -2,6 +2,7 @@
 #import "Navbar.h"
 #import "Redesigned/Kit/SGRTokens.h"
 #import "Settings/SGPage.h"
+#import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Headers/SPTEncoreIconView.h"
 #import "Shared/Navigation/TabIcons.h"
 #import <objc/message.h>
@@ -172,25 +173,53 @@ static UIImage *customGlyph(NSString *name, BOOL symbols) {
     return image;
 }
 
+static UIImage *stockGlyph(NSString *name, BOOL active) {
+    if (!name.length) return nil;
+    static NSCache<NSString *, UIImage *> *cache;
+    if (!cache) cache = [NSCache new];
+    NSString *key = [NSString stringWithFormat:@"%@:%d", name, active];
+    UIImage *cached = [cache objectForKey:key];
+    if (cached) return cached;
+
+    Class iconClass = NSClassFromString(@"SPTEncoreIcon");
+    Class viewClass = NSClassFromString(@"SPTEncoreIconView");
+    SEL glyphSelector = NSSelectorFromString(name);
+    if (!iconClass || !viewClass || ![iconClass respondsToSelector:glyphSelector]) return nil;
+    id icon = ((id (*)(id, SEL))objc_msgSend)(iconClass, glyphSelector);
+    if (!icon) return nil;
+
+    SPTEncoreIconView *view = [[viewClass alloc] initWithIcon:icon];
+    view.frame = CGRectMake(0, 0, 24, 24);
+    [view setForegroundColor:UIColor.whiteColor];
+    if ([view respondsToSelector:@selector(setActiveForegroundColor:)]) [view setActiveForegroundColor:UIColor.whiteColor];
+    if ([view respondsToSelector:@selector(setIsActive:)]) [view setIsActive:active];
+    [view layoutIfNeeded];
+    UIImage *image = renderLayer(view.layer, view.bounds.size);
+    if (image) [cache setObject:image forKey:key];
+    return image;
+}
+
 static UIImage *glyphOf(UIView *item, BOOL active) {
     NSString *sourceTitle = labelIn(item).text;
     if (![NSStringFromClass(item.class) isEqualToString:@"SGRTabItemView"]) {
+        NSDictionary *stockEntry = nil;
         for (NSDictionary *entry in SGRNavbarLayout()) {
-            NSString *icon = entry[SGRNavbarIcon];
-            NSString *defaultIcon = SGRNavbarDefaultIcon(entry[SGRNavbarID]);
-            BOOL customIcon = [entry[SGRNavbarCustomIcon] boolValue]
-                || (icon.length && ![icon isEqualToString:@"star"]
-                    && (!defaultIcon || ![icon isEqualToString:defaultIcon]))
-                || entry[SGRNavbarIconSet] != nil;
-            if ([entry[SGRNavbarID] isEqualToString:sourceTitle] && !entry[SGRNavbarURI]
-                && customIcon && [icon isKindOfClass:NSString.class]) {
-                return customGlyph(icon, [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols]);
+            if ([entry[SGRNavbarID] isEqualToString:sourceTitle] && !entry[SGRNavbarURI]) {
+                stockEntry = entry;
+                NSString *icon = entry[SGRNavbarIcon];
+                if (SGRNavbarEntryHasCustomIcon(entry) && [icon isKindOfClass:NSString.class]) {
+                    return customGlyph(icon, [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols]);
+                }
+                break;
             }
         }
         if (SGFlag(SGRKeyNavbarAppleIcons, NO)) {
             NSString *symbol = appleMusicSymbolForTab(sourceTitle);
             if (symbol) return customGlyph(symbol, YES);
         }
+        NSString *defaultIcon = SGRNavbarDefaultIcon(stockEntry[SGRNavbarID] ?: sourceTitle);
+        UIImage *defaultGlyph = stockGlyph(defaultIcon, active);
+        if (defaultGlyph) return defaultGlyph;
     }
     UIView *live = iconIn(item);
     if (!live) return nil;
@@ -581,6 +610,36 @@ CGRect SGRTabBarInlineSlot(UIView *host, CGFloat height) {
     if (slot.size.width < 100 || CGRectGetMinY(inWindow) < 0
         || CGRectGetMaxY(inWindow) > CGRectGetMaxY(bar.window.bounds)) return CGRectNull;
     return slot;
+}
+
+void SGRAlignCompactTabBarToNowPlayingCard(void) {
+    UIView *stockBar = sg_stockBar;
+    SGRSystemTabBar *bar = stockBar ? objc_getAssociatedObject(stockBar, &kBarKey) : nil;
+    UIView *host = stockBar ? objc_getAssociatedObject(stockBar, &kHostKey) : nil;
+    if (!sg_minimized || !SGFlag(SGRKeyNavbarCompact, YES) || !bar.window
+        || bar.superview != host || bar.items.count != 1) return;
+
+    CGRect card = SGRNowPlayingCardFrameIn(stockBar, NULL);
+    if (CGRectIsNull(card)) return;
+
+    UIImage *selectedImage = bar.selectedItem.selectedImage ?: bar.selectedItem.image;
+    __block UIImageView *glyphView = nil;
+    SGForEachView(bar, ^(UIView *view) {
+        if (glyphView || ![view isKindOfClass:UIImageView.class]
+            || view.bounds.size.width < 8 || view.bounds.size.height < 8) return;
+        UIImage *image = ((UIImageView *)view).image;
+        if (image == selectedImage || [image isEqual:selectedImage]) glyphView = (UIImageView *)view;
+    });
+    if (!glyphView) return;
+
+    CGPoint iconCenter = [glyphView convertPoint:CGPointMake(CGRectGetMidX(glyphView.bounds),
+                                                              CGRectGetMidY(glyphView.bounds)) toView:bar];
+    CGPoint cardCenter = [stockBar convertPoint:CGPointMake(CGRectGetMidX(card), CGRectGetMidY(card)) toView:host];
+    CGRect frame = bar.frame;
+    CGFloat targetY = cardCenter.y - iconCenter.y;
+    if (fabs(frame.origin.y - targetY) < 0.5) return;
+    frame.origin.y = targetY;
+    bar.frame = frame;
 }
 
 #pragma mark - hooks
