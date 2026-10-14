@@ -136,27 +136,50 @@ static NSString *titleOf(UIView *source) {
     return title;
 }
 
+static NSString *appleMusicSymbolForTab(NSString *title) {
+    static NSDictionary<NSString *, NSString *> *symbols;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        symbols = @{
+            @"home": @"house.fill",
+            @"listen now": @"house.fill",
+            @"search": @"magnifyingglass",
+            @"your library": @"square.stack.fill",
+            @"library": @"square.stack.fill",
+            @"browse": @"square.grid.2x2.fill",
+            @"radio": @"dot.radiowaves.left.and.right",
+        };
+    });
+    return symbols[title.lowercaseString];
+}
+
+static UIImage *customGlyph(NSString *name, BOOL symbols) {
+    static NSCache<NSString *, UIImage *> *cache;
+    if (!cache) cache = [NSCache new];
+    NSString *key = [NSString stringWithFormat:@"%@:%@", symbols ? @"symbols" : @"encore", name];
+    UIImage *image = [cache objectForKey:key];
+    if (image) return image;
+    UIView *custom = SGTabIconView(name, symbols, UIColor.whiteColor);
+    CGSize size = CGSizeMake(24, 24);
+    custom.translatesAutoresizingMaskIntoConstraints = YES;
+    custom.frame = (CGRect){CGPointZero, size};
+    [custom layoutIfNeeded];
+    image = renderLayer(custom.layer, size);
+    if (image) [cache setObject:image forKey:key];
+    return image;
+}
+
 static UIImage *glyphOf(UIView *item, BOOL active) {
     NSString *sourceTitle = labelIn(item).text;
     if (![NSStringFromClass(item.class) isEqualToString:@"SGRTabItemView"]) {
         for (NSDictionary *entry in SGRNavbarLayout()) {
             if ([entry[SGRNavbarID] isEqualToString:sourceTitle] && !entry[SGRNavbarURI] && [entry[SGRNavbarIcon] isKindOfClass:NSString.class]) {
-                static NSCache<NSString *, UIImage *> *customCache;
-                if (!customCache) customCache = [NSCache new];
-                NSString *name = [NSString stringWithFormat:@"%@:%@", entry[SGRNavbarIconSet] ?: @"encore", entry[SGRNavbarIcon]];
-                UIImage *image = [customCache objectForKey:name];
-                if (image) return image;
-                UIView *custom = SGTabIconView(entry[SGRNavbarIcon], [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols], UIColor.whiteColor);
-                CGSize customSize = CGSizeMake(24, 24);
-                custom.translatesAutoresizingMaskIntoConstraints = YES;
-                custom.frame = (CGRect){CGPointZero, customSize};
-                UIView *holder = [[UIView alloc] initWithFrame:(CGRect){CGPointZero, customSize}];
-                [holder addSubview:custom];
-                [custom layoutIfNeeded];
-                image = renderLayer(custom.layer, customSize);
-                if (image) [customCache setObject:image forKey:name];
-                return image;
+                return customGlyph(entry[SGRNavbarIcon], [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols]);
             }
+        }
+        if (SGFlag(SGRKeyNavbarAppleIcons, NO)) {
+            NSString *symbol = appleMusicSymbolForTab(sourceTitle);
+            if (symbol) return customGlyph(symbol, YES);
         }
     }
     UIView *live = iconIn(item);

@@ -37,6 +37,10 @@ BOOL SGLockScreenCanvasLyricsEnabled(void) {
     return canvas;
 }
 
+CGFloat SGLockScreenCoverArtworkScale(void) {
+    return (CGFloat)SGInt(SGKeyLockScreenCoverArtworkScale, 50) / 100.0;
+}
+
 void SGLockScreenCanvasLyricsSetEnabled(BOOL enabled) {
     SGSetEnabled(SGKeyLockScreenCanvasLyrics, enabled);
     if (enabled && SGEnabled(SGKeyLockScreenExclusiveLyrics)) SGSetEnabled(SGKeyLockScreenLyrics, NO);
@@ -60,6 +64,13 @@ NSArray *SGLockScreenMotionRows(void) {
                                      SGKeyLockScreenStar);
         SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Moving artwork, up to about 7 MB a song", SGKeyMotionLowData);
         lowData.visible = ^BOOL { return SGLockArtworkHasMotion(SGLockScreenArtwork()); };
+        SGModRow *coverSize = SGSliderRow(@"Fallback album art size",
+            @"Every song's blurred fallback when no moving artwork or lyrics clip is available",
+            0.25, 0.85, 0.05,
+            ^double { return SGLockScreenCoverArtworkScale(); },
+            ^(double value) { SGSetInt(SGKeyLockScreenCoverArtworkScale, (NSInteger)lround(value * 100)); },
+            ^NSString *(double value) { return [NSString stringWithFormat:@"%.0f%%", value * 100]; });
+        coverSize.visible = ^BOOL { return SGLockScreenArtwork() == SGLockArtworkEverySong; };
         SGModRow *sources = SGMotionSourcesRow();
         sources.visible = lowData.visible;
         return @[
@@ -72,6 +83,7 @@ NSArray *SGLockScreenMotionRows(void) {
             star,
             sources,
             lowData,
+            coverSize,
         ];
     }
     return @[SGLockScreenArtworkNeedsRow()];

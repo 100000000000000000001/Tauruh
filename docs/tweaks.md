@@ -112,6 +112,8 @@ Shared:
                   player menu and the lock-screen star toggle that independently of the artist-name setting.
                   The Canvas lyrics switch stays visible even while full-screen artwork is off, so it can be
                   prepared before choosing Moving artwork or Every song.
+                  In Every song mode, Fallback album art size controls the square cover shown over the blurred
+                  fallback when no moving artwork or lyrics clip is available; 50% is the original size.
                   The sources are asked in the user's order (Apple Music, then Spotify Canvas until set, on the
                   shared Settings/SGOrderPage the lyrics sources use too). Spotify's URL comes off canvas.url
                   in the played track's metadata, which Spotify's core fills whatever
@@ -389,6 +391,7 @@ registers in `Core/SGFlagForce.h`. A change shows after Spotify restarts.
 The tab editor on the Navbar page is the exception and applies as soon as the bar lays out again. It lists the tabs in the order
 the bar shows them: drag to reorder, use each row's switch to hide or show it, and tap a row to edit its name and icon.
 That works for Spotify's own tabs as well as tabs of the mod's own; icons can be Encore glyphs or SF Symbols.
+Apple Music tab icons, off by default, uses Apple-style SF Symbols for built-in tabs unless that tab has a custom icon.
 Add a tab puts a page of Spotify's or any `spotify:` link on the bar. Spotify's own tabs are kept by the
 name under their icon, so they can be hidden but never removed, and switching the app's language
 starts the order over. A tab of the mod's own opens its link through Spotify's link dispatcher, so it

@@ -113,7 +113,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 }
 
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    if (section == SGRNavbarSectionSwitch) return 4;
+    if (section == SGRNavbarSectionSwitch) return 5;
     return section == SGRNavbarSectionTabs ? (NSInteger)_entries.count : 1;
 }
 
@@ -139,15 +139,20 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
     UITableViewCell *cell = SGDequeueCell(table, @"navbar");
     switch (path.section) {
         case SGRNavbarSectionSwitch: {
-            BOOL labels = path.row == 1, profile = path.row == 2, compact = path.row == 3;
-            NSString *title = profile ? @"Show profile photo" : compact ? @"Compact player and tabs" : labels ? @"Hide labels" : @"Custom navbar";
-            NSString *detail = profile ? @"Open Spotify's side menu" : compact ? @"Share one row while scrolling" : labels ? @"Icons only" : nil;
+            BOOL labels = path.row == 1, profile = path.row == 2, compact = path.row == 3, appleIcons = path.row == 4;
+            NSString *title = appleIcons ? @"Apple Music tab icons"
+                : profile ? @"Show profile photo" : compact ? @"Compact player and tabs"
+                : labels ? @"Hide labels" : @"Custom navbar";
+            NSString *detail = appleIcons ? @"Use Apple's style for built-in tabs"
+                : profile ? @"Open Spotify's side menu" : compact ? @"Share one row while scrolling"
+                : labels ? @"Icons only" : nil;
             SGFillCell(cell, title, detail, nil, nil);
             UISwitch *toggle = [UISwitch new];
             toggle.onTintColor = SGGreen();
             toggle.tag = path.row;
             toggle.on = profile ? SGFlag(SGRKeyNavbarProfilePhoto, YES)
                                 : compact ? SGFlag(SGRKeyNavbarCompact, YES)
+                                : appleIcons ? SGFlag(SGRKeyNavbarAppleIcons, NO)
                                 : labels ? SGFlag(SGRKeyNavbarHideLabels, YES) : SGEnabled(SGRKeyNavbar);
             [toggle addTarget:self action:@selector(toggled:) forControlEvents:UIControlEventValueChanged];
             cell.accessoryView = toggle;
@@ -157,8 +162,9 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
             NSDictionary *entry = _entries[(NSUInteger)path.row];
             BOOL hidden = [entry[SGRNavbarHidden] boolValue];
             NSString *uri = entry[SGRNavbarURI];
-            NSString *detail = uri ?: ([entry[SGRNavbarIcon] || ![entry[SGRNavbarTitle] isEqualToString:entry[SGRNavbarID]]
-                                      ? @"Spotify tab · Tap to customize" : @"Spotify's own tab");
+            NSString *detail = uri ?: (entry[SGRNavbarIcon] != nil
+                || ![entry[SGRNavbarTitle] isEqualToString:entry[SGRNavbarID]]
+                ? @"Spotify tab · Tap to customize" : @"Spotify's own tab");
             SGFillCell(cell, entry[SGRNavbarTitle], detail, hidden ? SGGrey() : nil, nil);
             UISwitch *toggle = [UISwitch new];
             toggle.onTintColor = SGGreen();
@@ -221,8 +227,10 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
         __weak typeof(self) weakSelf = self;
         SGPresentAddTabSheet(self, tabPresets(), ^(NSDictionary *tab) {
             appendTab(tab);
-            weakSelf->_entries = navbarEntries();
-            [weakSelf.tableView reloadData];
+            SGRNavbarPage *page = weakSelf;
+            if (!page) return;
+            page->_entries = navbarEntries();
+            [page.tableView reloadData];
         });
     } else if (path.section == SGRNavbarSectionReset) {
         [self reset];
@@ -245,6 +253,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
         __weak typeof(self) weakSelf = self;
         SGPresentEditTabSheet(self, tabPresets(), entry, ^(NSDictionary *edited) {
             typeof(self) page = weakSelf;
+            if (!page) return;
             NSMutableDictionary *current = nil;
             for (NSMutableDictionary *candidate in page->_entries) {
                 if ([candidate[SGRNavbarID] isEqualToString:ident]) { current = candidate; break; }
@@ -259,6 +268,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
             [page.tableView reloadData];
         }, ^{
             typeof(self) page = weakSelf;
+            if (!page) return;
             NSUInteger index = [page->_entries indexOfObjectPassingTest:^BOOL(NSDictionary *candidate, NSUInteger idx, BOOL *stop) {
                 return [candidate[SGRNavbarID] isEqualToString:ident];
             }];
@@ -283,6 +293,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
     __weak typeof(self) weakSelf = self;
     SGPresentEditTabAppearanceSheet(self, tab, ^(NSDictionary *edited) {
         typeof(self) page = weakSelf;
+        if (!page) return;
         NSMutableDictionary *current = nil;
         for (NSMutableDictionary *candidate in page->_entries) {
             if ([candidate[SGRNavbarID] isEqualToString:ident]) { current = candidate; break; }
@@ -306,6 +317,9 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
         SGRSetTabBarMinimized(SGRTabBarMinimized(), NO);
         SGRRefreshTabBar();
         SGRNowPlayingBarFollowTabBar();
+    } else if (toggle.tag == 4) {
+        SGSetEnabled(SGRKeyNavbarAppleIcons, toggle.on);
+        SGRRefreshTabBar();
     } else {
         SGSetEnabled(toggle.tag == 1 ? SGRKeyNavbarHideLabels : SGRKeyNavbar, toggle.on);
         SGRRefreshTabBar();

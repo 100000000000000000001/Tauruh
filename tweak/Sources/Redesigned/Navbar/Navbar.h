@@ -7,6 +7,7 @@
 #define SGRKeyNavbarMinimize @"spotifyglass.redesign.navbar.minimize"
 #define SGRKeyNavbarProfilePhoto @"spotifyglass.redesign.navbar.profilePhoto"
 #define SGRKeyNavbarCompact @"spotifyglass.redesign.navbar.compact"
+#define SGRKeyNavbarAppleIcons @"spotifyglass.redesign.navbar.appleIcons"
 
 extern NSString *const SGRNavbarID;      // NSString, the entry's identity
 extern NSString *const SGRNavbarTitle;   // NSString, the name in the settings list and under the icon
