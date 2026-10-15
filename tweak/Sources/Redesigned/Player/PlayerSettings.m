@@ -7,7 +7,7 @@
 // as the playing one's would be, and with none ever played, Not Playing over a gradient of the accent.
 //
 // The background is the player's own: a field of the same kind (Still, Colors, Fluid, Fill), for Animated
-// the clip the player is playing (SGRPlayerMotionPreview) in place of the field, or, while the player has
+// the poster of a clip the player is playing (SGRPlayerMotionPreview) in place of the field, or, while the player has
 // none, the playing track's clip looked up for the card while it is on screen, Fluid until it comes in and
 // for a track with none, the chosen Animated fallback; the clip crosses over the field as it arrives, its poster first
 // while its video decodes. And for Visualizer the hills over Fluid held still (SGRPlayerVisualiserPreview),
@@ -190,6 +190,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
     __weak SGRPlayerShowcase *weakSelf = self;
     void (^arrived)(void) = !self.window ? nil : ^{
         SGRPlayerShowcase *showcase = weakSelf;
+        if (!showcase) return;
         if (showcase.window && !showcase->_motion && SGRPlayerBackground() == SGRPlayerBackgroundAnimated) [showcase reloadBackgroundAnimated:YES];
     };
     void (^apply)(void) = ^{

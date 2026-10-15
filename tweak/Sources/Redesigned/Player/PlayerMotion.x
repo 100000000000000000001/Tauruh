@@ -541,7 +541,14 @@ static UIImage *sg_previewPoster;
 static void (^sg_previewArrived)(void);
 
 UIView *SGRPlayerMotionPreview(void (^arrived)(void)) {
-    if (sg_motionFile) return previewOf(sg_motionFile, sg_motionPoster);
+    if (sg_motionFile) {
+        UIImageView *preview = [UIImageView new];
+        preview.image = sg_motionPoster;
+        preview.contentMode = UIViewContentModeScaleAspectFill;
+        preview.clipsToBounds = YES;
+        preview.userInteractionEnabled = NO;
+        return preview;
+    }
     SGShownTrack *shown = SGShownTrackNow();
     NSString *track = shown.uri;
     if (!track) return nil;
