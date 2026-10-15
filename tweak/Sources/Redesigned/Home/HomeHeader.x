@@ -173,7 +173,7 @@ static void layoutHeader(UIViewController *page) {
     sg_title = title;
     sg_face = face;
     UIView *wrapper = header.superview;
-    if (wrapper) {
+    if (wrapper && SGRHomeGlassStyle()) {
         UIVisualEffectView *bar = barIn(wrapper);
         CGFloat bottom = CGRectGetMaxY([header convertRect:header.bounds toView:view]) + 28;
         CGRect barFrame = [view convertRect:CGRectMake(0, 0, view.bounds.size.width, bottom) toView:wrapper];

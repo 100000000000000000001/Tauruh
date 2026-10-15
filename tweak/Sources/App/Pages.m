@@ -68,6 +68,7 @@ UIViewController *SGAppearanceSettingsPage(void) {
         [rows addObject:SGWithSymbol(redesign, @"sparkles")];
         if (SGRedesignedUIStored()) {
             [rows addObjectsFromArray:SGRAppearanceRows()];
+            [rows addObject:SGRHomeStyleRow()];
         } else {
             [rows addObjectsFromArray:SGNativeAppearanceRows()];
         }

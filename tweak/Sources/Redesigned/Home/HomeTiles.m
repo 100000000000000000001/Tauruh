@@ -4,6 +4,8 @@
 
 // How far the cover sits in from the tile's top, bottom and leading edges, and its corners there.
 static const CGFloat kInset = 6, kCoverRadius = 11, kPillRadius = 18;
+// The original look, when the Home page switch is off.
+static const CGFloat kPlainInset = 5, kPlainCoverRadius = 4;
 
 static char kSurfaceKey, kImageKey, kShownKey;
 
@@ -55,6 +57,7 @@ static UIView *surfaceIn(UIView *tile, UIView *fill) {
         else [tile insertSubview:surface atIndex:0];
     }
     if (!CGRectEqualToRect(surface.frame, tile.bounds)) surface.frame = tile.bounds;
+    if (!SGRHomeGlassStyle()) return surface;
     CALayer *layer = surface.layer;
     CGFloat radius = MIN(kPillRadius, tile.bounds.size.height / 2);
     if (layer.cornerRadius != radius) layer.cornerRadius = radius;
@@ -77,12 +80,14 @@ static UIView *surfaceIn(UIView *tile, UIView *fill) {
 static void inset(UIView *square) {
     CGFloat side = square.bounds.size.height;
     if (side <= kInset * 4) return;
-    CGFloat scale = (side - kInset * 2) / side;
+    BOOL glass = SGRHomeGlassStyle();
+    CGFloat inset = glass ? kInset : kPlainInset;
+    CGFloat scale = (side - inset * 2) / side;
     CGAffineTransform shrink = CGAffineTransformMakeScale(scale, scale);
     if (!CGAffineTransformEqualToTransform(square.transform, shrink)) square.transform = shrink;
     CALayer *layer = square.layer;
     // The radius is drawn scaled with the square.
-    CGFloat radius = kCoverRadius / scale;
+    CGFloat radius = (glass ? kCoverRadius : kPlainCoverRadius) / scale;
     if (layer.cornerRadius != radius) layer.cornerRadius = radius;
     if (layer.cornerCurve != kCACornerCurveContinuous) layer.cornerCurve = kCACornerCurveContinuous;
     if (!layer.masksToBounds) layer.masksToBounds = YES;
@@ -100,10 +105,11 @@ static void inset(UIView *square) {
 
 // The pill's colour: the cover's tint taken up to a glass-like, saturated level.
 static UIColor *vivid(UIColor *color) {
-    if (!color) return untinted();
+    if (!color) return SGRHomeGlassStyle() ? [UIColor colorWithWhite:1 alpha:0.14] : untinted();
+    if (!SGRHomeGlassStyle()) return color;
     CGFloat h, sat, b, a;
     if (![color getHue:&h saturation:&sat brightness:&b alpha:&a]) return color;
-    return [UIColor colorWithHue:h saturation:MIN(1, sat * 1.15) brightness:MAX(b, 0.12) * 3.2 > 0.5 ? 0.5 : MAX(b, 0.12) * 3.2 alpha:1];
+    return [UIColor colorWithHue:h saturation:MIN(1, sat * 1.15) brightness:MAX(b, 0.12) * 3.2 > 0.6 ? 0.6 : MAX(b, 0.12) * 3.2 alpha:0.62];
 }
 
 static void tint(UIView *tile, UIView *surface, UIColor *color, BOOL animated) {

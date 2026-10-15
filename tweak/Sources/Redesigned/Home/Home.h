@@ -15,6 +15,7 @@
 // Every hook installs only while Redesigned UI is on (SGRedesignedUI).
 // Threading: main thread only.
 #import <UIKit/UIKit.h>
+#import "Settings/SGModPage.h"
 
 // Whether HomeSections.x has collapsed the section in this cell.
 BOOL SGRHomeSectionCollapsed(UIView *cell);
@@ -34,3 +35,9 @@ typedef NS_ENUM(NSUInteger, SGRHomeProbe) {
 };
 CFTimeInterval SGRHomeProbeBegin(void);
 void SGRHomeProbeEnd(SGRHomeProbe probe, CFTimeInterval began);
+
+// The "Home page" switch of Appearance: on, the glass Home (mixes first, glass pills, gradient, scrolling header);
+// off, the Home as it was. Read once at launch (HomeCards.x).
+#define SGRKeyHomeGlass @"spotifyglass.redesign.home.glass"
+BOOL SGRHomeGlassStyle(void);
+SGModRow *SGRHomeStyleRow(void);

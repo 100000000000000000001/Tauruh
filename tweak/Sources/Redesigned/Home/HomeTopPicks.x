@@ -15,7 +15,7 @@
 #import "Home.h"
 
 static const CGFloat kScale = 1.7, kSmallest = 120, kHeading = 40;
-static char kAuraKey, kAuraShownKey, kAuraImageKey;
+static char kAuraKey, kAuraShownKey, kAuraImageKey, kAuraTriesKey;
 static char kLargeKey, kNaturalKey, kWrappedKey, kWidthKey, kAskedKey;
 static _Thread_local BOOL sg_enlarging;
 // The narrowest size kSmallest or more wide the running provider made, at Spotify's width: its cards.
@@ -25,6 +25,7 @@ static NSInteger sg_topIndex = NSIntegerMax;
 static NSIndexPath *sg_shortcutsPath, *sg_topPath;
 static __weak UICollectionViewLayout *sg_pageLayout;
 static _Thread_local BOOL sg_reordering;
+static void stripBase(UIView *cell, NSUInteger depth);
 
 // The layout a wrapped provider belongs to, set once the layout is made.
 @interface SGRLayoutBox : NSObject
@@ -174,6 +175,13 @@ static NSDictionary<NSIndexPath *, NSValue *> *swappedFrames(UICollectionViewLay
 %end
 
 %hook _TtC12Element_List18CollectionViewCell
+- (void)layoutSubviews {
+    %orig;
+    UICollectionViewCell *cell = (UICollectionViewCell *)self;
+    UICollectionView *page = sg_pageLayout.collectionView;
+    if (page && cell.superview == page && objc_getAssociatedObject(page, &kAuraKey)) stripBase(cell, 3);
+}
+
 - (UICollectionViewLayoutAttributes *)preferredLayoutAttributesFittingAttributes:(UICollectionViewLayoutAttributes *)attributes {
     UICollectionViewLayoutAttributes *result = %orig;
     static Class shelf;
@@ -259,6 +267,13 @@ static UIImage *coverOf(UIView *card) {
     return nil;
 }
 
+// Cells made or reused after the gradient came carry Spotify's black again: cleared as they lay out.
+static void stripBase(UIView *cell, NSUInteger depth) {
+    if (SGIsBaseSurface(cell.layer.backgroundColor)) cell.layer.backgroundColor = NULL;
+    if (depth == 0) return;
+    for (UIView *sub in cell.subviews) stripBase(sub, depth - 1);
+}
+
 static void paintAura(UICollectionView *list, UIColor *color) {
     CAGradientLayer *gradient = objc_getAssociatedObject(list, &kAuraKey);
     if (!gradient) {
@@ -298,7 +313,19 @@ static void followAlbum(UICollectionView *shelf) {
         if (d < best) { best = d; lead = cell; }
     }
     UIImage *image = lead ? coverOf(lead) : nil;
-    if (!image || objc_getAssociatedObject(shelf, &kAuraShownKey) == image) return;
+    if (!image) {
+        // The covers arrive after the first layout: look again until one has.
+        NSNumber *tries = objc_getAssociatedObject(shelf, &kAuraTriesKey);
+        if (tries.integerValue < 20) {
+            objc_setAssociatedObject(shelf, &kAuraTriesKey, @(tries.integerValue + 1), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            __weak UICollectionView *again = shelf;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [again setNeedsLayout];
+            });
+        }
+        return;
+    }
+    if (objc_getAssociatedObject(shelf, &kAuraShownKey) == image) return;
     objc_setAssociatedObject(shelf, &kAuraShownKey, image, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     __weak UICollectionView *weakShelf = shelf;
     SGRPaletteRequest request = {0};
@@ -336,6 +363,6 @@ static void followAlbum(UICollectionView *shelf) {
 %end
 
 %ctor {
-    if (!SGRedesignedUI()) return;
+    if (!SGRedesignedUI() || !SGRHomeGlassStyle()) return;
     %init;
 }
