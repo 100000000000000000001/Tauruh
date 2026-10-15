@@ -46,13 +46,27 @@ SGRPlayerBackgroundKind SGRPlayerBackground(void) {
     return kind >= SGRPlayerBackgroundStill && kind <= SGRPlayerBackgroundFill ? kind : SGRPlayerBackgroundColours;
 }
 
+SGRPlayerBackgroundKind SGRPlayerAnimatedFallback(void) {
+    static const SGRPlayerBackgroundKind choices[] = {
+        SGRPlayerBackgroundStill,
+        SGRPlayerBackgroundColours,
+        SGRPlayerBackgroundFluid,
+        SGRPlayerBackgroundVisualiser,
+        SGRPlayerBackgroundFill,
+    };
+    NSInteger index = SGInt(SGRKeyPlayerAnimatedFallback, (NSInteger)(sizeof choices / sizeof *choices) - 1);
+    if (index < 0 || index >= (NSInteger)(sizeof choices / sizeof *choices)) index = (NSInteger)(sizeof choices / sizeof *choices) - 1;
+    return choices[index];
+}
+
 NSArray<NSString *> *SGRPlayerBackgroundNames(void) {
     return @[@"Still", @"Colors", @"Fluid", @"Animated", @"Visualiser", @"Fill"];
 }
 
 void SGRPlayerApplyBackgroundToField(SGRArtworkField *field, SGRPlayerBackgroundKind kind) {
     if (!field) return;
-    BOOL fluid = kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundAnimated
+    if (kind == SGRPlayerBackgroundAnimated) kind = SGRPlayerAnimatedFallback();
+    BOOL fluid = kind == SGRPlayerBackgroundFluid
         || kind == SGRPlayerBackgroundVisualiser;
     field.flows = kind == SGRPlayerBackgroundColours;
     field.fluid = fluid;

@@ -498,15 +498,26 @@ static void setCoverShown(BOOL shown, BOOL animated) {
     fadeCoverMask(covers, mask, 0, animated, nil);
 }
 
+static BOOL coverShouldBeShown(void) {
+    SGRPlayerBackgroundKind background = SGRPlayerBackground();
+    return background != SGRPlayerBackgroundFill
+        && !(background == SGRPlayerBackgroundAnimated
+             && (sg_motion || SGRPlayerAnimatedFallback() == SGRPlayerBackgroundFill));
+}
+
+static void updateCoverVisibility(BOOL animated) {
+    setCoverShown(coverShouldBeShown(), animated);
+}
+
 void SGRPlayerMotionFieldLaidOut(void) {
     layOut();
-    setCoverShown(sg_motion == nil, NO);
+    updateCoverVisibility(NO);
 }
 
 // A clip that came in before the player opened finds no cover to hide at the field's first pass, the covers
 // laying out after it (issue #19: the cover over the clip after a relaunch), so each cover's layout asks too.
 void SGRPlayerMotionCoverLaidOut(void) {
-    setCoverShown(sg_motion == nil, NO);
+    updateCoverVisibility(NO);
 }
 
 BOOL SGRPlayerMotionShowing(void) {
@@ -600,7 +611,8 @@ static void clear(BOOL animated) {
     cover(NO);
     holdField();
     animated = animated && seen(old);
-    setCoverShown(YES, animated);
+    updateCoverVisibility(animated);
+    SGRPlayerVisualiserUpdate();
     if (animated) [old disappear:^{ [old removeFromSuperview]; }];
     else [old removeFromSuperview];
 }
@@ -623,6 +635,7 @@ static void show(NSString *track, NSURL *file) {
         [sg_motion playFile:file poster:poster];
         sg_motionFile = file;
         sg_motionPoster = poster;
+        SGRPlayerVisualiserUpdate();
         layOut();
         holdField();
         [sg_motion setBlurred:SGRPlayerLyricsOpen() animated:NO];
@@ -693,6 +706,7 @@ void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind) {
     if (current == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundAnimated) restartAnimatedArtwork();
     SGRPlayerVisualiserUpdate();
     SGRPlayerHoldField();
+    updateCoverVisibility(YES);
     SGLog(@"redesign player: background switched to %@ from the menu", SGRPlayerBackgroundNames()[(NSUInteger)kind]);
 }
 

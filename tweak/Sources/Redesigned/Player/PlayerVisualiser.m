@@ -428,7 +428,10 @@ static void shape(CAShapeLayer *layer, const float *bands, CGFloat width, CGFloa
 static SGRVisualiserView *sg_view;
 
 BOOL SGRPlayerVisualiserShowing(void) {
-    return SGRPlayerBackground() == SGRPlayerBackgroundVisualiser;
+    SGRPlayerBackgroundKind background = SGRPlayerBackground();
+    return background == SGRPlayerBackgroundVisualiser
+        || (background == SGRPlayerBackgroundAnimated
+            && SGRPlayerAnimatedFallback() == SGRPlayerBackgroundVisualiser);
 }
 
 UIView *SGRPlayerVisualiserPreview(void) {

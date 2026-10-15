@@ -5,6 +5,7 @@
 
 // The field behind the player.
 #define SGRKeyPlayerBackground @"spotifyglass.redesign.player.background"
+#define SGRKeyPlayerAnimatedFallback @"spotifyglass.redesign.player.animatedFallback"
 typedef NS_ENUM(NSInteger, SGRPlayerBackgroundKind) {
     SGRPlayerBackgroundStill,
     SGRPlayerBackgroundColours,
@@ -14,6 +15,7 @@ typedef NS_ENUM(NSInteger, SGRPlayerBackgroundKind) {
     SGRPlayerBackgroundFill,
 };
 SGRPlayerBackgroundKind SGRPlayerBackground(void);
+SGRPlayerBackgroundKind SGRPlayerAnimatedFallback(void);
 NSArray<NSString *> *SGRPlayerBackgroundNames(void);
 
 #define SGRKeyPlayerBackdropOpacity @"spotifyglass.redesign.player.backdropOpacity"

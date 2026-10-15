@@ -9,7 +9,7 @@
 // The background is the player's own: a field of the same kind (Still, Colors, Fluid, Fill), for Animated
 // the clip the player is playing (SGRPlayerMotionPreview) in place of the field, or, while the player has
 // none, the playing track's clip looked up for the card while it is on screen, Fluid until it comes in and
-// for a track with none, as in the player; the clip crosses over the field as it arrives, its poster first
+// for a track with none, the chosen Animated fallback; the clip crosses over the field as it arrives, its poster first
 // while its video decodes. And for Visualizer the hills over Fluid held still (SGRPlayerVisualiserPreview),
 // moving with the song. It moves under the field's own conditions (in a window, Spotify in front, Reduce
 // Motion and Low Power Mode off). Under the card a segmented control picks the background, all six of
@@ -17,7 +17,7 @@
 // width, and every choice stays one tap away with the card showing it at once. A note under the control says what the
 // choice does; it is given the room of the longest note, so the rows under it hold still as it changes.
 //
-// Under the header: the rows that follow the choice (Animated's sources and its Low Data Mode switch; Fluid's
+// Under the header: the rows that follow the choice (Animated's fallback, sources and its Low Data Mode switch; Fluid's
 // five sliders and their Reset, which the card and the player follow as they move, SGRFluid.h), the Mini
 // player section (Redesigned/NowPlayingBar/NowPlayingBarSettings.m), then the sections either look shares.
 //
@@ -199,7 +199,10 @@ static NSArray<NSString *> *backgroundNotes(void) {
         self->_motion = kind == SGRPlayerBackgroundAnimated ? SGRPlayerMotionPreview(arrived) : nil;
         if (self->_motion) [self insertSubview:self->_motion aboveSubview:self->_field];
         [self->_visualiser removeFromSuperview];
-        self->_visualiser = kind == SGRPlayerBackgroundVisualiser ? SGRPlayerVisualiserPreview() : nil;
+        SGRPlayerBackgroundKind effectiveKind = kind == SGRPlayerBackgroundAnimated
+            ? SGRPlayerAnimatedFallback() : kind;
+        self->_visualiser = effectiveKind == SGRPlayerBackgroundVisualiser && !self->_motion
+            ? SGRPlayerVisualiserPreview() : nil;
         if (self->_visualiser) [self insertSubview:self->_visualiser aboveSubview:self->_field];
         self->_field.motionHeld = SGPlayerState().isPaused || self->_motion != nil || self->_visualiser != nil;
     };
@@ -367,12 +370,29 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     };
     BOOL (^stillOrFill)(void) = ^BOOL {
         SGRPlayerBackgroundKind kind = SGRPlayerBackground();
+        if (kind == SGRPlayerBackgroundAnimated) kind = SGRPlayerAnimatedFallback();
         return kind == SGRPlayerBackgroundStill || kind == SGRPlayerBackgroundFill;
     };
     BOOL (^fluidBackdrop)(void) = ^BOOL {
         SGRPlayerBackgroundKind kind = SGRPlayerBackground();
-        return kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundAnimated
-            || kind == SGRPlayerBackgroundVisualiser;
+        if (kind == SGRPlayerBackgroundAnimated) kind = SGRPlayerAnimatedFallback();
+        return kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundVisualiser;
+    };
+    SGModRow *animatedFallback = SGChoiceRow(@"Animated fallback",
+                                               @"Background shown when Canvas is unavailable or cannot play",
+                                               SGRKeyPlayerAnimatedFallback,
+                                               @[@"Still", @"Colors", @"Fluid", @"Visualiser", @"Fill"], 4);
+    animatedFallback.visible = lowData.visible;
+    animatedFallback.chosen = ^(NSInteger index) {
+        (void)index;
+        SGRArtworkField *field = SGRPlayerField();
+        SGRPlayerApplyBackgroundToField(field, SGRPlayerBackground());
+        [field refreshStyleAnimated:YES];
+        SGRPlayerMotionCoverLaidOut();
+        SGRPlayerVisualiserUpdate();
+        SGRPlayerHoldField();
+        [weakShowcase reloadBackgroundAnimated:NO];
+        [weakPage.tableView reloadData];
     };
     SGModRow *reset = SGActionRow(@"Reset", nil, ^{
         SGRResetFluidSettings();
@@ -388,18 +408,26 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     NSArray<SGModRow *> *blur = @[
         opacitySlider(@"Blurred artwork opacity", SGRKeyPlayerBackdropOpacity, stillOrFill, refreshArtworkOpacity),
         opacitySlider(@"Fill artwork opacity", SGRKeyPlayerFillOpacity,
-                      ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundFill; }, refreshArtworkOpacity),
+                      ^BOOL {
+                          SGRPlayerBackgroundKind kind = SGRPlayerBackground();
+                          if (kind == SGRPlayerBackgroundAnimated) kind = SGRPlayerAnimatedFallback();
+                          return kind == SGRPlayerBackgroundFill;
+                      }, refreshArtworkOpacity),
         opacitySlider(@"Fluid artwork opacity", SGRKeyPlayerFluidOpacity, fluidBackdrop, refreshArtworkOpacity),
         opacitySlider(@"Canvas blur opacity", SGRKeyPlayerCanvasBlurOpacity,
                       ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundAnimated; }, refreshBlurOpacity),
         opacitySlider(@"Lyrics blur opacity", SGRKeyPlayerLyricsBlurOpacity,
                       ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundAnimated; }, refreshBlurOpacity),
         opacitySlider(@"Visualiser lyrics blur opacity", SGRKeyPlayerVisualiserBlurOpacity,
-                      ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundVisualiser; }, refreshBlurOpacity),
+                      ^BOOL {
+                          SGRPlayerBackgroundKind kind = SGRPlayerBackground();
+                          if (kind == SGRPlayerBackgroundAnimated) kind = SGRPlayerAnimatedFallback();
+                          return kind == SGRPlayerBackgroundVisualiser;
+                      }, refreshBlurOpacity),
     ];
 
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
-        SGSection(nil, @[sources, lowData]),
+        SGSection(nil, @[animatedFallback, sources, lowData]),
         SGNotedSection(nil, fluid, @"Brightness above 100% can make white text harder to read. A paused song holds the "
                     @"background still. Animated and Visualiser use these where they show Fluid."),
         SGNotedSection(@"Background opacity", blur, @"Lower opacity makes each background layer more transparent. "

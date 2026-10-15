@@ -233,7 +233,10 @@ Redesigned:
                   until they do. The Canvas field extends below the clip with a blurred poster bleed instead of
                   stretched edge rows; the clip begins at the top of the visible player, as in the previous layout.
                   Fill keeps the cover crisp, then blends it through progressively stronger blur into a dark tint sampled
-                  from the artwork's bottom edge, adapting Pulse-Ice/EeveeImmersive's layered treatment.
+                  from the artwork's bottom edge, adapting Pulse-Ice/EeveeImmersive's layered treatment; it hides
+                  Spotify's normal cover, including when Animated uses Fill as its fallback. Player settings let the
+                  user choose Still, Colors, Fluid, Visualiser or Fill, with Fill as the default, for when Canvas is
+                  unavailable or cannot play.
                   Player settings expose separate opacity sliders for its artwork and Canvas/lyrics blur layers.
                   Always on in the redesign.
                   Tested in the simulator against harness/playermenu/
@@ -343,8 +346,9 @@ voice model's download (Redesigned/Lyrics/SingSettings.m), with Off, On, No mode
 each with its own list of tabs. Player: Gestures and Blocked artists (with the count on the row), which work
 with either look. In the redesigned look Appearance holds the profile-photo toggle and accent colour.
 The redesigned Player page also has independent Show Sing button and Show Translate button
-switches, the six background styles (Still, Colors, Fluid, Animated, Visualiser and Fill), background opacity
-sliders for the artwork and each player blur layer, and its volume controls.
+switches, the six background styles (Still, Colors, Fluid, Animated, Visualiser and Fill), an Animated fallback
+choice (Still, Colors, Fluid, Visualiser or Fill, default Fill), background opacity sliders for the artwork
+and each player blur layer, and its volume controls.
 Lyrics: the ordered list of lyrics sources, lyrics for every track,
 naming the source in the redesign, artist-name replacement on the lock screen (independent of Canvas lyrics),
 and glass lyrics in the native look; in the redesign also
