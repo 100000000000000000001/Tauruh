@@ -1,6 +1,6 @@
 // Player redesign: the Visualizer background, a calm spectrum of what is playing behind the player, in the
 // cover's colors, over the Fluid field held still (PlayerField.x keeps the field Fluid for this choice, as for
-// Animated, so the ⋯ menu moves between all five background styles without a restart).
+// Animated, so the ⋯ menu moves between all six background styles without a restart).
 //
 // The sound is Spotify's output as it plays, read on the render thread through the audio effects' notify
 // (SGAudioSetOutputReader, Shared/AudioEffects/AudioEffects.h) into SGRSpectrum.m's bands. Here, on the main
@@ -90,6 +90,8 @@ static NSDictionary *noActions(void) {
     CAGradientLayer *_backFill, *_frontFill;
     CAShapeLayer *_backShape, *_frontShape;
     UIVisualEffectView *_lyricsBlur;
+    UIView *_lyricsVeil;
+    BOOL _lyricsRequested;
     CADisplayLink *_link;
     BOOL _reading, _idle;
     float _front[kBands], _back[kBands], _peak;
@@ -129,6 +131,9 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     [self addSubview:_content];
     _lyricsBlur = [[UIVisualEffectView alloc] initWithEffect:nil];
     _lyricsBlur.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    _lyricsVeil = [UIView new];
+    _lyricsVeil.userInteractionEnabled = NO;
+    [_lyricsBlur.contentView addSubview:_lyricsVeil];
     [self addSubview:_lyricsBlur];
     [self applyColors:@[UIColor.darkGrayColor, UIColor.darkGrayColor, UIColor.darkGrayColor, UIColor.darkGrayColor, UIColor.darkGrayColor]];
 
@@ -138,6 +143,8 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
         [center addObserver:self selector:@selector(updateMotionSoon) name:name object:nil];
     }
     [center addObserver:self selector:@selector(artworkChanged) name:SGRNowPlayingArtworkDidChangeNotification object:nil];
+    [center addObserver:self selector:@selector(updateBlurOpacity) name:SGRPlayerBlurOpacityDidChangeNotification object:nil];
+    [self updateBlurOpacity];
     SGRObservePlayerTransition(self, ^(id owner) { [owner updateMotion]; }, ^(id owner) { [owner updateMotion]; });
     SGAddPlayerStateObserver(self);
     [self artworkChanged];
@@ -148,6 +155,13 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
 - (void)dealloc {
     [NSNotificationCenter.defaultCenter removeObserver:self];
     [_link invalidate];
+}
+
+- (void)updateBlurOpacity {
+    CGFloat opacity = MIN(100, MAX(0, SGInt(SGRKeyPlayerVisualiserBlurOpacity, 100))) / 100.0;
+    _lyricsVeil.backgroundColor = [UIColor colorWithWhite:0 alpha:opacity > 0 ? 1 - opacity : 0];
+    _lyricsVeil.frame = _lyricsBlur.contentView.bounds;
+    _lyricsBlur.effect = _lyricsRequested && opacity > 0 ? blurEffect() : nil;
     if (_reading) needReader(NO);
 }
 
@@ -201,6 +215,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     CGRect bounds = self.bounds;
     _content.frame = bounds;
     _lyricsBlur.frame = bounds;
+    _lyricsVeil.frame = _lyricsBlur.contentView.bounds;
     _backFill.frame = bounds;
     _frontFill.frame = bounds;
     _backShape.frame = bounds;
@@ -217,16 +232,19 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
 - (void)disappear:(void (^)(void))done {
     SGRAnimate(SGRMotionFade, ^{
         self->_content.alpha = 0;
+        self->_lyricsRequested = NO;
         self->_lyricsBlur.effect = nil;
     }, ^(BOOL finished) { done(); });
 }
 
 - (BOOL)blurred {
-    return _lyricsBlur.effect != nil;
+    return _lyricsRequested;
 }
 
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated {
-    void (^apply)(void) = ^{ self->_lyricsBlur.effect = blurred ? blurEffect() : nil; };
+    _lyricsRequested = blurred;
+    CGFloat opacity = MIN(100, MAX(0, SGInt(SGRKeyPlayerVisualiserBlurOpacity, 100))) / 100.0;
+    void (^apply)(void) = ^{ self->_lyricsBlur.effect = blurred && opacity > 0 ? blurEffect() : nil; };
     if (animated) SGRAnimate(SGRMotionFade, apply, nil);
     else apply();
     [self updateMotion];

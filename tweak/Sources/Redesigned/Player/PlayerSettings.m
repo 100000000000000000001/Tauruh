@@ -6,13 +6,13 @@
 // card shows the last one played (Shared/Player/SGLastTrack.h), its cover fetched and its Canvas looked up
 // as the playing one's would be, and with none ever played, Not Playing over a gradient of the accent.
 //
-// The background is the player's own: a field of the same kind (Still, Colors, Fluid), for Animated
+// The background is the player's own: a field of the same kind (Still, Colors, Fluid, Fill), for Animated
 // the clip the player is playing (SGRPlayerMotionPreview) in place of the field, or, while the player has
 // none, the playing track's clip looked up for the card while it is on screen, Fluid until it comes in and
 // for a track with none, as in the player; the clip crosses over the field as it arrives, its poster first
 // while its video decodes. And for Visualizer the hills over Fluid held still (SGRPlayerVisualiserPreview),
 // moving with the song. It moves under the field's own conditions (in a window, Spotify in front, Reduce
-// Motion and Low Power Mode off). Under the card a segmented control picks the background, all five of
+// Motion and Low Power Mode off). Under the card a segmented control picks the background, all six of
 // them: the names are one word each, each segment as wide as its name, so they fit side by side at an iPhone's
 // width, and every choice stays one tap away with the card showing it at once. A note under the control says what the
 // choice does; it is given the room of the longest note, so the rows under it hold still as it changes.
@@ -43,14 +43,16 @@ static NSArray<NSString *> *backgroundNotes(void) {
         @"The cover, blurred and held still.",
         @"The cover's colors, drifting slowly.",
         @"The cover itself, blurred and slowly turning. It rests while a song is paused.",
-        @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between all five backgrounds.",
+        @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between all six backgrounds.",
         @"The song's sound as gentle hills in the cover's colors, over Fluid held still. They settle while a song is paused.",
+        @"The cover fills the screen, then dissolves into its blurred colors and black toward the bottom.",
     ];
 }
 
 @interface SGRPlayerShowcase : UIView <SGPlayerStateObserver>
 - (void)reloadTrack;
 - (void)reloadBackgroundAnimated:(BOOL)animated;
+- (void)refreshBackgroundOpacity;
 @end
 
 @implementation SGRPlayerShowcase {
@@ -191,8 +193,8 @@ static NSArray<NSString *> *backgroundNotes(void) {
         if (showcase.window && !showcase->_motion && SGRPlayerBackground() == SGRPlayerBackgroundAnimated) [showcase reloadBackgroundAnimated:YES];
     };
     void (^apply)(void) = ^{
-        self->_field.flows = kind == SGRPlayerBackgroundColours;
-        self->_field.fluid = kind >= SGRPlayerBackgroundFluid;
+        SGRPlayerApplyBackgroundToField(self->_field, kind);
+        [self->_field refreshStyleAnimated:animated];
         [self->_motion removeFromSuperview];
         self->_motion = kind == SGRPlayerBackgroundAnimated ? SGRPlayerMotionPreview(arrived) : nil;
         if (self->_motion) [self insertSubview:self->_motion aboveSubview:self->_field];
@@ -210,6 +212,10 @@ static NSArray<NSString *> *backgroundNotes(void) {
         apply();
     }
     [self setNeedsLayout];
+}
+
+- (void)refreshBackgroundOpacity {
+    SGRPlayerApplyBackgroundToField(_field, SGRPlayerBackground());
 }
 
 // The clip runs from the card's top at its width, as in the player, and its blur comes in from the
@@ -309,7 +315,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
 }
 
 - (void)backgroundPicked {
-    SGSetInt(SGRKeyPlayerBackground, self.backgrounds.selectedSegmentIndex);
+    SGRPlayerMenuSetBackground((SGRPlayerBackgroundKind)self.backgrounds.selectedSegmentIndex);
     [self.showcase reloadBackgroundAnimated:YES];
     [self showNote];
     [self refreshVisibility];
@@ -323,6 +329,18 @@ static SGModRow *fluidSlider(NSString *title, SGRFluidSetting setting, NSString 
     return SGSliderRow(title, nil, l.least, l.most, l.step, ^double { return SGRFluidValue(setting); },
                        ^(double value) { SGRSetFluidValue(setting, lround(value)); },
                        ^NSString *(double value) { return [NSString stringWithFormat:@"%.0f%@", value, unit]; });
+}
+
+static SGModRow *opacitySlider(NSString *title, NSString *key, BOOL (^visible)(void),
+                               void (^changed)(void)) {
+    SGModRow *row = SGSliderRow(title, nil, 0, 100, 5, ^double { return SGInt(key, 100); },
+                                ^(double value) {
+                                    SGSetInt(key, lround(value));
+                                    if (changed) changed();
+                                },
+                                ^NSString *(double value) { return [NSString stringWithFormat:@"%.0f%%", value]; });
+    row.visible = visible;
+    return row;
 }
 
 UIViewController *SGRPlayerSettingsPage(NSArray *more) {
@@ -339,6 +357,23 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     sources.visible = lowData.visible;
 
     __block __weak UITableViewController *weakPage;
+    __weak SGRPlayerShowcase *weakShowcase = showcase;
+    void (^refreshBlurOpacity)(void) = ^{
+        [[NSNotificationCenter defaultCenter] postNotificationName:SGRPlayerBlurOpacityDidChangeNotification object:nil];
+    };
+    void (^refreshArtworkOpacity)(void) = ^{
+        SGRPlayerApplyBackgroundToField(SGRPlayerField(), SGRPlayerBackground());
+        [weakShowcase refreshBackgroundOpacity];
+    };
+    BOOL (^stillOrFill)(void) = ^BOOL {
+        SGRPlayerBackgroundKind kind = SGRPlayerBackground();
+        return kind == SGRPlayerBackgroundStill || kind == SGRPlayerBackgroundFill;
+    };
+    BOOL (^fluidBackdrop)(void) = ^BOOL {
+        SGRPlayerBackgroundKind kind = SGRPlayerBackground();
+        return kind == SGRPlayerBackgroundFluid || kind == SGRPlayerBackgroundAnimated
+            || kind == SGRPlayerBackgroundVisualiser;
+    };
     SGModRow *reset = SGActionRow(@"Reset", nil, ^{
         SGRResetFluidSettings();
         [weakPage.tableView reloadData];   // the sliders at once, rather than at the page's next tick
@@ -348,12 +383,27 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         fluidSlider(@"Speed", SGRFluidSpeed, @"%"), fluidSlider(@"Warp", SGRFluidWarp, @"%"), fluidSlider(@"Blur", SGRFluidBlur, @""),
         fluidSlider(@"Saturation", SGRFluidSaturation, @"%"), fluidSlider(@"Brightness", SGRFluidBrightness, @"%"), reset,
     ];
-    for (SGModRow *row in fluid) row.visible = ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundFluid; };
+    for (SGModRow *row in fluid) row.visible = fluidBackdrop;
+
+    NSArray<SGModRow *> *blur = @[
+        opacitySlider(@"Blurred artwork opacity", SGRKeyPlayerBackdropOpacity, stillOrFill, refreshArtworkOpacity),
+        opacitySlider(@"Fill artwork opacity", SGRKeyPlayerFillOpacity,
+                      ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundFill; }, refreshArtworkOpacity),
+        opacitySlider(@"Fluid artwork opacity", SGRKeyPlayerFluidOpacity, fluidBackdrop, refreshArtworkOpacity),
+        opacitySlider(@"Canvas blur opacity", SGRKeyPlayerCanvasBlurOpacity,
+                      ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundAnimated; }, refreshBlurOpacity),
+        opacitySlider(@"Lyrics blur opacity", SGRKeyPlayerLyricsBlurOpacity,
+                      ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundAnimated; }, refreshBlurOpacity),
+        opacitySlider(@"Visualiser lyrics blur opacity", SGRKeyPlayerVisualiserBlurOpacity,
+                      ^BOOL { return SGRPlayerBackground() == SGRPlayerBackgroundVisualiser; }, refreshBlurOpacity),
+    ];
 
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:
         SGSection(nil, @[sources, lowData]),
         SGNotedSection(nil, fluid, @"Brightness above 100% can make white text harder to read. A paused song holds the "
                     @"background still. Animated and Visualiser use these where they show Fluid."),
+        SGNotedSection(@"Background opacity", blur, @"Lower opacity makes each background layer more transparent. "
+                    @"Canvas and lyrics sliders adjust the matching blurred panels."),
         SGNotedSection(@"Controls", @[
                        SGOptionRow(@"Show Sing button", @"Karaoke control in the player lyrics", SGRKeyPlayerKaraokeButton),
                        SGOptionRow(@"Show Translate button", @"Pronunciation and translation in the player lyrics", SGRKeyPlayerTranslateButton),
@@ -367,8 +417,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         SGNotedSection(@"Mini player", SGRNowPlayingBarRows(),
                        @"Apple Music style moves the now playing bar in between two tabs as you scroll down."), nil];
     [sections addObjectsFromArray:more];
-    // The settings page keeps its documented next-song/restart behavior; the player's menu changes the live field immediately.
-    NSString *footer = @"From the player's ⋯ menu, any background takes effect immediately. Here, Fluid, Animated and Visualiser change with the next song; Still, Colors and volume controls apply after you restart Spotify.";
+    NSString *footer = @"From the player's ⋯ menu, any background takes effect immediately. The background and opacity settings apply live; volume controls apply after you restart Spotify.";
     SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:footer];
     weakPage = page;
     page.showcase = showcase;

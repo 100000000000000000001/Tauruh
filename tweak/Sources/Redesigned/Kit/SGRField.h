@@ -6,6 +6,11 @@ extern NSNotificationName const SGRFieldColorDidChangeNotification;
 @property (nonatomic) UIEdgeInsets bleed;
 @property (nonatomic) BOOL showsBackdrop;
 @property (nonatomic) BOOL flows;
+// The sharp artwork layered over the blurred backdrop, fading into it toward the bottom.
+@property (nonatomic) BOOL fills;
+@property (nonatomic) CGFloat backdropOpacity;
+@property (nonatomic) CGFloat fillOpacity;
+@property (nonatomic) CGFloat fluidOpacity;
 // Fluid artwork instead (SGRFluid.h): the cover itself blurred and slowly turning over the whole of the
 // bounds, under the same conditions for moving as `flows`. Setting one turns the other off.
 @property (nonatomic) BOOL fluid;

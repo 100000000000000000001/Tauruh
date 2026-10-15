@@ -222,7 +222,7 @@ Redesigned:
                   Music app draws one (PlayerMenu.x, SGRPlayerMenu.m): a pane of glass grown out of the button,
                   Add to playlist, Add to Queue and Share as three tiles across its top, groups of rows under
                   them, Speed and pitch opening onto Shared/Player's sliders in place, then the star-marked Canvas
-                  Lyrics switch and Background Style's five choices (Still, Colors, Fluid, Animated and Visualiser),
+                  Lyrics switch and Background Style's six choices (Still, Colors, Fluid, Animated, Visualiser and Fill),
                   everything else Spotify
                   offers under More, and Remove from this playlist last in red. What is in it and what each row
                   does stay Spotify's: its own sheet still opens, out of sight, and the menu is read off its
@@ -231,7 +231,10 @@ Redesigned:
                   sheet, and a sheet with no rows within 4 s is shown as it is. It opens on the rows the last
                   menu had, kept across launches, and moves to Spotify's as they come in, a tap meanwhile held
                   until they do. The Canvas field extends below the clip with a blurred poster bleed instead of
-                  stretched edge rows; the clip is centered within the visible player height. Always on in the redesign.
+                  stretched edge rows; the clip begins at the top of the visible player, as in the previous layout.
+                  Fill draws the sharp cover edge to edge, blending into its blurred colors and black at the bottom.
+                  Player settings expose separate opacity sliders for its artwork and Canvas/lyrics blur layers.
+                  Always on in the redesign.
                   Tested in the simulator against harness/playermenu/
                   With Sing on and its voice model downloaded (Mod Settings > Karaoke, Redesigned/Lyrics/SingSettings.m,
                   both applying at once), its microphone (Redesigned/Lyrics/SGRSingControl.m) sits in the
@@ -337,8 +340,10 @@ what the restart will bring. In the redesign Karaoke comes next, on a card of it
 voice model's download (Redesigned/Lyrics/SingSettings.m), with Off, On, No model or the download's percentage
                 beside the row, "Needs iOS 18" below iOS 18. Then a card of parts. Navbar: the tab editor of the stored look,
 each with its own list of tabs. Player: Gestures and Blocked artists (with the count on the row), which work
-with either look. The redesigned Player page also has independent Show Sing button and Show Translate button
-switches, the five background styles (Still, Colors, Fluid, Animated and Visualiser), and its volume controls.
+with either look. In the redesigned look Appearance holds the profile-photo toggle and accent colour.
+The redesigned Player page also has independent Show Sing button and Show Translate button
+switches, the six background styles (Still, Colors, Fluid, Animated, Visualiser and Fill), background opacity
+sliders for the artwork and each player blur layer, and its volume controls.
 Lyrics: the ordered list of lyrics sources, lyrics for every track,
 naming the source in the redesign, artist-name replacement on the lock screen (independent of Canvas lyrics),
 and glass lyrics in the native look; in the redesign also
@@ -352,8 +357,9 @@ Audio effects follows Lock Screen, which appears between Lyrics and Audio effect
 In the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
-buttons to hide); in the redesign instead Now Playing (its device button, moving background, an optional
-volume slider off by default with its thumb hidden if enabled, and rounded-square mini-player art, off by default).
+buttons to hide); in the redesign instead Now Playing (its device button and moving background); the Player page's
+Mini player section has the mini-player merge/transition toggle and rounded-square artwork option, the latter off by default.
+An optional volume slider is off by default, with its thumb hidden if enabled.
 Vibrations follows under either look, a card for
 Controls (on until switched off) and one for Music Haptics (off until switched on, with an ⓘ saying it
 follows the sound this iPhone plays while Spotify is open), each opening out while its switch is on:
@@ -400,8 +406,10 @@ never lights up as the tab you are on. Hide labels, on the same page, leaves the
 icons alone and applies straight away too. Spotify tabs can be hidden with their switches or removed from
 the editor; Use Spotify's order restores them. Compact player and tabs is on by default: while scroll-minimization
 is active, the glass bar narrows to the current tab and the wider mini-player fills the remaining row; it
-can be switched off independently. Its compact footprint stays square so the tab's glass button remains
-round, and it is vertically aligned to the mini-player card.
+can be switched off independently from Player > Mini player > Mini player transition animations. That
+setting controls whether the bar merges into the compact tab while scrolling. The minimized tab uses its
+own square glass button, sized within the available row and aligned to the mini-player card, so UIKit's
+safe-area-dependent tab-item shape cannot squash it on different devices.
 
 ## Adding a feature
 

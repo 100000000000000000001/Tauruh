@@ -2,6 +2,7 @@
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
 #import "SGRAccent.h"
+#import "Redesigned/Navbar/Navbar.h"
 
 static void chooseAccent(void) {
     if (!SGRAccentColor()) {
@@ -21,7 +22,11 @@ static void chooseAccent(void) {
 
 // The redesign's rows of the Appearance card (App/Pages.m). AMOLED has no row: the redesign is always black.
 NSArray<SGModRow *> *SGRAppearanceRows(void) {
+    SGModRow *profile = SGSwitchRow(@"Show profile photo", @"Show the profile photo at the top right",
+                                    SGRKeyNavbarProfilePhoto);
+    profile.changed = ^(BOOL on) { SGRNavbarRefreshProfilePhotos(); };
     return @[
+        profile,
         SGWithSymbol(SGStatActionRow(@"Accent colour", nil, ^NSString *{ return SGRAccentLabel(); }, ^{ chooseAccent(); }), @"paintpalette"),
     ];
 }

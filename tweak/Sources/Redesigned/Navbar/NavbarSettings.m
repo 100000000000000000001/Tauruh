@@ -116,7 +116,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 }
 
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    if (section == SGRNavbarSectionSwitch) return 5;
+    if (section == SGRNavbarSectionSwitch) return 3;
     return section == SGRNavbarSectionTabs ? (NSInteger)_entries.count : 1;
 }
 
@@ -142,20 +142,16 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
     UITableViewCell *cell = SGDequeueCell(table, @"navbar");
     switch (path.section) {
         case SGRNavbarSectionSwitch: {
-            BOOL labels = path.row == 1, profile = path.row == 2, compact = path.row == 3, appleIcons = path.row == 4;
+            BOOL labels = path.row == 1, appleIcons = path.row == 2;
             NSString *title = appleIcons ? @"Apple Music tab icons"
-                : profile ? @"Show profile photo" : compact ? @"Compact player and tabs"
                 : labels ? @"Hide labels" : @"Custom navbar";
             NSString *detail = appleIcons ? @"Use Apple's style for built-in tabs"
-                : profile ? @"Open Spotify's side menu" : compact ? @"Share one row while scrolling"
                 : labels ? @"Icons only" : nil;
             SGFillCell(cell, title, detail, nil, nil);
             UISwitch *toggle = [UISwitch new];
             toggle.onTintColor = SGGreen();
             toggle.tag = path.row;
-            toggle.on = profile ? SGFlag(SGRKeyNavbarProfilePhoto, YES)
-                                : compact ? SGFlag(SGRKeyNavbarCompact, YES)
-                                : appleIcons ? SGFlag(SGRKeyNavbarAppleIcons, NO)
+            toggle.on = appleIcons ? SGFlag(SGRKeyNavbarAppleIcons, NO)
                                 : labels ? SGFlag(SGRKeyNavbarHideLabels, YES) : SGEnabled(SGRKeyNavbar);
             [toggle addTarget:self action:@selector(toggled:) forControlEvents:UIControlEventValueChanged];
             cell.accessoryView = toggle;
@@ -326,14 +322,6 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 
 - (void)toggled:(UISwitch *)toggle {
     if (toggle.tag == 2) {
-        SGSetEnabled(SGRKeyNavbarProfilePhoto, toggle.on);
-        SGRNavbarRefreshProfilePhotos();
-    } else if (toggle.tag == 3) {
-        SGSetEnabled(SGRKeyNavbarCompact, toggle.on);
-        SGRSetTabBarMinimized(SGRTabBarMinimized(), NO);
-        SGRRefreshTabBar();
-        SGRNowPlayingBarFollowTabBar();
-    } else if (toggle.tag == 4) {
         SGSetEnabled(SGRKeyNavbarAppleIcons, toggle.on);
         SGRRefreshTabBar();
     } else {

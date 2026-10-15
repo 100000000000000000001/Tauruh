@@ -1,5 +1,5 @@
 // Player redesign: Animated artwork, the track's Canvas or Apple Music's animated cover behind the player,
-// the way the Music app draws it. The clip is centered in the visible player height, sharp to near its foot,
+// the way the Music app draws it. The clip starts at the top of the visible player, sharp to near its foot,
 // where it dissolves into its own last rows drawn on down to the bottom of the field, so it ends in its own
 // color rather than on the Fluid field. A blur comes in from the seam (from above the controls for a
 // Canvas as tall as the screen) and lies under the controls; behind the lyrics the whole clip is blurred.
@@ -42,6 +42,8 @@
 #import "Shared/Player/SGLastTrack.h"
 #import "Shared/Player/SpeedPitch.h"
 #import "Player.h"
+
+NSNotificationName const SGRPlayerBlurOpacityDidChangeNotification = @"spotifyglass.redesign.player.blurOpacityDidChange";
 
 // Where the clip starts dissolving into its foot, as a share of its height.
 static const CGFloat kFootFrom = 0.9;
@@ -138,8 +140,9 @@ static CGFloat brightEnd(NSData *luminances) {
     CALayer *_foot;
     CALayer *_dim;   // black over the clip and its foot, as dark as the clip is bright
     NSMutableData *_luminances;   // of the frames measured so far
-    BOOL _lyricsUp;
+    BOOL _lyricsUp, _seamUp;
     UIVisualEffectView *_seamBlur, *_lyricsBlur;
+    UIView *_seamVeil, *_lyricsVeil;
     CGFloat _aspect;
     BOOL _timing;   // the give-up's count is running
 }
@@ -148,6 +151,15 @@ static CGFloat brightEnd(NSData *luminances) {
 // fading alpha or a mask wrongly or not at all.
 static UIBlurEffect *blurEffect(void) {
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark];
+}
+
+static CGFloat blurOpacity(NSString *key) {
+    return MIN(100, MAX(0, SGInt(key, 100))) / 100.0;
+}
+
+static void setBlurVeil(UIView *veil, NSString *key) {
+    CGFloat opacity = blurOpacity(key);
+    veil.backgroundColor = [UIColor colorWithWhite:0 alpha:opacity > 0 ? 1 - opacity : 0];
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -186,9 +198,15 @@ static UIBlurEffect *blurEffect(void) {
     _seamMask.colors = @[(id)UIColor.clearColor.CGColor, (id)UIColor.blackColor.CGColor];
     [mask.layer addSublayer:_seamMask];
     _seamBlur.maskView = mask;
+    _seamVeil = [UIView new];
+    _seamVeil.userInteractionEnabled = NO;
+    [_seamBlur.contentView addSubview:_seamVeil];
     [self addSubview:_seamBlur];
     _lyricsBlur = [[UIVisualEffectView alloc] initWithEffect:nil];
     _lyricsBlur.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    _lyricsVeil = [UIView new];
+    _lyricsVeil.userInteractionEnabled = NO;
+    [_lyricsBlur.contentView addSubview:_lyricsVeil];
     [self addSubview:_lyricsBlur];
 
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
@@ -197,9 +215,18 @@ static UIBlurEffect *blurEffect(void) {
         [center addObserver:self selector:@selector(updateMotionSoon) name:name object:nil];
     }
     [center addObserver:self selector:@selector(updateDim) name:UIAccessibilityDarkerSystemColorsStatusDidChangeNotification object:nil];
+    [center addObserver:self selector:@selector(updateBlurOpacity) name:SGRPlayerBlurOpacityDidChangeNotification object:nil];
+    [self updateBlurOpacity];
     SGRObservePlayerTransition(self, ^(id owner) { [owner updateMotion]; }, ^(id owner) { [owner updateMotion]; });
     SGAddPlayerStateObserver(self);
     return self;
+}
+
+- (void)updateBlurOpacity {
+    setBlurVeil(_seamVeil, SGRKeyPlayerCanvasBlurOpacity);
+    setBlurVeil(_lyricsVeil, SGRKeyPlayerLyricsBlurOpacity);
+    _seamBlur.effect = _seamUp && blurOpacity(SGRKeyPlayerCanvasBlurOpacity) > 0 ? blurEffect() : nil;
+    _lyricsBlur.effect = _lyricsUp && blurOpacity(SGRKeyPlayerLyricsBlurOpacity) > 0 ? blurEffect() : nil;
 }
 
 - (void)playerStateDidChange:(SPTPlayerState *)state {
@@ -223,15 +250,16 @@ static UIBlurEffect *blurEffect(void) {
     CGFloat screen = _screenHeight > 0 ? _screenHeight : total;
     CGFloat height = round(width * _aspect);
     if (_aspect > kCanvasAspect) height = MAX(height, screen);
-    CGFloat top = round((screen - height) / 2);
-    CGFloat seam = top + round(height * kFootFrom), blurFrom = MIN(seam, round(screen * kBlurByControls));
+    CGFloat seam = round(height * kFootFrom), blurFrom = MIN(seam, round(screen * kBlurByControls));
     _picture.frame = bounds;
     _seamBlur.frame = bounds;
     _seamBlur.maskView.frame = bounds;
     _lyricsBlur.frame = bounds;
+    _seamVeil.frame = _seamBlur.contentView.bounds;
+    _lyricsVeil.frame = _lyricsBlur.contentView.bounds;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
-    _still.frame = CGRectMake(0, top, width, height);
+    _still.frame = CGRectMake(0, 0, width, height);
     _clip.frame = _still.bounds;
     _clipMask.frame = _still.bounds;
     _foot.frame = CGRectMake(0, seam, width, MAX(0, total - seam));
@@ -299,7 +327,8 @@ static UIBlurEffect *blurEffect(void) {
     _picture.alpha = 0;
     void (^apply)(void) = ^{
         self->_picture.alpha = 1;
-        self->_seamBlur.effect = blurEffect();
+        self->_seamUp = YES;
+        self->_seamBlur.effect = blurOpacity(SGRKeyPlayerCanvasBlurOpacity) > 0 ? blurEffect() : nil;
     };
     if (animated) {
         SGRAnimate(SGRMotionFade, apply, ^(BOOL finished) {
@@ -315,6 +344,8 @@ static UIBlurEffect *blurEffect(void) {
 - (void)disappear:(void (^)(void))done {
     SGRAnimate(SGRMotionFade, ^{
         self->_picture.alpha = 0;
+        self->_seamUp = NO;
+        self->_lyricsUp = NO;
         self->_seamBlur.effect = nil;
         self->_lyricsBlur.effect = nil;
     }, ^(BOOL finished) { done(); });
@@ -323,7 +354,9 @@ static UIBlurEffect *blurEffect(void) {
 // The lyrics' blur, and their share of the dim, which a layer's own animation carries over the same fade.
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated {
     _lyricsUp = blurred;
-    void (^apply)(void) = ^{ self->_lyricsBlur.effect = blurred ? blurEffect() : nil; };
+    void (^apply)(void) = ^{
+        self->_lyricsBlur.effect = blurred && blurOpacity(SGRKeyPlayerLyricsBlurOpacity) > 0 ? blurEffect() : nil;
+    };
     [CATransaction begin];
     [CATransaction setDisableActions:!animated];
     [CATransaction setAnimationDuration:SGRCrossfade];
@@ -641,7 +674,7 @@ static void restartAnimatedArtwork(void) {
 }
 
 void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind) {
-    if (kind < SGRPlayerBackgroundStill || kind > SGRPlayerBackgroundVisualiser) {
+    if (kind < SGRPlayerBackgroundStill || kind > SGRPlayerBackgroundFill) {
         SGLog(@"redesign player: ignored invalid background style %ld", (long)kind);
         return;
     }
@@ -650,11 +683,8 @@ void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind) {
 
     SGSetInt(SGRKeyPlayerBackground, kind);
     SGRArtworkField *field = SGRPlayerField();
-    if (field) {
-        field.fluid = kind >= SGRPlayerBackgroundFluid;
-        field.flows = kind == SGRPlayerBackgroundColours;
-        [field refreshStyleAnimated:YES];
-    }
+    SGRPlayerApplyBackgroundToField(field, kind);
+    [field refreshStyleAnimated:YES];
     if (current == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundAnimated) restartAnimatedArtwork();
     SGRPlayerVisualiserUpdate();
     SGRPlayerHoldField();

@@ -8,18 +8,48 @@
 #import <objc/message.h>
 
 static char kBarKey, kHostKey;
+static char kCompactButtonKey, kCompactGlassKey;
 static __weak UIView *sg_stockBar;
 static CGFloat sg_room, sg_glassHeight;   // see "room for the glass bar"
+
+@interface SGRCompactTabButton : UIControl
+@property (nonatomic, strong) UIImageView *glyphView;
+@end
+
+@implementation SGRCompactTabButton
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    if (!(self = [super initWithFrame:frame])) return nil;
+    self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    self.isAccessibilityElement = YES;
+    self.accessibilityTraits = UIAccessibilityTraitButton;
+    _glyphView = [UIImageView new];
+    _glyphView.contentMode = UIViewContentModeCenter;
+    _glyphView.tintColor = UIColor.whiteColor;
+    [self addSubview:_glyphView];
+    return self;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGFloat side = MIN(24, MIN(self.bounds.size.width, self.bounds.size.height));
+    _glyphView.frame = CGRectMake((self.bounds.size.width - side) / 2,
+                                  (self.bounds.size.height - side) / 2, side, side);
+}
+
+@end
 
 @interface SGRSystemTabBar : UITabBar <UITabBarDelegate, UIGestureRecognizerDelegate>
 @property (nonatomic, weak) UIView *stockBar;
 @property (nonatomic, copy) NSArray<UIView *> *sources;
+@property (nonatomic, weak) SGRCompactTabButton *compactButton;
 @property (nonatomic, weak) UILongPressGestureRecognizer *hold;
 @property (nonatomic, weak) UITapGestureRecognizer *tabTap;
 @property (nonatomic) BOOL holding;
 @property (nonatomic, weak) UITabBarItem *shown;
 - (UITabBarItem *)itemAt:(CGPoint)point;
 - (void)tabTapped:(UITapGestureRecognizer *)tap;
+- (void)compactTapped;
 @end
 
 static void syncBar(UIView *stockBar);
@@ -303,6 +333,21 @@ static void forwardTap(UIView *item) {
 
 @implementation SGRSystemTabBar
 
+- (void)compactTapped {
+    UITabBarItem *item = self.selectedItem ?: self.items.firstObject;
+    if (!item || !self.sources.count) return;
+    UIView *source = self.sources.firstObject;
+    SEL open = NSSelectorFromString(@"open");
+    if ([source respondsToSelector:open]) {
+        sg_compactSource = source;
+        self.shown = item;
+        self.selectedItem = item;
+        ((void (*)(id, SEL))objc_msgSend)(source, open);
+        return;
+    }
+    [self tabBar:self didSelectItem:item];
+}
+
 - (void)tabBar:(UITabBar *)tabBar didSelectItem:(UITabBarItem *)item {
     NSUInteger index = [self.items indexOfObject:item];
     if (index == NSNotFound || index >= self.sources.count) return;
@@ -469,6 +514,51 @@ static CGFloat glassHeight(UITabBar *bar, UIView *stockBar) {
     return sg_glassHeight;
 }
 
+static CGFloat compactButtonSide(UIView *host) {
+    return MAX(1, MIN(52, MIN(host.bounds.size.width, host.bounds.size.height)));
+}
+
+static SGRCompactTabButton *compactButton(UIView *host, SGRSystemTabBar *bar) {
+    SGRCompactTabButton *button = objc_getAssociatedObject(host, &kCompactButtonKey);
+    if (!button) {
+        button = [SGRCompactTabButton new];
+        [button addTarget:bar action:@selector(compactTapped) forControlEvents:UIControlEventTouchUpInside];
+        UILongPressGestureRecognizer *hold = [[UILongPressGestureRecognizer alloc] initWithTarget:bar action:@selector(held:)];
+        [button addGestureRecognizer:hold];
+        objc_setAssociatedObject(host, &kCompactButtonKey, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    bar.compactButton = button;
+    return button;
+}
+
+static void syncCompactButton(UIView *host, SGRSystemTabBar *bar, BOOL compact) {
+    SGRCompactTabButton *button = compactButton(host, bar);
+    button.hidden = !compact;
+    if (!compact) return;
+
+    CGFloat side = compactButtonSide(host);
+    button.frame = CGRectMake(0, (host.bounds.size.height - side) / 2, side, side);
+    button.layer.cornerRadius = side / 2;
+    button.layer.cornerCurve = kCACornerCurveCircular;
+    button.clipsToBounds = YES;
+    UIVisualEffectView *glass = SGGlassFor(button, &kCompactGlassKey);
+    glass.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    glass.frame = button.bounds;
+    SGShapeGlass(glass, side / 2, NO);
+    glass.layer.cornerRadius = side / 2;
+    glass.layer.cornerCurve = kCACornerCurveCircular;
+
+    UITabBarItem *item = bar.selectedItem ?: bar.items.firstObject;
+    UIImage *image = item.selectedImage ?: item.image;
+    button.glyphView.image = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    button.glyphView.tintColor = bar.tintColor;
+    UIView *source = bar.sources.firstObject;
+    button.accessibilityLabel = source ? titleOf(source) : @"Current tab";
+    button.accessibilityHint = @"Double-tap to expand the tab bar";
+    if (button.superview != host) [host addSubview:button];
+    else [host bringSubviewToFront:button];
+}
+
 static UIViewController *containerOf(UIView *stockBar) {
     Class containerClass = NSClassFromString(@"_TtC23NavigationUI_TabBarImpl19TabBarContainerImpl");
     for (UIResponder *r = stockBar.nextResponder; r; r = r.nextResponder) {
@@ -583,14 +673,18 @@ static void syncBar(UIView *stockBar) {
     CGFloat height = MAX(bounds.size.height, glassHeight(bar, stockBar));
     CGRect frame = CGRectMake(0, CGRectGetMaxY(bounds) - height, width, height);
     if (!CGRectEqualToRect(host.frame, frame)) host.frame = frame;
-    CGFloat compactWidth = host.bounds.size.height;
+    CGFloat compactWidth = compact ? compactButtonSide(host) : 0;
     CGRect barFrame = compact ? CGRectMake(0, 0, compactWidth, host.bounds.size.height) : host.bounds;
     if (!CGRectEqualToRect(bar.frame, barFrame)) bar.frame = barFrame;
+    // UIKit sizes a compact UITabBar item's glass from its safe-area-adjusted layout; use a square glass
+    // control instead so the minimized button cannot become a tall capsule on a different device.
+    bar.alpha = compact ? 0 : 1;
     CGAffineTransform hostTransform = sg_minimized && !compact
         ? CGAffineTransformMakeTranslation(0, host.bounds.size.height) : CGAffineTransformIdentity;
     if (!CGAffineTransformEqualToTransform(host.transform, hostTransform)) host.transform = hostTransform;
     if (host.superview != stockBar) [stockBar addSubview:host];
     else if (stockBar.subviews.lastObject != host) [stockBar bringSubviewToFront:host];
+    syncCompactButton(host, bar, compact);
     logBarOnce(bar);
     makeRoom(containerOf(stockBar));
     if (compact) SGRNowPlayingBarFollowTabBar();
@@ -602,7 +696,9 @@ CGRect SGRTabBarInlineSlot(UIView *host, CGFloat height) {
     if (!sg_minimized || !SGFlag(SGRKeyNavbarCompact, YES) || !host || !bar.window
         || stockBar.hidden || stockBar.alpha < 0.01) return CGRectNull;
     CGRect whole = [stockBar convertRect:stockBar.bounds toView:host];
-    CGRect leading = [bar convertRect:bar.bounds toView:host];
+    UIView *compact = objc_getAssociatedObject(objc_getAssociatedObject(stockBar, &kHostKey), &kCompactButtonKey);
+    CGRect leading = compact && !compact.hidden
+        ? [compact convertRect:compact.bounds toView:host] : [bar convertRect:bar.bounds toView:host];
     CGFloat left = CGRectGetMaxX(leading);
     CGFloat right = CGRectGetMaxX(whole) - 12;
     CGRect slot = CGRectMake(left, CGRectGetMidY(whole) - height / 2, right - left, height);
@@ -616,30 +712,29 @@ void SGRAlignCompactTabBarToNowPlayingCard(void) {
     UIView *stockBar = sg_stockBar;
     SGRSystemTabBar *bar = stockBar ? objc_getAssociatedObject(stockBar, &kBarKey) : nil;
     UIView *host = stockBar ? objc_getAssociatedObject(stockBar, &kHostKey) : nil;
+    SGRCompactTabButton *button = bar.compactButton;
     if (!sg_minimized || !SGFlag(SGRKeyNavbarCompact, YES) || !bar.window
-        || bar.superview != host || bar.items.count != 1) return;
+        || bar.superview != host || bar.items.count != 1 || !button || button.hidden) return;
 
     CGRect card = SGRNowPlayingCardFrameIn(stockBar, NULL);
-    if (CGRectIsNull(card)) return;
-
-    UIImage *selectedImage = bar.selectedItem.selectedImage ?: bar.selectedItem.image;
-    __block UIImageView *glyphView = nil;
-    SGForEachView(bar, ^(UIView *view) {
-        if (glyphView || ![view isKindOfClass:UIImageView.class]
-            || view.bounds.size.width < 8 || view.bounds.size.height < 8) return;
-        UIImage *image = ((UIImageView *)view).image;
-        if (image == selectedImage || [image isEqual:selectedImage]) glyphView = (UIImageView *)view;
-    });
-    if (!glyphView) return;
-
-    CGPoint iconCenter = [glyphView convertPoint:CGPointMake(CGRectGetMidX(glyphView.bounds),
-                                                              CGRectGetMidY(glyphView.bounds)) toView:bar];
-    CGPoint cardCenter = [stockBar convertPoint:CGPointMake(CGRectGetMidX(card), CGRectGetMidY(card)) toView:host];
-    CGRect frame = bar.frame;
-    CGFloat targetY = cardCenter.y - iconCenter.y;
-    if (fabs(frame.origin.y - targetY) < 0.5) return;
-    frame.origin.y = targetY;
-    bar.frame = frame;
+    CGPoint center = CGRectIsNull(card)
+        ? [stockBar convertPoint:CGPointMake(CGRectGetMidX(stockBar.bounds), CGRectGetMidY(stockBar.bounds)) toView:host]
+        : [stockBar convertPoint:CGPointMake(CGRectGetMidX(card), CGRectGetMidY(card)) toView:host];
+    CGFloat side = compactButtonSide(host);
+    center.y = MIN(MAX(center.y, side / 2), host.bounds.size.height - side / 2);
+    CGRect frame = button.frame;
+    frame.origin.x = 0;
+    frame.origin.y = center.y - side / 2;
+    frame.size = CGSizeMake(side, side);
+    if (!CGRectEqualToRect(button.frame, frame)) button.frame = frame;
+    button.layer.cornerRadius = side / 2;
+    button.layer.cornerCurve = kCACornerCurveCircular;
+    button.clipsToBounds = YES;
+    UIVisualEffectView *glass = SGGlassFor(button, &kCompactGlassKey);
+    glass.frame = button.bounds;
+    SGShapeGlass(glass, side / 2, NO);
+    glass.layer.cornerRadius = side / 2;
+    glass.layer.cornerCurve = kCACornerCurveCircular;
 }
 
 #pragma mark - hooks
