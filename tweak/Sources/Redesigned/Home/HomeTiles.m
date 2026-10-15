@@ -3,7 +3,7 @@
 #import "Home.h"
 
 // How far the cover sits in from the tile's top, bottom and leading edges, and its corners there.
-static const CGFloat kInset = 6, kCoverRadius = 12;
+static const CGFloat kInset = 6, kCoverRadius = 11, kPillRadius = 18;
 
 static char kSurfaceKey, kImageKey, kShownKey;
 
@@ -56,7 +56,7 @@ static UIView *surfaceIn(UIView *tile, UIView *fill) {
     }
     if (!CGRectEqualToRect(surface.frame, tile.bounds)) surface.frame = tile.bounds;
     CALayer *layer = surface.layer;
-    CGFloat radius = tile.bounds.size.height / 2;
+    CGFloat radius = MIN(kPillRadius, tile.bounds.size.height / 2);
     if (layer.cornerRadius != radius) layer.cornerRadius = radius;
     if (layer.cornerCurve != kCACornerCurveContinuous) layer.cornerCurve = kCACornerCurveContinuous;
     layer.masksToBounds = YES;

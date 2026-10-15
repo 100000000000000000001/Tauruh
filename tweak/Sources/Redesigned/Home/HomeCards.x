@@ -63,7 +63,7 @@ static void calmDJ(UIView *card) {
 static void style(UIView *button) {
     NSString *identifier = button.accessibilityIdentifier;
     if ([identifier isEqualToString:@"Shortcut.Card.Home"]) {
-        CGFloat pill = button.bounds.size.height / 2;
+        CGFloat pill = MIN(18, button.bounds.size.height / 2);
         roundCorners(button, pill);
         if (button.superview.layer.cornerRadius > 0) roundCorners(button.superview, pill);
         SGRHomeStyleTile(button);

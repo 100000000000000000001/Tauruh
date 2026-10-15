@@ -21,6 +21,10 @@ static _Thread_local BOOL sg_enlarging;
 // The narrowest size kSmallest or more wide the running provider made, at Spotify's width: its cards.
 static _Thread_local CGFloat sg_cardWidth;
 static NSInteger sg_topIndex = NSIntegerMax;
+// Where the shortcuts and the top shelf are in the page, to put the shelf first.
+static NSIndexPath *sg_shortcutsPath, *sg_topPath;
+static __weak UICollectionViewLayout *sg_pageLayout;
+static _Thread_local BOOL sg_reordering;
 
 // The layout a wrapped provider belongs to, set once the layout is made.
 @interface SGRLayoutBox : NSObject
@@ -84,6 +88,91 @@ static CGFloat growth(CGFloat width) {
 }
 %end
 
+
+// The page's layout, with the top shelf (and the heading just above it) laid out before the shortcuts: the two
+// blocks trade places, so the page is as tall as it was. Only frames change; the cells are Spotify's.
+static NSArray<NSIndexPath *> *pathsBetween(UICollectionView *list, NSIndexPath *from, NSIndexPath *to) {
+    NSMutableArray *paths = [NSMutableArray array];
+    for (NSInteger sec = from.section; sec <= to.section; sec++) {
+        NSInteger count = [list numberOfItemsInSection:sec];
+        for (NSInteger item = (sec == from.section ? from.item : 0); item < count; item++) {
+            NSIndexPath *path = [NSIndexPath indexPathForItem:item inSection:sec];
+            if ([path compare:to] == NSOrderedDescending) return paths;
+            [paths addObject:path];
+        }
+    }
+    return paths;
+}
+
+static NSDictionary<NSIndexPath *, NSValue *> *swappedFrames(UICollectionViewLayout *layout) {
+    UICollectionView *list = layout.collectionView;
+    if (!list || !sg_shortcutsPath || !sg_topPath || [sg_shortcutsPath compare:sg_topPath] != NSOrderedAscending) return nil;
+    if (sg_pageLayout != layout) return nil;
+    NSArray<NSIndexPath *> *paths = pathsBetween(list, sg_shortcutsPath, sg_topPath);
+    if (paths.count < 2) return nil;
+    sg_reordering = YES;
+    NSMutableArray<UICollectionViewLayoutAttributes *> *items = [NSMutableArray array];
+    for (NSIndexPath *path in paths) {
+        UICollectionViewLayoutAttributes *a = [layout layoutAttributesForItemAtIndexPath:path];
+        if (!a) { sg_reordering = NO; return nil; }
+        [items addObject:a];
+    }
+    sg_reordering = NO;
+    UICollectionViewLayoutAttributes *shortcuts = items.firstObject, *top = items.lastObject;
+    NSMutableArray<UICollectionViewLayoutAttributes *> *order = [NSMutableArray array];
+    NSMutableArray<UICollectionViewLayoutAttributes *> *rest = [NSMutableArray array];
+    for (NSUInteger i = 1; i + 1 < items.count; i++) {
+        // A short cell right before the shelf is its heading.
+        if (i + 2 == items.count && items[i].frame.size.height < 80) [order addObject:items[i]];
+        else [rest addObject:items[i]];
+    }
+    [order addObject:top];
+    [order addObject:shortcuts];
+    [order addObjectsFromArray:rest];
+    CGFloat gap = MAX(0, CGRectGetMinY(items[1].frame) - CGRectGetMaxY(shortcuts.frame));
+    CGFloat y = CGRectGetMinY(shortcuts.frame);
+    NSMutableDictionary *frames = [NSMutableDictionary dictionary];
+    for (UICollectionViewLayoutAttributes *a in order) {
+        CGRect frame = a.frame;
+        frame.origin.y = y;
+        frames[a.indexPath] = [NSValue valueWithCGRect:frame];
+        y += frame.size.height + gap;
+    }
+    return frames;
+}
+
+%hook UICollectionViewCompositionalLayout
+- (NSArray<UICollectionViewLayoutAttributes *> *)layoutAttributesForElementsInRect:(CGRect)rect {
+    if (sg_reordering || sg_pageLayout != (UICollectionViewLayout *)self) return %orig;
+    // Asked for the whole of the swapped range, so a block that moves into the rect is found.
+    NSDictionary *frames = swappedFrames((UICollectionViewLayout *)self);
+    if (!frames) return %orig;
+    sg_reordering = YES;
+    NSArray *all = %orig(CGRectInfinite);
+    sg_reordering = NO;
+    NSMutableArray *out = [NSMutableArray array];
+    for (UICollectionViewLayoutAttributes *a in all) {
+        NSValue *moved = a.representedElementCategory == UICollectionElementCategoryCell ? frames[a.indexPath] : nil;
+        if (moved) {
+            a = [a copy];
+            a.frame = moved.CGRectValue;
+        }
+        if (CGRectIntersectsRect(a.frame, rect)) [out addObject:a];
+    }
+    return out;
+}
+
+- (UICollectionViewLayoutAttributes *)layoutAttributesForItemAtIndexPath:(NSIndexPath *)path {
+    UICollectionViewLayoutAttributes *a = %orig;
+    if (sg_reordering || sg_pageLayout != (UICollectionViewLayout *)self || !a) return a;
+    NSValue *moved = swappedFrames((UICollectionViewLayout *)self)[path];
+    if (!moved) return a;
+    a = [a copy];
+    a.frame = moved.CGRectValue;
+    return a;
+}
+%end
+
 %hook _TtC12Element_List18CollectionViewCell
 - (UICollectionViewLayoutAttributes *)preferredLayoutAttributesFittingAttributes:(UICollectionViewLayoutAttributes *)attributes {
     UICollectionViewLayoutAttributes *result = %orig;
@@ -93,6 +182,22 @@ static CGFloat growth(CGFloat width) {
     // Home's sections only, as HomeSections.x tells them: a shelf on another page is not Home's top.
     if (![NSStringFromClass(object_getClass(content)) containsString:@"Home_EvoPageImpl13HomeStructure"]) return result;
     UIView *root = content.subviews.firstObject;
+    UICollectionView *pageList = nil;
+    for (UIView *v = ((UIView *)self).superview; v; v = v.superview) {
+        if ([v isKindOfClass:UICollectionView.class]) { pageList = (UICollectionView *)v; break; }
+    }
+    if (pageList && pageList.collectionViewLayout != sg_pageLayout) {
+        sg_pageLayout = pageList.collectionViewLayout;
+        sg_shortcutsPath = sg_topPath = nil;
+    }
+    if (root && ![root isKindOfClass:shelf ?: NSObject.class] && [root isKindOfClass:UICollectionView.class]) {
+        UIView *first = ((UICollectionView *)root).visibleCells.firstObject;
+        if ([NSStringFromClass(object_getClass(first.subviews.firstObject)) containsString:@"Home_AnchorsAndShortcutsKit"]
+            && ![attributes.indexPath isEqual:sg_shortcutsPath]) {
+            sg_shortcutsPath = attributes.indexPath;
+            [sg_pageLayout invalidateLayout];
+        }
+    }
     NSInteger index = attributes.indexPath.section * 10000 + attributes.indexPath.item;
     if (!shelf || ![root isKindOfClass:shelf] || result.size.height <= kHeading) {
         // The top's place holds something else now (the feed came again): the next shelf measured takes it.
@@ -101,6 +206,10 @@ static CGFloat growth(CGFloat width) {
     }
     UICollectionViewLayout *layout = ((UICollectionView *)root).collectionViewLayout;
     if (index < sg_topIndex) sg_topIndex = index;
+    if (index == sg_topIndex && ![attributes.indexPath isEqual:sg_topPath]) {
+        sg_topPath = attributes.indexPath;
+        [sg_pageLayout invalidateLayout];
+    }
     BOOL large = index == sg_topIndex, was = objc_getAssociatedObject(layout, &kLargeKey) != nil;
     // The shelf's height as Spotify sizes it, from a measuring before it was large.
     if (!was) objc_setAssociatedObject(layout, &kNaturalKey, @(result.size.height), OBJC_ASSOCIATION_RETAIN_NONATOMIC);

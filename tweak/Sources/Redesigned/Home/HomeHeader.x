@@ -26,6 +26,12 @@
 static const NSUInteger kTitleTries = 8;
 
 static char kTitleKey, kTabKey;
+static __weak UILabel *sg_title;
+static __weak UIView *sg_face;
+static UIVisualEffectView *sg_bar;
+static CAGradientLayer *sg_barMask, *sg_barTint;
+// How far the page scrolls before the big title and the avatar are gone and the bar is fully in.
+static const CGFloat kFadeDistance = 48;
 static NSString *sg_tabName;
 
 static void vanish(UIView *view) {
@@ -98,6 +104,38 @@ static BOOL findHeader(UIView *view) {
     return NO;
 }
 
+static UIVisualEffectView *barIn(UIView *wrapper) {
+    if (!sg_bar) {
+        sg_bar = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark]];
+        sg_bar.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+        sg_bar.userInteractionEnabled = NO;
+        sg_bar.accessibilityElementsHidden = YES;
+        sg_bar.alpha = 0;
+        sg_barMask = [CAGradientLayer layer];
+        sg_barMask.colors = @[(id)UIColor.blackColor.CGColor, (id)UIColor.blackColor.CGColor, (id)UIColor.clearColor.CGColor];
+        sg_barMask.locations = @[@0, @0.45, @1];
+        sg_bar.layer.mask = sg_barMask;
+        sg_barTint = [CAGradientLayer layer];
+        sg_barTint.colors = @[(id)[UIColor colorWithWhite:0 alpha:0.92].CGColor, (id)[UIColor colorWithWhite:0 alpha:0.55].CGColor,
+                              (id)[UIColor colorWithWhite:0 alpha:0].CGColor];
+        sg_barTint.locations = @[@0, @0.5, @1];
+        [sg_bar.contentView.layer addSublayer:sg_barTint];
+    }
+    return sg_bar;
+}
+
+// Scrolled down: the big title and the avatar fade away and a dark glass gradient takes the top of the screen.
+static void applyScroll(UIScrollView *list) {
+    CGFloat p = (list.contentOffset.y + list.adjustedContentInset.top) / kFadeDistance;
+    p = MAX(0, MIN(1, p));
+    if (sg_bar && sg_bar.alpha != p) sg_bar.alpha = p;
+    if (sg_title && sg_title.alpha != 1 - p) sg_title.alpha = 1 - p;
+    if (sg_face) {
+        if (sg_face.alpha != 1 - p) sg_face.alpha = 1 - p;
+        sg_face.userInteractionEnabled = p < 0.5;
+    }
+}
+
 static void layoutHeader(UIViewController *page) {
     UIView *view = page.viewIfLoaded;
     if (!view || !findHeader(view)) return;
@@ -132,6 +170,22 @@ static void layoutHeader(UIViewController *page) {
     CGRect frame = CGRectMake(SGRSideMargin, round(CGRectGetMidY(stack.frame) - height / 2), MAX(0, trailing - SGRSideMargin), height);
     if (!CGRectEqualToRect(title.frame, frame)) title.frame = frame;
 
+    sg_title = title;
+    sg_face = face;
+    UIView *wrapper = header.superview;
+    if (wrapper) {
+        UIVisualEffectView *bar = barIn(wrapper);
+        CGFloat bottom = CGRectGetMaxY([header convertRect:header.bounds toView:view]) + 28;
+        CGRect barFrame = [view convertRect:CGRectMake(0, 0, view.bounds.size.width, bottom) toView:wrapper];
+        if (bar.superview != wrapper) [wrapper insertSubview:bar belowSubview:header];
+        if (!CGRectEqualToRect(bar.frame, barFrame)) bar.frame = barFrame;
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        sg_barMask.frame = bar.bounds;
+        sg_barTint.frame = bar.bounds;
+        [CATransaction commit];
+    }
+
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         SGLog(@"redesign home: header %@, avatar %@ in the stack %@, title %@, scrim %@", NSStringFromCGRect(header.frame),
@@ -139,6 +193,19 @@ static void layoutHeader(UIViewController *page) {
               sg_scrim ? @"found" : @"not found");
     });
 }
+
+// The page's own list is the one collection view with no other inside which it sits: the shelves are nested in it.
+%hook _TtC16Home_CarouselKit29TouchCancellingCollectionView
+- (void)layoutSubviews {
+    %orig;
+    UIScrollView *list = (UIScrollView *)self;
+    if (list.bounds.size.height < 300 || !sg_bar) return;
+    for (UIView *v = list.superview; v; v = v.superview) {
+        if ([v isKindOfClass:UICollectionView.class]) return;
+    }
+    applyScroll(list);
+}
+%end
 
 %hook _TtC19Home_FunkisPageImpl20FunkisViewController
 - (void)viewDidLayoutSubviews {
@@ -160,5 +227,6 @@ static void layoutHeader(UIViewController *page) {
     SGRequireClasses(@[
         @"_TtC19Home_FunkisPageImpl20FunkisViewController",
         @"_TtC29ListeningActivity_ElementsKit21AdaptiveFaceContainer",
+        @"_TtC16Home_CarouselKit29TouchCancellingCollectionView",
     ]);
 }
