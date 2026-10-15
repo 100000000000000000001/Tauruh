@@ -105,12 +105,11 @@ static UIBlurEffect *blurEffect(void) {
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark];
 }
 
-static void setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator **animator, CGFloat intensity) {
+static UIViewPropertyAnimator *setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator *animator, CGFloat intensity) {
     intensity = MIN(1, MAX(0, intensity));
-    if (*animator && (*animator).state != UIViewAnimatingStateInactive) [*animator stopAnimation:YES];
-    *animator = nil;
+    if (animator && animator.state != UIViewAnimatingStateInactive) [animator stopAnimation:YES];
     view.effect = nil;
-    if (intensity <= 0) return;
+    if (intensity <= 0) return nil;
 
     __weak UIVisualEffectView *weakView = view;
     UIViewPropertyAnimator *fractional = [[UIViewPropertyAnimator alloc] initWithDuration:1
@@ -118,10 +117,10 @@ static void setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator **
                                                                                animations:^{
         weakView.effect = blurEffect();
     }];
-    *animator = fractional;
     [fractional startAnimation];
     [fractional pauseAnimation];
     fractional.fractionComplete = intensity;
+    return fractional;
 }
 
 static CAGradientLayer *fill(CAShapeLayer *shape) {
@@ -175,7 +174,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
 
 - (void)updateBlurOpacity {
     CGFloat opacity = MIN(100, MAX(0, SGInt(SGRKeyPlayerVisualiserBlurOpacity, 100))) / 100.0;
-    setBlurIntensity(_lyricsBlur, &_lyricsBlurAnimator, _lyricsRequested ? opacity : 0);
+    _lyricsBlurAnimator = setBlurIntensity(_lyricsBlur, _lyricsBlurAnimator, _lyricsRequested ? opacity : 0);
     if (_reading) needReader(NO);
 }
 
@@ -246,7 +245,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     SGRAnimate(SGRMotionFade, ^{
         self->_content.alpha = 0;
         self->_lyricsRequested = NO;
-        setBlurIntensity(self->_lyricsBlur, &self->_lyricsBlurAnimator, 0);
+        self->_lyricsBlurAnimator = setBlurIntensity(self->_lyricsBlur, self->_lyricsBlurAnimator, 0);
     }, ^(BOOL finished) { done(); });
 }
 
@@ -258,7 +257,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     _lyricsRequested = blurred;
     CGFloat opacity = MIN(100, MAX(0, SGInt(SGRKeyPlayerVisualiserBlurOpacity, 100))) / 100.0;
     void (^apply)(void) = ^{
-        setBlurIntensity(self->_lyricsBlur, &self->_lyricsBlurAnimator, blurred ? opacity : 0);
+        self->_lyricsBlurAnimator = setBlurIntensity(self->_lyricsBlur, self->_lyricsBlurAnimator, blurred ? opacity : 0);
     };
     if (animated) SGRAnimate(SGRMotionFade, apply, nil);
     else apply();

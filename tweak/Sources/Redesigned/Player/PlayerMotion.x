@@ -155,12 +155,11 @@ static CGFloat blurOpacity(NSString *key) {
     return MIN(100, MAX(0, SGInt(key, 100))) / 100.0;
 }
 
-static void setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator **animator, CGFloat intensity) {
+static UIViewPropertyAnimator *setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator *animator, CGFloat intensity) {
     intensity = MIN(1, MAX(0, intensity));
-    if (*animator && (*animator).state != UIViewAnimatingStateInactive) [*animator stopAnimation:YES];
-    *animator = nil;
+    if (animator && animator.state != UIViewAnimatingStateInactive) [animator stopAnimation:YES];
     view.effect = nil;
-    if (intensity <= 0) return;
+    if (intensity <= 0) return nil;
 
     __weak UIVisualEffectView *weakView = view;
     UIViewPropertyAnimator *fractional = [[UIViewPropertyAnimator alloc] initWithDuration:1
@@ -168,10 +167,10 @@ static void setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator **
                                                                                animations:^{
         weakView.effect = blurEffect();
     }];
-    *animator = fractional;
     [fractional startAnimation];
     [fractional pauseAnimation];
     fractional.fractionComplete = intensity;
+    return fractional;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -229,10 +228,10 @@ static void setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator **
 }
 
 - (void)updateBlurOpacity {
-    setBlurIntensity(_seamBlur, &_seamBlurAnimator,
-                     _seamUp ? blurOpacity(SGRKeyPlayerCanvasBlurOpacity) : 0);
-    setBlurIntensity(_lyricsBlur, &_lyricsBlurAnimator,
-                     _lyricsUp ? blurOpacity(SGRKeyPlayerLyricsBlurOpacity) : 0);
+    _seamBlurAnimator = setBlurIntensity(_seamBlur, _seamBlurAnimator,
+                                         _seamUp ? blurOpacity(SGRKeyPlayerCanvasBlurOpacity) : 0);
+    _lyricsBlurAnimator = setBlurIntensity(_lyricsBlur, _lyricsBlurAnimator,
+                                           _lyricsUp ? blurOpacity(SGRKeyPlayerLyricsBlurOpacity) : 0);
 }
 
 - (void)playerStateDidChange:(SPTPlayerState *)state {
@@ -332,8 +331,8 @@ static void setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator **
     void (^apply)(void) = ^{
         self->_picture.alpha = 1;
         self->_seamUp = YES;
-        setBlurIntensity(self->_seamBlur, &self->_seamBlurAnimator,
-                         blurOpacity(SGRKeyPlayerCanvasBlurOpacity));
+        self->_seamBlurAnimator = setBlurIntensity(self->_seamBlur, self->_seamBlurAnimator,
+                                                   blurOpacity(SGRKeyPlayerCanvasBlurOpacity));
     };
     if (animated) {
         SGRAnimate(SGRMotionFade, apply, ^(BOOL finished) {
@@ -351,8 +350,8 @@ static void setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator **
         self->_picture.alpha = 0;
         self->_seamUp = NO;
         self->_lyricsUp = NO;
-        setBlurIntensity(self->_seamBlur, &self->_seamBlurAnimator, 0);
-        setBlurIntensity(self->_lyricsBlur, &self->_lyricsBlurAnimator, 0);
+        self->_seamBlurAnimator = setBlurIntensity(self->_seamBlur, self->_seamBlurAnimator, 0);
+        self->_lyricsBlurAnimator = setBlurIntensity(self->_lyricsBlur, self->_lyricsBlurAnimator, 0);
     }, ^(BOOL finished) { done(); });
 }
 
@@ -360,8 +359,8 @@ static void setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator **
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated {
     _lyricsUp = blurred;
     void (^apply)(void) = ^{
-        setBlurIntensity(self->_lyricsBlur, &self->_lyricsBlurAnimator,
-                         blurred ? blurOpacity(SGRKeyPlayerLyricsBlurOpacity) : 0);
+        self->_lyricsBlurAnimator = setBlurIntensity(self->_lyricsBlur, self->_lyricsBlurAnimator,
+                                                     blurred ? blurOpacity(SGRKeyPlayerLyricsBlurOpacity) : 0);
     };
     [CATransaction begin];
     [CATransaction setDisableActions:!animated];
