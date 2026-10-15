@@ -45,7 +45,7 @@ static NSArray<NSString *> *backgroundNotes(void) {
         @"The cover itself, blurred and slowly turning. It rests while a song is paused.",
         @"The song's Canvas or the album's moving cover, else Fluid. The player's ⋯ menu switches between all six backgrounds.",
         @"The song's sound as gentle hills in the cover's colors, over Fluid held still. They settle while a song is paused.",
-        @"The cover fills the screen, then dissolves into its blurred colors and black toward the bottom.",
+        @"The cover fades into progressively stronger blur over a dark tint sampled from its lower edge.",
     ];
 }
 
@@ -403,7 +403,7 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         SGNotedSection(nil, fluid, @"Brightness above 100% can make white text harder to read. A paused song holds the "
                     @"background still. Animated and Visualiser use these where they show Fluid."),
         SGNotedSection(@"Background opacity", blur, @"Lower opacity makes each background layer more transparent. "
-                    @"Canvas and lyrics sliders adjust the matching blurred panels."),
+                    @"Canvas and lyrics sliders reduce blur strength directly; at 0% the blur is fully transparent."),
         SGNotedSection(@"Controls", @[
                        SGOptionRow(@"Show Sing button", @"Karaoke control in the player lyrics", SGRKeyPlayerKaraokeButton),
                        SGOptionRow(@"Show Translate button", @"Pronunciation and translation in the player lyrics", SGRKeyPlayerTranslateButton),
@@ -415,7 +415,8 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
                        @"Hiding its thumb leaves the slider interactive. "
                        @"Follow the cover paints the like, shuffle and repeat in the color of the song playing."),
         SGNotedSection(@"Mini player", SGRNowPlayingBarRows(),
-                       @"Apple Music style moves the now playing bar in between two tabs as you scroll down."), nil];
+                       @"Apple Music style moves the now playing bar in between two tabs as you scroll down. "
+                       @"The device button and moving background settings apply after you restart Spotify."), nil];
     [sections addObjectsFromArray:more];
     NSString *footer = @"From the player's ⋯ menu, any background takes effect immediately. The background and opacity settings apply live; volume controls apply after you restart Spotify.";
     SGRPlayerPage *page = [[SGRPlayerPage alloc] initWithTitle:@"Player" intro:nil sections:sections footer:footer];

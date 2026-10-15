@@ -142,13 +142,11 @@ static CGFloat brightEnd(NSData *luminances) {
     NSMutableData *_luminances;   // of the frames measured so far
     BOOL _lyricsUp, _seamUp;
     UIVisualEffectView *_seamBlur, *_lyricsBlur;
-    UIView *_seamVeil, *_lyricsVeil;
     CGFloat _aspect;
     BOOL _timing;   // the give-up's count is running
+    UIViewPropertyAnimator *_seamBlurAnimator, *_lyricsBlurAnimator;
 }
 
-// What fades is the effect views' effect, never their alpha or an ancestor's: UIKit draws a blur under a
-// fading alpha or a mask wrongly or not at all.
 static UIBlurEffect *blurEffect(void) {
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark];
 }
@@ -157,9 +155,23 @@ static CGFloat blurOpacity(NSString *key) {
     return MIN(100, MAX(0, SGInt(key, 100))) / 100.0;
 }
 
-static void setBlurVeil(UIView *veil, NSString *key) {
-    CGFloat opacity = blurOpacity(key);
-    veil.backgroundColor = [UIColor colorWithWhite:0 alpha:opacity > 0 ? 1 - opacity : 0];
+static void setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator **animator, CGFloat intensity) {
+    intensity = MIN(1, MAX(0, intensity));
+    if (*animator && (*animator).state != UIViewAnimatingStateInactive) [*animator stopAnimation:YES];
+    *animator = nil;
+    view.effect = nil;
+    if (intensity <= 0) return;
+
+    __weak UIVisualEffectView *weakView = view;
+    UIViewPropertyAnimator *fractional = [[UIViewPropertyAnimator alloc] initWithDuration:1
+                                                                                    curve:UIViewAnimationCurveLinear
+                                                                               animations:^{
+        weakView.effect = blurEffect();
+    }];
+    *animator = fractional;
+    [fractional startAnimation];
+    [fractional pauseAnimation];
+    fractional.fractionComplete = intensity;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -198,15 +210,9 @@ static void setBlurVeil(UIView *veil, NSString *key) {
     _seamMask.colors = @[(id)UIColor.clearColor.CGColor, (id)UIColor.blackColor.CGColor];
     [mask.layer addSublayer:_seamMask];
     _seamBlur.maskView = mask;
-    _seamVeil = [UIView new];
-    _seamVeil.userInteractionEnabled = NO;
-    [_seamBlur.contentView addSubview:_seamVeil];
     [self addSubview:_seamBlur];
     _lyricsBlur = [[UIVisualEffectView alloc] initWithEffect:nil];
     _lyricsBlur.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
-    _lyricsVeil = [UIView new];
-    _lyricsVeil.userInteractionEnabled = NO;
-    [_lyricsBlur.contentView addSubview:_lyricsVeil];
     [self addSubview:_lyricsBlur];
 
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
@@ -223,10 +229,10 @@ static void setBlurVeil(UIView *veil, NSString *key) {
 }
 
 - (void)updateBlurOpacity {
-    setBlurVeil(_seamVeil, SGRKeyPlayerCanvasBlurOpacity);
-    setBlurVeil(_lyricsVeil, SGRKeyPlayerLyricsBlurOpacity);
-    _seamBlur.effect = _seamUp && blurOpacity(SGRKeyPlayerCanvasBlurOpacity) > 0 ? blurEffect() : nil;
-    _lyricsBlur.effect = _lyricsUp && blurOpacity(SGRKeyPlayerLyricsBlurOpacity) > 0 ? blurEffect() : nil;
+    setBlurIntensity(_seamBlur, &_seamBlurAnimator,
+                     _seamUp ? blurOpacity(SGRKeyPlayerCanvasBlurOpacity) : 0);
+    setBlurIntensity(_lyricsBlur, &_lyricsBlurAnimator,
+                     _lyricsUp ? blurOpacity(SGRKeyPlayerLyricsBlurOpacity) : 0);
 }
 
 - (void)playerStateDidChange:(SPTPlayerState *)state {
@@ -255,8 +261,6 @@ static void setBlurVeil(UIView *veil, NSString *key) {
     _seamBlur.frame = bounds;
     _seamBlur.maskView.frame = bounds;
     _lyricsBlur.frame = bounds;
-    _seamVeil.frame = _seamBlur.contentView.bounds;
-    _lyricsVeil.frame = _lyricsBlur.contentView.bounds;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     _still.frame = CGRectMake(0, 0, width, height);
@@ -328,7 +332,8 @@ static void setBlurVeil(UIView *veil, NSString *key) {
     void (^apply)(void) = ^{
         self->_picture.alpha = 1;
         self->_seamUp = YES;
-        self->_seamBlur.effect = blurOpacity(SGRKeyPlayerCanvasBlurOpacity) > 0 ? blurEffect() : nil;
+        setBlurIntensity(self->_seamBlur, &self->_seamBlurAnimator,
+                         blurOpacity(SGRKeyPlayerCanvasBlurOpacity));
     };
     if (animated) {
         SGRAnimate(SGRMotionFade, apply, ^(BOOL finished) {
@@ -346,8 +351,8 @@ static void setBlurVeil(UIView *veil, NSString *key) {
         self->_picture.alpha = 0;
         self->_seamUp = NO;
         self->_lyricsUp = NO;
-        self->_seamBlur.effect = nil;
-        self->_lyricsBlur.effect = nil;
+        setBlurIntensity(self->_seamBlur, &self->_seamBlurAnimator, 0);
+        setBlurIntensity(self->_lyricsBlur, &self->_lyricsBlurAnimator, 0);
     }, ^(BOOL finished) { done(); });
 }
 
@@ -355,7 +360,8 @@ static void setBlurVeil(UIView *veil, NSString *key) {
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated {
     _lyricsUp = blurred;
     void (^apply)(void) = ^{
-        self->_lyricsBlur.effect = blurred && blurOpacity(SGRKeyPlayerLyricsBlurOpacity) > 0 ? blurEffect() : nil;
+        setBlurIntensity(self->_lyricsBlur, &self->_lyricsBlurAnimator,
+                         blurred ? blurOpacity(SGRKeyPlayerLyricsBlurOpacity) : 0);
     };
     [CATransaction begin];
     [CATransaction setDisableActions:!animated];

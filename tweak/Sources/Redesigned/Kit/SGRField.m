@@ -28,14 +28,38 @@ static NSDictionary *noActions(void) {
     return none;
 }
 
+static CAGradientLayer *fillRamp(CGFloat start, CGFloat end, BOOL rising) {
+    NSMutableArray *locations = [NSMutableArray array];
+    NSMutableArray *colors = [NSMutableArray array];
+    void (^add)(CGFloat, CGFloat) = ^(CGFloat location, CGFloat alpha) {
+        [locations addObject:@(location)];
+        [colors addObject:(id)[UIColor colorWithWhite:1 alpha:alpha].CGColor];
+    };
+    add(0, rising ? 0 : 1);
+    for (NSUInteger index = 0; index <= 12; index++) {
+        CGFloat progress = (CGFloat)index / 12;
+        CGFloat smooth = progress * progress * (3 - 2 * progress);
+        add(start + (end - start) * progress, rising ? smooth : 1 - smooth);
+    }
+    add(1, rising ? 1 : 0);
+    CAGradientLayer *ramp = [CAGradientLayer layer];
+    ramp.actions = noActions();
+    ramp.colors = colors;
+    ramp.locations = locations;
+    ramp.startPoint = CGPointMake(0.5, 0);
+    ramp.endPoint = CGPointMake(0.5, 1);
+    return ramp;
+}
+
 @implementation SGRArtworkField {
     CALayer *_solid;
     CAGradientLayer *_black;
     CALayer *_backdrop;
+    CALayer *_fillBackground;
     CALayer *_fill;
     CAGradientLayer *_fillMask;
-    CALayer *_fillShade;
-    CAGradientLayer *_fillShadeMask;
+    NSArray<CALayer *> *_fillBlurLayers;
+    NSArray<CAGradientLayer *> *_fillBlurMasks;
     SGRFlowLayer *_flow;
     SGRFluidLayer *_fluidLayer;
     BOOL _watching;
@@ -53,8 +77,8 @@ static NSDictionary *noActions(void) {
 - (void)readPaletteForImage:(UIImage *)image animated:(BOOL)animated {
     if (_fluid) [_fluidLayer setArtwork:image animated:animated && self.window != nil];
     NSUInteger generation = ++_generation;
-    SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows};
-    if (_showsBackdrop && !_flows && !_fluid) request.backdropSize = CGSizeMake(self.bounds.size.width > 0 ? self.bounds.size.width : 402, [self backdropHeightNow]);
+    SGRPaletteRequest request = {CGSizeZero, NO, YES, _flows, _fills};
+    if (_showsBackdrop && !_flows && !_fluid && !_fills) request.backdropSize = CGSizeMake(self.bounds.size.width > 0 ? self.bounds.size.width : 402, [self backdropHeightNow]);
     __weak SGRArtworkField *weakSelf = self;
     [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
         SGRArtworkField *field = weakSelf;
@@ -87,32 +111,35 @@ static NSDictionary *noActions(void) {
     [self.layer addSublayer:_backdrop];
     _backdropOpacity = _fillOpacity = _fluidOpacity = 1;
 
+    _fillBackground = [CALayer layer];
+    _fillBackground.actions = noActions();
+    _fillBackground.backgroundColor = UIColor.blackColor.CGColor;
+    _fillBackground.hidden = YES;
+    [self.layer addSublayer:_fillBackground];
+
     _fill = [CALayer layer];
     _fill.actions = noActions();
     _fill.contentsGravity = kCAGravityResizeAspectFill;
+    _fill.masksToBounds = YES;
     _fill.hidden = YES;
-    _fillMask = [CAGradientLayer layer];
-    _fillMask.actions = noActions();
-    _fillMask.colors = @[(id)UIColor.blackColor.CGColor, (id)UIColor.blackColor.CGColor,
-                         (id)UIColor.clearColor.CGColor];
-    _fillMask.locations = @[@0, @0.55, @0.84];
-    _fillMask.startPoint = CGPointMake(0.5, 0);
-    _fillMask.endPoint = CGPointMake(0.5, 1);
+    _fillMask = fillRamp(0.76, 0.985, NO);
     _fill.mask = _fillMask;
     [self.layer addSublayer:_fill];
-    _fillShade = [CALayer layer];
-    _fillShade.actions = noActions();
-    _fillShade.backgroundColor = UIColor.blackColor.CGColor;
-    _fillShade.opacity = 0.28f;
-    _fillShade.hidden = YES;
-    _fillShadeMask = [CAGradientLayer layer];
-    _fillShadeMask.actions = noActions();
-    _fillShadeMask.colors = _fillMask.colors;
-    _fillShadeMask.locations = _fillMask.locations;
-    _fillShadeMask.startPoint = _fillMask.startPoint;
-    _fillShadeMask.endPoint = _fillMask.endPoint;
-    _fillShade.mask = _fillShadeMask;
-    [self.layer addSublayer:_fillShade];
+    static const CGFloat bands[4][2] = {{0.74, 0.84}, {0.79, 0.89}, {0.84, 0.94}, {0.89, 0.985}};
+    NSMutableArray<CALayer *> *blurLayers = [NSMutableArray arrayWithCapacity:4];
+    NSMutableArray<CAGradientLayer *> *blurMasks = [NSMutableArray arrayWithCapacity:4];
+    for (NSUInteger index = 0; index < 4; index++) {
+        CALayer *blur = [CALayer layer];
+        blur.actions = noActions();
+        blur.contentsGravity = kCAGravityResizeAspectFill;
+        CAGradientLayer *mask = fillRamp(bands[index][0], bands[index][1], YES);
+        blur.mask = mask;
+        [_fill addSublayer:blur];
+        [blurLayers addObject:blur];
+        [blurMasks addObject:mask];
+    }
+    _fillBlurLayers = blurLayers;
+    _fillBlurMasks = blurMasks;
     return self;
 }
 
@@ -148,10 +175,14 @@ static NSDictionary *noActions(void) {
     _black.frame = painted;
     _black.locations = @[@(MIN(1, from / total)), @(MIN(1, to / total))];
     _backdrop.frame = CGRectMake(0, 0, bounds.size.width, [self backdropHeightNow]);
-    _fill.frame = _backdrop.frame;
+    CGFloat fillHeight = MIN(bounds.size.height, round(windowHeight(self) * 0.625));
+    _fillBackground.frame = painted;
+    _fill.frame = CGRectMake(0, 0, bounds.size.width, fillHeight);
     _fillMask.frame = _fill.bounds;
-    _fillShade.frame = _fill.frame;
-    _fillShadeMask.frame = _fillShade.bounds;
+    for (NSUInteger index = 0; index < _fillBlurLayers.count; index++) {
+        _fillBlurLayers[index].frame = _fill.bounds;
+        _fillBlurMasks[index].frame = _fill.bounds;
+    }
     _flow.frame = CGRectMake(0, 0, bounds.size.width, [self backdropHeightNow]);
     _fluidLayer.frame = painted;
     // The screen's part of it, so the copies turn about it and the shade ends at the screen's foot.
@@ -172,10 +203,10 @@ static NSDictionary *noActions(void) {
     // The fluid field is the whole picture, as the moving one is.
     _fluidLayer.hidden = !fluid || _covered;
     _fluidLayer.opacity = (float)_fluidOpacity;
-    _black.hidden = fluid || _flows;
-    _backdrop.hidden = fluid || _flows;
+    _black.hidden = fluid || _flows || _fills;
+    _backdrop.hidden = fluid || _flows || _fills;
+    _fillBackground.hidden = !_fills || fluid || _flows;
     _fill.hidden = fluid || _flows || !_fills || !_image.CGImage;
-    _fillShade.hidden = _fill.hidden;
     if (fluid && _image) [_fluidLayer setArtwork:_image animated:NO];
     [self watch];
     [self updateMotion];
@@ -192,10 +223,10 @@ static NSDictionary *noActions(void) {
         [self.layer insertSublayer:_flow above:_solid];
     }
     // The moving field is the whole picture: no still backdrop over it, no fade to black under it.
-    _black.hidden = flows || _fluid;
-    _backdrop.hidden = flows || _fluid;
+    _black.hidden = flows || _fluid || _fills;
+    _backdrop.hidden = flows || _fluid || _fills;
+    _fillBackground.hidden = !_fills || flows || _fluid;
     _fill.hidden = flows || _fluid || !_fills || !_image.CGImage;
-    _fillShade.hidden = _fill.hidden;
     if (!flows) _flow.hidden = YES;
     [self watch];
     [self updateMotion];
@@ -205,8 +236,11 @@ static NSDictionary *noActions(void) {
 - (void)setFills:(BOOL)fills {
     if (fills == _fills) return;
     _fills = fills;
+    if (fills) _fillBackground.backgroundColor = _color.CGColor;
+    _black.hidden = fills || _fluid || _flows;
+    _backdrop.hidden = fills || _fluid || _flows;
+    _fillBackground.hidden = !fills || _fluid || _flows;
     _fill.hidden = !fills || _fluid || _flows || !_image.CGImage;
-    _fillShade.hidden = _fill.hidden;
 }
 
 - (void)setBackdropOpacity:(CGFloat)opacity {
@@ -217,7 +251,6 @@ static NSDictionary *noActions(void) {
 - (void)setFillOpacity:(CGFloat)opacity {
     _fillOpacity = MIN(1, MAX(0, opacity));
     _fill.opacity = (float)_fillOpacity;
-    _fillShade.opacity = (float)(0.28 * _fillOpacity);
 }
 
 - (void)setFluidOpacity:(CGFloat)opacity {
@@ -338,7 +371,6 @@ static NSDictionary *noActions(void) {
     _identity = [identity copy];
     _fill.contents = (__bridge id)image.CGImage;
     _fill.hidden = !_fills || _fluid || _flows || !image.CGImage;
-    _fillShade.hidden = _fill.hidden;
     [self readPaletteForImage:image animated:animated];
 }
 
@@ -357,7 +389,7 @@ static NSDictionary *noActions(void) {
         [self didColor];
         return;
     }
-    if (_showsBackdrop && !_flows && palette.backdrop) {
+    if (_showsBackdrop && !_flows && !_fluid && !_fills && palette.backdrop) {
         [CATransaction begin];
         [CATransaction setDisableActions:YES];
         if (animated) {
@@ -369,6 +401,15 @@ static NSDictionary *noActions(void) {
         _backdrop.contents = (__bridge id)palette.backdrop.CGImage;
         _backdrop.opacity = (float)_backdropOpacity;
         _backdrop.hidden = NO;
+        [CATransaction commit];
+    }
+    if (_fills && palette.fillBackgroundColor) _fillBackground.backgroundColor = palette.fillBackgroundColor.CGColor;
+    if (_fills && palette.fillBlurs.count == _fillBlurLayers.count) {
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        for (NSUInteger index = 0; index < _fillBlurLayers.count; index++) {
+            _fillBlurLayers[index].contents = (__bridge id)palette.fillBlurs[index].CGImage;
+        }
         [CATransaction commit];
     }
     [self applyColor:_preferred ?: palette.fieldColor animated:animated];

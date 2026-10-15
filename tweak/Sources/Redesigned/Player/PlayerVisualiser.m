@@ -90,7 +90,7 @@ static NSDictionary *noActions(void) {
     CAGradientLayer *_backFill, *_frontFill;
     CAShapeLayer *_backShape, *_frontShape;
     UIVisualEffectView *_lyricsBlur;
-    UIView *_lyricsVeil;
+    UIViewPropertyAnimator *_lyricsBlurAnimator;
     BOOL _lyricsRequested;
     CADisplayLink *_link;
     BOOL _reading, _idle;
@@ -103,6 +103,25 @@ static NSDictionary *noActions(void) {
 // As PlayerMotion.x: what fades is the effect view's effect, never its alpha or an ancestor's.
 static UIBlurEffect *blurEffect(void) {
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark];
+}
+
+static void setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator **animator, CGFloat intensity) {
+    intensity = MIN(1, MAX(0, intensity));
+    if (*animator && (*animator).state != UIViewAnimatingStateInactive) [*animator stopAnimation:YES];
+    *animator = nil;
+    view.effect = nil;
+    if (intensity <= 0) return;
+
+    __weak UIVisualEffectView *weakView = view;
+    UIViewPropertyAnimator *fractional = [[UIViewPropertyAnimator alloc] initWithDuration:1
+                                                                                    curve:UIViewAnimationCurveLinear
+                                                                               animations:^{
+        weakView.effect = blurEffect();
+    }];
+    *animator = fractional;
+    [fractional startAnimation];
+    [fractional pauseAnimation];
+    fractional.fractionComplete = intensity;
 }
 
 static CAGradientLayer *fill(CAShapeLayer *shape) {
@@ -131,9 +150,6 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     [self addSubview:_content];
     _lyricsBlur = [[UIVisualEffectView alloc] initWithEffect:nil];
     _lyricsBlur.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
-    _lyricsVeil = [UIView new];
-    _lyricsVeil.userInteractionEnabled = NO;
-    [_lyricsBlur.contentView addSubview:_lyricsVeil];
     [self addSubview:_lyricsBlur];
     [self applyColors:@[UIColor.darkGrayColor, UIColor.darkGrayColor, UIColor.darkGrayColor, UIColor.darkGrayColor, UIColor.darkGrayColor]];
 
@@ -159,9 +175,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
 
 - (void)updateBlurOpacity {
     CGFloat opacity = MIN(100, MAX(0, SGInt(SGRKeyPlayerVisualiserBlurOpacity, 100))) / 100.0;
-    _lyricsVeil.backgroundColor = [UIColor colorWithWhite:0 alpha:opacity > 0 ? 1 - opacity : 0];
-    _lyricsVeil.frame = _lyricsBlur.contentView.bounds;
-    _lyricsBlur.effect = _lyricsRequested && opacity > 0 ? blurEffect() : nil;
+    setBlurIntensity(_lyricsBlur, &_lyricsBlurAnimator, _lyricsRequested ? opacity : 0);
     if (_reading) needReader(NO);
 }
 
@@ -179,7 +193,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     UIImage *image = SGRNowPlayingArtwork(NULL, NULL);
     if (!image) return;
     NSUInteger generation = ++_palette;
-    SGRPaletteRequest request = {CGSizeZero, NO, YES, YES};
+    SGRPaletteRequest request = {CGSizeZero, NO, YES, YES, NO};
     __weak SGRVisualiserView *weakSelf = self;
     [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
         SGRVisualiserView *view = weakSelf;
@@ -215,7 +229,6 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     CGRect bounds = self.bounds;
     _content.frame = bounds;
     _lyricsBlur.frame = bounds;
-    _lyricsVeil.frame = _lyricsBlur.contentView.bounds;
     _backFill.frame = bounds;
     _frontFill.frame = bounds;
     _backShape.frame = bounds;
@@ -233,7 +246,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     SGRAnimate(SGRMotionFade, ^{
         self->_content.alpha = 0;
         self->_lyricsRequested = NO;
-        self->_lyricsBlur.effect = nil;
+        setBlurIntensity(self->_lyricsBlur, &self->_lyricsBlurAnimator, 0);
     }, ^(BOOL finished) { done(); });
 }
 
@@ -244,7 +257,9 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated {
     _lyricsRequested = blurred;
     CGFloat opacity = MIN(100, MAX(0, SGInt(SGRKeyPlayerVisualiserBlurOpacity, 100))) / 100.0;
-    void (^apply)(void) = ^{ self->_lyricsBlur.effect = blurred && opacity > 0 ? blurEffect() : nil; };
+    void (^apply)(void) = ^{
+        setBlurIntensity(self->_lyricsBlur, &self->_lyricsBlurAnimator, blurred ? opacity : 0);
+    };
     if (animated) SGRAnimate(SGRMotionFade, apply, nil);
     else apply();
     [self updateMotion];

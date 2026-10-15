@@ -5,8 +5,7 @@
 
 @class SGModRow;
 
-UIViewController *SGRNowPlayingBarSettingsPage(void);
-NSArray<SGModRow *> *SGRNowPlayingBarRows(void);   // the Mini player section on the redesign's Player page
+NSArray<SGModRow *> *SGRNowPlayingBarRows(void);   // all redesigned now-playing and mini-player options
 
 CGRect SGRNowPlayingCardFrameIn(UIView *host, CGFloat *radius);
 // The round artwork on that card in `host`'s coordinates; CGRectNull when none was found.

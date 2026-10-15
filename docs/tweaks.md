@@ -217,7 +217,7 @@ Redesigned:
                   Offline or Private Session under the bar), so the now playing bar and the pages move up with it. Laid out on
                   the Mac against harness/tabbar/
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
-                  (BarConnect.x, its own key and its own Now playing page, apart from the native look's)
+                  (BarConnect.x); all redesigned now-playing options are grouped under Player > Mini player
     Player/       the redesigned full screen player (Player.h lists its files); its ⋯ opens a menu the way the
                   Music app draws one (PlayerMenu.x, SGRPlayerMenu.m): a pane of glass grown out of the button,
                   Add to playlist, Add to Queue and Share as three tiles across its top, groups of rows under
@@ -232,7 +232,8 @@ Redesigned:
                   menu had, kept across launches, and moves to Spotify's as they come in, a tap meanwhile held
                   until they do. The Canvas field extends below the clip with a blurred poster bleed instead of
                   stretched edge rows; the clip begins at the top of the visible player, as in the previous layout.
-                  Fill draws the sharp cover edge to edge, blending into its blurred colors and black at the bottom.
+                  Fill keeps the cover crisp, then blends it through progressively stronger blur into a dark tint sampled
+                  from the artwork's bottom edge, adapting Pulse-Ice/EeveeImmersive's layered treatment.
                   Player settings expose separate opacity sliders for its artwork and Canvas/lyrics blur layers.
                   Always on in the redesign.
                   Tested in the simulator against harness/playermenu/
@@ -357,9 +358,10 @@ Audio effects follows Lock Screen, which appears between Lyrics and Audio effect
 In the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
-buttons to hide); in the redesign instead Now Playing (its device button and moving background); the Player page's
-Mini player section has the mini-player merge/transition toggle and rounded-square artwork option, the latter off by default.
-An optional volume slider is off by default, with its thumb hidden if enabled.
+buttons to hide); in the redesign the Player page's Mini player section groups the device button, moving
+background, mini-player merge/transition toggle and rounded-square artwork option, the latter off by default.
+An optional volume slider is off by default, with its thumb hidden if enabled. The taurus settings page
+credits @Pulse-Ice for the Fill background treatment adapted from EeveeImmersive.
 Vibrations follows under either look, a card for
 Controls (on until switched off) and one for Music Haptics (off until switched on, with an ⓘ saying it
 follows the sound this iPhone plays while Spotify is open), each opening out while its switch is on:
