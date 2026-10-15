@@ -41,3 +41,6 @@ void SGRHomeProbeEnd(SGRHomeProbe probe, CFTimeInterval began);
 #define SGRKeyHomeGlass @"spotifyglass.redesign.home.glass"
 BOOL SGRHomeGlassStyle(void);
 SGModRow *SGRHomeStyleRow(void);
+
+// Whether the view sits in the shelf HomeTopPicks.x draws large (a card of it, or its cell).
+BOOL SGRHomeShelfIsLarge(UIView *view);

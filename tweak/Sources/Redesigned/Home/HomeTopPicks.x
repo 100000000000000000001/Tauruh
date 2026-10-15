@@ -14,7 +14,7 @@
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"
 
-static const CGFloat kScale = 1.7, kSmallest = 120, kHeading = 40;
+static const CGFloat kScale = 1.4, kSmallest = 120, kHeading = 40;
 static char kAuraKey, kAuraShownKey, kAuraImageKey, kAuraTriesKey;
 static char kLargeKey, kNaturalKey, kWrappedKey, kWidthKey, kAskedKey;
 static _Thread_local BOOL sg_enlarging;
@@ -23,6 +23,7 @@ static _Thread_local CGFloat sg_cardWidth;
 static NSInteger sg_topIndex = NSIntegerMax;
 // Where the shortcuts and the top shelf are in the page, to put the shelf first.
 static NSIndexPath *sg_shortcutsPath, *sg_topPath;
+static NSIndexPath *sg_headingPath;
 static __weak UICollectionViewLayout *sg_pageLayout;
 static _Thread_local BOOL sg_reordering;
 static void stripBase(UIView *cell, NSUInteger depth);
@@ -122,22 +123,32 @@ static NSDictionary<NSIndexPath *, NSValue *> *swappedFrames(UICollectionViewLay
     UICollectionViewLayoutAttributes *shortcuts = items.firstObject, *top = items.lastObject;
     NSMutableArray<UICollectionViewLayoutAttributes *> *order = [NSMutableArray array];
     NSMutableArray<UICollectionViewLayoutAttributes *> *rest = [NSMutableArray array];
+    UICollectionViewLayoutAttributes *heading = nil;
     for (NSUInteger i = 1; i + 1 < items.count; i++) {
         // A short cell right before the shelf is its heading.
-        if (i + 2 == items.count && items[i].frame.size.height < 80) [order addObject:items[i]];
+        if (i + 2 == items.count && items[i].frame.size.height < 80) heading = items[i];
         else [rest addObject:items[i]];
     }
+    sg_headingPath = heading.indexPath;
     [order addObject:top];
     [order addObject:shortcuts];
     [order addObjectsFromArray:rest];
     CGFloat gap = MAX(0, CGRectGetMinY(items[1].frame) - CGRectGetMaxY(shortcuts.frame));
+    // The top shelf's heading is gone; the room it had goes between the shelf and the shortcuts.
+    CGFloat spare = heading ? heading.frame.size.height + gap : 0;
     CGFloat y = CGRectGetMinY(shortcuts.frame);
     NSMutableDictionary *frames = [NSMutableDictionary dictionary];
     for (UICollectionViewLayoutAttributes *a in order) {
         CGRect frame = a.frame;
         frame.origin.y = y;
         frames[a.indexPath] = [NSValue valueWithCGRect:frame];
-        y += frame.size.height + gap;
+        y += frame.size.height + gap + (a == top ? spare : 0);
+    }
+    if (heading) {
+        CGRect gone = heading.frame;
+        gone.size.height = 0;
+        gone.origin.y = CGRectGetMinY(shortcuts.frame);
+        frames[heading.indexPath] = [NSValue valueWithCGRect:gone];
     }
     return frames;
 }
@@ -157,6 +168,7 @@ static NSDictionary<NSIndexPath *, NSValue *> *swappedFrames(UICollectionViewLay
         if (moved) {
             a = [a copy];
             a.frame = moved.CGRectValue;
+            if ([a.indexPath isEqual:sg_headingPath]) { a.hidden = YES; a.alpha = 0; }
         }
         if (CGRectIntersectsRect(a.frame, rect)) [out addObject:a];
     }
@@ -170,6 +182,7 @@ static NSDictionary<NSIndexPath *, NSValue *> *swappedFrames(UICollectionViewLay
     if (!moved) return a;
     a = [a copy];
     a.frame = moved.CGRectValue;
+    if ([path isEqual:sg_headingPath]) { a.hidden = YES; a.alpha = 0; }
     return a;
 }
 %end
@@ -250,6 +263,37 @@ static NSDictionary<NSIndexPath *, NSValue *> *swappedFrames(UICollectionViewLay
 %end
 
 
+BOOL SGRHomeShelfIsLarge(UIView *view) {
+    static Class shelf;
+    if (!shelf) shelf = NSClassFromString(@"_TtC16Home_CarouselKit29TouchCancellingCollectionView");
+    for (UIView *v = view.superview; v; v = v.superview) {
+        if (shelf && [v isKindOfClass:shelf]) return objc_getAssociatedObject(((UICollectionView *)v).collectionViewLayout, &kLargeKey) != nil;
+    }
+    return NO;
+}
+
+// The cards style themselves as they lay out, which can be before the shelf is large: ask each once more.
+static void pokeCards(UICollectionView *shelf) {
+    static char kPokedKey;
+    NSHashTable *poked = objc_getAssociatedObject(shelf, &kPokedKey);
+    if (!poked) {
+        poked = [NSHashTable weakObjectsHashTable];
+        objc_setAssociatedObject(shelf, &kPokedKey, poked, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    for (UICollectionViewCell *cell in shelf.visibleCells) {
+        if ([poked containsObject:cell]) continue;
+        [poked addObject:cell];
+        void (^poke)(void) = ^{
+            SGForEachView(cell, ^(UIView *v) {
+                if ([v.accessibilityIdentifier isEqualToString:@"Components.UI.HomeCard"]) [v setNeedsLayout];
+            });
+        };
+        poke();
+        __weak UICollectionViewCell *weak = cell;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ if (weak) poke(); });
+    }
+}
+
 // The page's gradient: behind the list, in the colour of the cover at the shelf's leading edge, so it changes as the
 // large shelf is scrolled. Cells lose their base-surface backgrounds so it shows through.
 static UICollectionView *pageListOf(UIView *shelf) {
@@ -304,6 +348,7 @@ static void paintAura(UICollectionView *list, UIColor *color) {
 }
 
 static void followAlbum(UICollectionView *shelf) {
+    pokeCards(shelf);
     UICollectionView *list = pageListOf(shelf);
     if (!list) return;
     UIView *lead = nil;

@@ -26,43 +26,37 @@ static void roundCorners(UIView *view, CGFloat radius) {
 
 static char kBackingKey;
 
-// Top picks' cards (a cover over 200pt wide) sit on a translucent glass card with the cover at its top, text gone.
-static void backing(UIView *card, UIView *holder, BOOL large) {
+// Top picks' cards sit on a translucent glass card as a whole: the cover at its top, Spotify's text below.
+static const CGFloat kCardRadius = 26;
+
+static void backing(UIView *card, BOOL large) {
     UIView *back = objc_getAssociatedObject(card, &kBackingKey);
     if (!large) { back.hidden = YES; return; }
     if (!back) {
         back = [UIView new];
         back.userInteractionEnabled = NO;
         back.accessibilityElementsHidden = YES;
-        back.backgroundColor = [UIColor colorWithWhite:1 alpha:0.16];
+        back.backgroundColor = [UIColor colorWithWhite:1 alpha:0.14];
         back.layer.cornerCurve = kCACornerCurveContinuous;
         back.layer.borderWidth = 1;
-        back.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.12].CGColor;
+        back.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.14].CGColor;
         objc_setAssociatedObject(card, &kBackingKey, back, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     if (back.superview != card) [card insertSubview:back atIndex:0];
     back.hidden = NO;
-    CGRect picture = [holder convertRect:holder.bounds toView:card];
-    CGRect frame = CGRectMake(0, 0, card.bounds.size.width, CGRectGetMaxY(picture) + 14);
-    if (!CGRectEqualToRect(back.frame, frame)) back.frame = frame;
-    if (back.layer.cornerRadius != 32) back.layer.cornerRadius = 32;
+    if (!CGRectEqualToRect(back.frame, card.bounds)) back.frame = card.bounds;
+    if (back.layer.cornerRadius != kCardRadius) back.layer.cornerRadius = kCardRadius;
 }
 
 static void roundCover(UIView *card) {
     UIView *holder = SGRFindByIdentifier(card, @"Encore.ImageView", &kImageKey);
     if (holder.bounds.size.width < kCoverMinWidth) return;
     BOOL glass = SGRHomeGlassStyle();
-    BOOL large = glass && holder.bounds.size.width >= 200;
-    if (glass) backing(card, holder, large);
-    if (large) {
-        // The card's own text goes: the picture is the card.
-        SGForEachView(card, ^(UIView *v) {
-            if ([v isKindOfClass:UILabel.class]) SGRSuppress(v);
-        });
-    }
+    BOOL large = glass && SGRHomeShelfIsLarge(card);
+    if (glass) backing(card, large);
     for (UIView *sub in holder.subviews) {
         if (![sub isKindOfClass:UIImageView.class]) continue;
-        roundCorners(sub, large ? 32 : SGRRadiusCover);
+        roundCorners(sub, large ? kCardRadius : SGRRadiusCover);
         CACornerMask corners = large ? (kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner) : (kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner | kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner);
         if (sub.layer.maskedCorners != corners) sub.layer.maskedCorners = corners;
         if (!sub.layer.masksToBounds) sub.layer.masksToBounds = YES;
