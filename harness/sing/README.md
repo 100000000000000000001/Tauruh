@@ -1,7 +1,7 @@
 # Sing
 
-Sing turns a song's vocals down, anywhere from 20 to 100 %, while Spotify plays it, from the
-redesigned player's lyrics. The vocals are separated on the iPhone by Vitrine's full Neural Engine
+Sing balances the background and vocals while Spotify plays, from the redesigned player's lyrics:
+background-only at 0, the full track at 50, and vocals-only at 100. The stems are separated on the iPhone by Vitrine's full Neural Engine
 Core ML export of Mel-Band RoFormer, mirrored at `My-Name-Is-Jeff/vitrine-sing`; no audio leaves
 the phone. It needs iOS 18.
 
@@ -12,8 +12,8 @@ Sing operates on 44.1 kHz stereo source samples before time/pitch processing; ou
 runs speed/pitch, the audio effects engine, then music haptics in a fixed order. The audio callback
 exchanges generation/track/source-frame/format-stamped packets with an asynchronous Swift worker
 through bounded single-producer/single-consumer queues. Model loading and inference never run on
-that callback. The reconstructed mix is `original - (1 - level²) * vocals`, clamped to [-1, 1],
-with a 30 ms level ramp and a 120 ms return to aligned original audio.
+that callback. The mix crossfades from `original - vocals` to `original`, then from `original` to `vocals`,
+clamped to [-1, 1], with a 30 ms level ramp and a 120 ms return to aligned original audio.
 
 `SGAudioSourceQueue.m` reads queue metadata only for the pinned Spotify 9.1.78 arm64 Mach-O UUID
 and verified callback/reader signatures. It neither reads private PCM nor calls private functions.

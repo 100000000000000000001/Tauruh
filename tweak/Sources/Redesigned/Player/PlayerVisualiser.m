@@ -1,6 +1,6 @@
 // Player redesign: the Visualizer background, a calm spectrum of what is playing behind the player, in the
 // cover's colors, over the Fluid field held still (PlayerField.x keeps the field Fluid for this choice, as for
-// Animated, so the ⋯ menu moves between all five background styles without a restart).
+// Animated, so the ⋯ menu moves between all six background styles without a restart).
 //
 // The sound is Spotify's output as it plays, read on the render thread through the audio effects' notify
 // (SGAudioSetOutputReader, Shared/AudioEffects/AudioEffects.h) into SGRSpectrum.m's bands. Here, on the main
@@ -90,6 +90,8 @@ static NSDictionary *noActions(void) {
     CAGradientLayer *_backFill, *_frontFill;
     CAShapeLayer *_backShape, *_frontShape;
     UIVisualEffectView *_lyricsBlur;
+    UIViewPropertyAnimator *_lyricsBlurAnimator;
+    BOOL _lyricsRequested;
     CADisplayLink *_link;
     BOOL _reading, _idle;
     float _front[kBands], _back[kBands], _peak;
@@ -101,6 +103,24 @@ static NSDictionary *noActions(void) {
 // As PlayerMotion.x: what fades is the effect view's effect, never its alpha or an ancestor's.
 static UIBlurEffect *blurEffect(void) {
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark];
+}
+
+static UIViewPropertyAnimator *setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator *animator, CGFloat intensity) {
+    intensity = MIN(1, MAX(0, intensity));
+    if (animator && animator.state != UIViewAnimatingStateInactive) [animator stopAnimation:YES];
+    view.effect = nil;
+    if (intensity <= 0) return nil;
+
+    __weak UIVisualEffectView *weakView = view;
+    UIViewPropertyAnimator *fractional = [[UIViewPropertyAnimator alloc] initWithDuration:1
+                                                                                    curve:UIViewAnimationCurveLinear
+                                                                               animations:^{
+        weakView.effect = blurEffect();
+    }];
+    [fractional startAnimation];
+    [fractional pauseAnimation];
+    fractional.fractionComplete = intensity;
+    return fractional;
 }
 
 static CAGradientLayer *fill(CAShapeLayer *shape) {
@@ -138,6 +158,8 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
         [center addObserver:self selector:@selector(updateMotionSoon) name:name object:nil];
     }
     [center addObserver:self selector:@selector(artworkChanged) name:SGRNowPlayingArtworkDidChangeNotification object:nil];
+    [center addObserver:self selector:@selector(updateBlurOpacity) name:SGRPlayerBlurOpacityDidChangeNotification object:nil];
+    [self updateBlurOpacity];
     SGRObservePlayerTransition(self, ^(id owner) { [owner updateMotion]; }, ^(id owner) { [owner updateMotion]; });
     SGAddPlayerStateObserver(self);
     [self artworkChanged];
@@ -148,6 +170,11 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
 - (void)dealloc {
     [NSNotificationCenter.defaultCenter removeObserver:self];
     [_link invalidate];
+}
+
+- (void)updateBlurOpacity {
+    CGFloat opacity = MIN(100, MAX(0, SGInt(SGRKeyPlayerVisualiserBlurOpacity, 100))) / 100.0;
+    _lyricsBlurAnimator = setBlurIntensity(_lyricsBlur, _lyricsBlurAnimator, _lyricsRequested ? opacity : 0);
     if (_reading) needReader(NO);
 }
 
@@ -165,7 +192,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     UIImage *image = SGRNowPlayingArtwork(NULL, NULL);
     if (!image) return;
     NSUInteger generation = ++_palette;
-    SGRPaletteRequest request = {CGSizeZero, NO, YES, YES};
+    SGRPaletteRequest request = {CGSizeZero, NO, YES, YES, NO};
     __weak SGRVisualiserView *weakSelf = self;
     [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
         SGRVisualiserView *view = weakSelf;
@@ -217,16 +244,21 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
 - (void)disappear:(void (^)(void))done {
     SGRAnimate(SGRMotionFade, ^{
         self->_content.alpha = 0;
-        self->_lyricsBlur.effect = nil;
+        self->_lyricsRequested = NO;
+        self->_lyricsBlurAnimator = setBlurIntensity(self->_lyricsBlur, self->_lyricsBlurAnimator, 0);
     }, ^(BOOL finished) { done(); });
 }
 
 - (BOOL)blurred {
-    return _lyricsBlur.effect != nil;
+    return _lyricsRequested;
 }
 
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated {
-    void (^apply)(void) = ^{ self->_lyricsBlur.effect = blurred ? blurEffect() : nil; };
+    _lyricsRequested = blurred;
+    CGFloat opacity = MIN(100, MAX(0, SGInt(SGRKeyPlayerVisualiserBlurOpacity, 100))) / 100.0;
+    void (^apply)(void) = ^{
+        self->_lyricsBlurAnimator = setBlurIntensity(self->_lyricsBlur, self->_lyricsBlurAnimator, blurred ? opacity : 0);
+    };
     if (animated) SGRAnimate(SGRMotionFade, apply, nil);
     else apply();
     [self updateMotion];
@@ -396,7 +428,10 @@ static void shape(CAShapeLayer *layer, const float *bands, CGFloat width, CGFloa
 static SGRVisualiserView *sg_view;
 
 BOOL SGRPlayerVisualiserShowing(void) {
-    return SGRPlayerBackground() == SGRPlayerBackgroundVisualiser;
+    SGRPlayerBackgroundKind background = SGRPlayerBackground();
+    return background == SGRPlayerBackgroundVisualiser
+        || (background == SGRPlayerBackgroundAnimated
+            && SGRPlayerAnimatedFallback() == SGRPlayerBackgroundVisualiser);
 }
 
 UIView *SGRPlayerVisualiserPreview(void) {

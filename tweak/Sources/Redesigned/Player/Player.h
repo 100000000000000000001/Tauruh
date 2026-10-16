@@ -5,15 +5,27 @@
 
 // The field behind the player.
 #define SGRKeyPlayerBackground @"spotifyglass.redesign.player.background"
+#define SGRKeyPlayerAnimatedFallback @"spotifyglass.redesign.player.animatedFallback"
 typedef NS_ENUM(NSInteger, SGRPlayerBackgroundKind) {
     SGRPlayerBackgroundStill,
     SGRPlayerBackgroundColours,
     SGRPlayerBackgroundFluid,
     SGRPlayerBackgroundAnimated,
     SGRPlayerBackgroundVisualiser,
+    SGRPlayerBackgroundFill,
 };
 SGRPlayerBackgroundKind SGRPlayerBackground(void);
+SGRPlayerBackgroundKind SGRPlayerAnimatedFallback(void);
 NSArray<NSString *> *SGRPlayerBackgroundNames(void);
+
+#define SGRKeyPlayerBackdropOpacity @"spotifyglass.redesign.player.backdropOpacity"
+#define SGRKeyPlayerFillOpacity @"spotifyglass.redesign.player.fillOpacity"
+#define SGRKeyPlayerFluidOpacity @"spotifyglass.redesign.player.fluidOpacity"
+#define SGRKeyPlayerCanvasBlurOpacity @"spotifyglass.redesign.player.canvasBlurOpacity"
+#define SGRKeyPlayerLyricsBlurOpacity @"spotifyglass.redesign.player.lyricsBlurOpacity"
+#define SGRKeyPlayerVisualiserBlurOpacity @"spotifyglass.redesign.player.visualiserBlurOpacity"
+extern NSNotificationName const SGRPlayerBlurOpacityDidChangeNotification;
+void SGRPlayerApplyBackgroundToField(SGRArtworkField *field, SGRPlayerBackgroundKind kind);
 
 #define SGRKeyPlayerMotion @"spotifyglass.redesign.player.movingBackground"
 #pragma mark - the ⋯ menu (PlayerMenu.x)
@@ -49,6 +61,7 @@ void SGRPlayerToggleLyrics(void);
 void SGRPlayerLyricsChanged(void);
 #define SGRKeyLyricsAutoHide @"spotifyglass.redesign.lyrics.autoHide"
 #define SGRKeyLyricsLandscapeAutoHide @"spotifyglass.redesign.lyrics.landscapeAutoHide"
+#define SGRKeyPlayerVolumeMatchSlider @"spotifyglass.redesign.player.volume.matchSlider"
 #define SGRKeyPlayerKaraokeButton @"spotifyglass.redesign.player.karaokeButton"
 #define SGRKeyPlayerTranslateButton @"spotifyglass.redesign.player.translateButton"
 

@@ -22,6 +22,8 @@ static const CGFloat kFlowSaturationLift = 1.25, kFlowSaturationMax = 0.9, kFlow
 @property (nonatomic, readwrite) UIImage *backdrop;
 @property (nonatomic, readwrite) UIImage *dissolve;
 @property (nonatomic, readwrite) NSArray<UIColor *> *flowColors;
+@property (nonatomic, readwrite) NSArray<UIImage *> *fillBlurs;
+@property (nonatomic, readwrite) UIColor *fillBackgroundColor;
 @end
 
 static dispatch_queue_t paletteQueue(void) {
@@ -139,6 +141,35 @@ static UIColor *edgeColorOf(CGImageRef image) {
     return [UIColor colorWithRed:r / coverage green:g / coverage blue:b / coverage alpha:1];
 }
 
+static UIColor *fillBackgroundColorOf(CGImageRef image) {
+    CGContextRef context = newBitmap(kSample, kSample);
+    if (!context) return UIColor.blackColor;
+    CGContextSetInterpolationQuality(context, kCGInterpolationMedium);
+    CGContextDrawImage(context, CGRectMake(0, 0, kSample, kSample), image);
+    const uint8_t *pixels = CGBitmapContextGetData(context);
+    double red = 0, green = 0, blue = 0;
+    NSUInteger count = 0;
+    for (size_t y = kSample - 5; pixels && y < kSample; y++) {
+        for (size_t x = 8; x < kSample - 8; x++) {
+            const uint8_t *pixel = pixels + (y * kSample + x) * 4;
+            red += pixel[0];
+            green += pixel[1];
+            blue += pixel[2];
+            count++;
+        }
+    }
+    CGContextRelease(context);
+    if (!count) return UIColor.blackColor;
+    UIColor *average = [UIColor colorWithRed:red / (count * 255.0)
+                                       green:green / (count * 255.0)
+                                        blue:blue / (count * 255.0) alpha:1];
+    CGFloat hue = 0, saturation = 0, brightness = 0, alpha = 1;
+    if (![average getHue:&hue saturation:&saturation brightness:&brightness alpha:&alpha]) return UIColor.blackColor;
+    brightness = MIN(0.42, MAX(0.03, 0.9 * pow(brightness, 1.6)));
+    saturation = MIN(saturation * 1.05, 1.0);
+    return [UIColor colorWithHue:hue saturation:saturation brightness:brightness alpha:1];
+}
+
 #pragma mark - bitmaps
 
 static CGImageRef newBlurred(CGImageRef image, size_t width, size_t height, CGFloat sigma) {
@@ -152,6 +183,19 @@ static CGImageRef newBlurred(CGImageRef image, size_t width, size_t height, CGFl
     CGImageRelease(small);
     CIImage *output = [[input imageByClampingToExtent] imageByApplyingGaussianBlurWithSigma:sigma];
     return [blurContext() createCGImage:output fromRect:input.extent format:kCIFormatRGBA8 colorSpace:sRGB()];
+}
+
+static NSArray<UIImage *> *fillBlursOf(CGImageRef image) {
+    CGFloat scale = MAX(1, (CGFloat)CGImageGetWidth(image) / 640.0);
+    static const CGFloat radii[] = {2.5, 6.0, 12.0, 22.0};
+    NSMutableArray<UIImage *> *images = [NSMutableArray arrayWithCapacity:sizeof radii / sizeof *radii];
+    for (NSUInteger index = 0; index < sizeof radii / sizeof *radii; index++) {
+        CGImageRef blurred = newBlurred(image, 640, 640, radii[index] * scale);
+        if (!blurred) return nil;
+        [images addObject:[UIImage imageWithCGImage:blurred scale:1 orientation:UIImageOrientationUp]];
+        CGImageRelease(blurred);
+    }
+    return images;
 }
 
 static void drawRamp(CGContextRef context, size_t height, CGFloat y0, CGFloat a0, CGFloat y1, CGFloat a1, CGBlendMode mode) {
@@ -288,6 +332,11 @@ static UIColor *tintOf(CGImageRef image, UIColor *surface) {
             CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
             palette = [SGRPalette new];
             palette.edgeColor = edge;
+            if (request.fill) {
+                palette.fillBackgroundColor = fillBackgroundColorOf(cg);
+                palette.fillBlurs = fillBlursOf(cg);
+                if (!palette.fillBlurs) SGLog(@"redesign kit: could not render Fill background blur layers");
+            }
             CGFloat main[3];
             UIColor *source = dominantColorOf(cg, main)
                 ? [UIColor colorWithRed:toEncoded(main[0]) green:toEncoded(main[1]) blue:toEncoded(main[2]) alpha:1] : edge;

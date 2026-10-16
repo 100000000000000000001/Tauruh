@@ -1,5 +1,6 @@
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Redesigned/Navbar/Navbar.h"
 #import "Search.h"
 
 // Layout passes without the header before that is logged.
@@ -93,6 +94,7 @@ static void layoutHeader(UIStackView *row) {
         if (faceClass && [part isKindOfClass:faceClass]) face = part;
         else vanish(part);
     }
+    SGRNavbarSetProfilePhotoVisible(face);
     if (row.semanticContentAttribute != UISemanticContentAttributeForceRightToLeft) {
         row.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
         [row setNeedsLayout];

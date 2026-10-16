@@ -6,6 +6,8 @@ extern const CGFloat SGRHeaderInfoTitleRise;  // 56, of the content over the pic
 @interface SGRHeaderInfo : UIView
 // YES when anything shown changed. nil or empty hides that line.
 - (BOOL)showTitle:(NSString *)title creator:(NSString *)creator length:(NSString *)length about:(NSString *)about;
+// A title image such as an artist's logo; nil restores the spoken title.
+- (void)showTitleImage:(UIImage *)image;
 - (void)showCreatorLink:(UIView *)control;
 @property (nonatomic, copy) BOOL (^trailingState)(BOOL *on);
 @property (nonatomic, copy) NSString *trailingOffSymbol;

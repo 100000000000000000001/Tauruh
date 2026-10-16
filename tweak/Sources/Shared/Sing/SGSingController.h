@@ -25,7 +25,7 @@ NSString *SGSingExplanation(void);
 BOOL SGSingCanRetry(void); // current playback/thermal restrictions and previous generation retired
 BOOL SGSingEnabled(void); // user's intent, retained across playback changes
 float SGSingVocalLevel(void);
-float SGSingReducedLevel(void); // the last level below 100 %, which turning Sing on goes back to
+float SGSingReducedLevel(void); // the last balance below vocals-only, which turning Sing on goes back to
 void SGSingSetVocalLevel(float level);
 void SGSingSetEnabled(BOOL enabled);
 #if SG_DRIVER

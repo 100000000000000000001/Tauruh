@@ -58,14 +58,14 @@ static void mixing(void) {
     float original[] = {0.7f, -0.3f}, vocal[] = {0.5f, -0.5f}, out[2];
     SGSingMixerInit(&m, 44100, 0);
     SGSingMixerProcess(&m, original, vocal, out, 1);
-    assert(fabsf(out[0] - 0.22f) < 1e-6f && fabsf(out[1] - 0.18f) < 1e-6f);
-    assert(fabsf(m.gain - .04f) < 1e-6f); // minimum 20%, including non-UI requests
-    SGSingMixerSetLevel(&m, -10); assert(fabsf(m.targetGain - .04f) < 1e-6f);
-    assert(SGSingLevelFromPosition(0) == .2f && SGSingLevelFromPosition(1) == 1);
-    assert(fabsf(SGSingLevelFromPosition(.5f) - .6f) < 1e-6f);
-    assert(SGSingPositionFromLevel(.2f) == 0 && SGSingPositionFromLevel(1) == 1);
+    assert(fabsf(out[0] - 0.2f) < 1e-6f && fabsf(out[1] - 0.2f) < 1e-6f);
+    assert(fabsf(m.gain) < 1e-6f);
+    SGSingMixerSetLevel(&m, -10); assert(fabsf(m.targetGain) < 1e-6f);
+    assert(SGSingLevelFromPosition(0) == 0 && SGSingLevelFromPosition(1) == 1);
+    assert(fabsf(SGSingLevelFromPosition(.5f) - .5f) < 1e-6f);
+    assert(SGSingPositionFromLevel(0) == 0 && SGSingPositionFromLevel(1) == 1);
     assert(SGSingClampLevel(NAN) == 1);
-    SGSingMixerSetLevel(&m, 1);
+    SGSingMixerSetLevel(&m, .5f);
     float last = out[0];
     for (unsigned i = 0; i < 1323; i++) {
         SGSingMixerProcess(&m, original, vocal, out, 1);
@@ -73,8 +73,11 @@ static void mixing(void) {
         last = out[0];
     }
     assert(m.remaining == 0 && out[0] == original[0] && out[1] == original[1]);
-    SGSingMixerInit(&m, 48000, 0.5f);
-    assert(m.gain == 0.25f);
+    SGSingMixerSetLevel(&m, 1);
+    for (unsigned i = 0; i < 1323; i++) SGSingMixerProcess(&m, original, vocal, out, 1);
+    assert(out[0] == vocal[0] && out[1] == vocal[1]);
+    SGSingMixerInit(&m, 48000, 1);
+    assert(m.gain == 1);
     SGSingMixerBypass(&m);
     assert(m.remaining == 5760);
     for (unsigned i = 0; i < 5760; i++) SGSingMixerProcess(&m, original, vocal, out, 1);

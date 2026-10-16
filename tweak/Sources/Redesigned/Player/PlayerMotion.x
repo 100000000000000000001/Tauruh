@@ -1,6 +1,6 @@
 // Player redesign: Animated artwork, the track's Canvas or Apple Music's animated cover behind the player,
-// the way the Music app draws it. The clip runs edge to edge from the top, sharp to near its foot, where
-// it dissolves into its own last rows drawn on down to the bottom of the field, so it ends in its own
+// the way the Music app draws it. The clip starts at the top of the visible player, sharp to near its foot,
+// where it dissolves into its own last rows drawn on down to the bottom of the field, so it ends in its own
 // color rather than on the Fluid field. A blur comes in from the seam (from above the controls for a
 // Canvas as tall as the screen) and lies under the controls; behind the lyrics the whole clip is blurred.
 // The player's square cover goes while a clip plays, so a track without one keeps its cover over Fluid
@@ -42,6 +42,8 @@
 #import "Shared/Player/SGLastTrack.h"
 #import "Shared/Player/SpeedPitch.h"
 #import "Player.h"
+
+NSNotificationName const SGRPlayerBlurOpacityDidChangeNotification = @"spotifyglass.redesign.player.blurOpacityDidChange";
 
 // Where the clip starts dissolving into its foot, as a share of its height.
 static const CGFloat kFootFrom = 0.9;
@@ -138,16 +140,37 @@ static CGFloat brightEnd(NSData *luminances) {
     CALayer *_foot;
     CALayer *_dim;   // black over the clip and its foot, as dark as the clip is bright
     NSMutableData *_luminances;   // of the frames measured so far
-    BOOL _lyricsUp;
+    BOOL _lyricsUp, _seamUp;
     UIVisualEffectView *_seamBlur, *_lyricsBlur;
     CGFloat _aspect;
     BOOL _timing;   // the give-up's count is running
+    UIViewPropertyAnimator *_seamBlurAnimator, *_lyricsBlurAnimator;
 }
 
-// What fades is the effect views' effect, never their alpha or an ancestor's: UIKit draws a blur under a
-// fading alpha or a mask wrongly or not at all.
 static UIBlurEffect *blurEffect(void) {
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark];
+}
+
+static CGFloat blurOpacity(NSString *key) {
+    return MIN(100, MAX(0, SGInt(key, 100))) / 100.0;
+}
+
+static UIViewPropertyAnimator *setBlurIntensity(UIVisualEffectView *view, UIViewPropertyAnimator *animator, CGFloat intensity) {
+    intensity = MIN(1, MAX(0, intensity));
+    if (animator && animator.state != UIViewAnimatingStateInactive) [animator stopAnimation:YES];
+    view.effect = nil;
+    if (intensity <= 0) return nil;
+
+    __weak UIVisualEffectView *weakView = view;
+    UIViewPropertyAnimator *fractional = [[UIViewPropertyAnimator alloc] initWithDuration:1
+                                                                                    curve:UIViewAnimationCurveLinear
+                                                                               animations:^{
+        weakView.effect = blurEffect();
+    }];
+    [fractional startAnimation];
+    [fractional pauseAnimation];
+    fractional.fractionComplete = intensity;
+    return fractional;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -155,6 +178,7 @@ static UIBlurEffect *blurEffect(void) {
     self.userInteractionEnabled = NO;
     self.accessibilityElementsHidden = YES;
     _picture = [[UIView alloc] initWithFrame:frame];
+    _picture.clipsToBounds = YES;
     [self addSubview:_picture];
     _foot = [CALayer layer];
     _foot.contentsGravity = kCAGravityResize;
@@ -196,9 +220,18 @@ static UIBlurEffect *blurEffect(void) {
         [center addObserver:self selector:@selector(updateMotionSoon) name:name object:nil];
     }
     [center addObserver:self selector:@selector(updateDim) name:UIAccessibilityDarkerSystemColorsStatusDidChangeNotification object:nil];
+    [center addObserver:self selector:@selector(updateBlurOpacity) name:SGRPlayerBlurOpacityDidChangeNotification object:nil];
+    [self updateBlurOpacity];
     SGRObservePlayerTransition(self, ^(id owner) { [owner updateMotion]; }, ^(id owner) { [owner updateMotion]; });
     SGAddPlayerStateObserver(self);
     return self;
+}
+
+- (void)updateBlurOpacity {
+    _seamBlurAnimator = setBlurIntensity(_seamBlur, _seamBlurAnimator,
+                                         _seamUp ? blurOpacity(SGRKeyPlayerCanvasBlurOpacity) : 0);
+    _lyricsBlurAnimator = setBlurIntensity(_lyricsBlur, _lyricsBlurAnimator,
+                                           _lyricsUp ? blurOpacity(SGRKeyPlayerLyricsBlurOpacity) : 0);
 }
 
 - (void)playerStateDidChange:(SPTPlayerState *)state {
@@ -297,7 +330,9 @@ static UIBlurEffect *blurEffect(void) {
     _picture.alpha = 0;
     void (^apply)(void) = ^{
         self->_picture.alpha = 1;
-        self->_seamBlur.effect = blurEffect();
+        self->_seamUp = YES;
+        self->_seamBlurAnimator = setBlurIntensity(self->_seamBlur, self->_seamBlurAnimator,
+                                                   blurOpacity(SGRKeyPlayerCanvasBlurOpacity));
     };
     if (animated) {
         SGRAnimate(SGRMotionFade, apply, ^(BOOL finished) {
@@ -313,15 +348,20 @@ static UIBlurEffect *blurEffect(void) {
 - (void)disappear:(void (^)(void))done {
     SGRAnimate(SGRMotionFade, ^{
         self->_picture.alpha = 0;
-        self->_seamBlur.effect = nil;
-        self->_lyricsBlur.effect = nil;
+        self->_seamUp = NO;
+        self->_lyricsUp = NO;
+        self->_seamBlurAnimator = setBlurIntensity(self->_seamBlur, self->_seamBlurAnimator, 0);
+        self->_lyricsBlurAnimator = setBlurIntensity(self->_lyricsBlur, self->_lyricsBlurAnimator, 0);
     }, ^(BOOL finished) { done(); });
 }
 
 // The lyrics' blur, and their share of the dim, which a layer's own animation carries over the same fade.
 - (void)setBlurred:(BOOL)blurred animated:(BOOL)animated {
     _lyricsUp = blurred;
-    void (^apply)(void) = ^{ self->_lyricsBlur.effect = blurred ? blurEffect() : nil; };
+    void (^apply)(void) = ^{
+        self->_lyricsBlurAnimator = setBlurIntensity(self->_lyricsBlur, self->_lyricsBlurAnimator,
+                                                     blurred ? blurOpacity(SGRKeyPlayerLyricsBlurOpacity) : 0);
+    };
     [CATransaction begin];
     [CATransaction setDisableActions:!animated];
     [CATransaction setAnimationDuration:SGRCrossfade];
@@ -458,15 +498,26 @@ static void setCoverShown(BOOL shown, BOOL animated) {
     fadeCoverMask(covers, mask, 0, animated, nil);
 }
 
+static BOOL coverShouldBeShown(void) {
+    SGRPlayerBackgroundKind background = SGRPlayerBackground();
+    return background != SGRPlayerBackgroundFill
+        && !(background == SGRPlayerBackgroundAnimated
+             && (sg_motion || SGRPlayerAnimatedFallback() == SGRPlayerBackgroundFill));
+}
+
+static void updateCoverVisibility(BOOL animated) {
+    setCoverShown(coverShouldBeShown(), animated);
+}
+
 void SGRPlayerMotionFieldLaidOut(void) {
     layOut();
-    setCoverShown(sg_motion == nil, NO);
+    updateCoverVisibility(NO);
 }
 
 // A clip that came in before the player opened finds no cover to hide at the field's first pass, the covers
 // laying out after it (issue #19: the cover over the clip after a relaunch), so each cover's layout asks too.
 void SGRPlayerMotionCoverLaidOut(void) {
-    setCoverShown(sg_motion == nil, NO);
+    updateCoverVisibility(NO);
 }
 
 BOOL SGRPlayerMotionShowing(void) {
@@ -490,7 +541,14 @@ static UIImage *sg_previewPoster;
 static void (^sg_previewArrived)(void);
 
 UIView *SGRPlayerMotionPreview(void (^arrived)(void)) {
-    if (sg_motionFile) return previewOf(sg_motionFile, sg_motionPoster);
+    if (sg_motionFile) {
+        UIImageView *preview = [UIImageView new];
+        preview.image = sg_motionPoster;
+        preview.contentMode = UIViewContentModeScaleAspectFill;
+        preview.clipsToBounds = YES;
+        preview.userInteractionEnabled = NO;
+        return preview;
+    }
     SGShownTrack *shown = SGShownTrackNow();
     NSString *track = shown.uri;
     if (!track) return nil;
@@ -560,7 +618,8 @@ static void clear(BOOL animated) {
     cover(NO);
     holdField();
     animated = animated && seen(old);
-    setCoverShown(YES, animated);
+    updateCoverVisibility(animated);
+    SGRPlayerVisualiserUpdate();
     if (animated) [old disappear:^{ [old removeFromSuperview]; }];
     else [old removeFromSuperview];
 }
@@ -583,6 +642,7 @@ static void show(NSString *track, NSURL *file) {
         [sg_motion playFile:file poster:poster];
         sg_motionFile = file;
         sg_motionPoster = poster;
+        SGRPlayerVisualiserUpdate();
         layOut();
         holdField();
         [sg_motion setBlurred:SGRPlayerLyricsOpen() animated:NO];
@@ -639,7 +699,7 @@ static void restartAnimatedArtwork(void) {
 }
 
 void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind) {
-    if (kind < SGRPlayerBackgroundStill || kind > SGRPlayerBackgroundVisualiser) {
+    if (kind < SGRPlayerBackgroundStill || kind > SGRPlayerBackgroundFill) {
         SGLog(@"redesign player: ignored invalid background style %ld", (long)kind);
         return;
     }
@@ -648,14 +708,12 @@ void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind) {
 
     SGSetInt(SGRKeyPlayerBackground, kind);
     SGRArtworkField *field = SGRPlayerField();
-    if (field) {
-        field.fluid = kind >= SGRPlayerBackgroundFluid;
-        field.flows = kind == SGRPlayerBackgroundColours;
-        [field refreshStyleAnimated:YES];
-    }
+    SGRPlayerApplyBackgroundToField(field, kind);
+    [field refreshStyleAnimated:YES];
     if (current == SGRPlayerBackgroundAnimated || kind == SGRPlayerBackgroundAnimated) restartAnimatedArtwork();
     SGRPlayerVisualiserUpdate();
     SGRPlayerHoldField();
+    updateCoverVisibility(YES);
     SGLog(@"redesign player: background switched to %@ from the menu", SGRPlayerBackgroundNames()[(NSUInteger)kind]);
 }
 

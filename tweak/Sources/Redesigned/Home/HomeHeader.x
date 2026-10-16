@@ -1,5 +1,6 @@
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Redesigned/Navbar/Navbar.h"
 #import "Home.h"
 
 // Tries at finding the tab's name before settling for the English one: a miss walks the window.
@@ -92,6 +93,7 @@ static void layoutHeader(UIViewController *page) {
         if (faceClass && [part isKindOfClass:faceClass]) face = part;
         else vanish(part);
     }
+    SGRNavbarSetProfilePhotoVisible(face);
     if (stack.semanticContentAttribute != UISemanticContentAttributeForceRightToLeft) {
         stack.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
         [stack setNeedsLayout];

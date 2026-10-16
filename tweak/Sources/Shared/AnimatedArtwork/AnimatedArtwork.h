@@ -11,6 +11,8 @@
 #define SGKeyLegacyLockScreenArtwork @"spotifyglass.lockscreen.animatedartwork"
 #define SGKeyLockScreenCanvasLyrics @"spotifyglass.lockscreen.canvasLyrics"
 #define SGKeyLockScreenStar @"spotifyglass.lockscreen.star"
+#define SGKeyLockScreenExclusiveLyrics @"spotifyglass.lockscreen.exclusiveLyrics"
+#define SGKeyLockScreenCoverArtworkScale @"spotifyglass.lockscreen.coverArtworkScale"
 typedef NS_ENUM(NSInteger, SGLockArtwork) {
     SGLockArtworkOff = 0,
     SGLockArtworkMotion,   // the Canvas, else Apple Music's animated cover (LockScreenMotion.x)
@@ -19,6 +21,7 @@ typedef NS_ENUM(NSInteger, SGLockArtwork) {
 };
 // Off below iOS 26, which has no animated artwork on the lock screen.
 SGLockArtwork SGLockScreenArtwork(void);
+CGFloat SGLockScreenCoverArtworkScale(void);
 BOOL SGLockScreenCanvasLyricsEnabled(void);
 void SGLockScreenCanvasLyricsSetEnabled(BOOL enabled);
 void SGLockMotionShowPlain(BOOL plain);
@@ -52,7 +55,7 @@ CGFloat SGMotionPixels(void);
 void SGMotionSongsWithISRC(NSString *isrc, void (^done)(NSArray *songs));
 
 // Where moving artwork comes from (MotionSources.m): the keys that are on, in the order they are asked,
-// Apple Music's animated cover then Spotify's Canvas unless the user changed it.
+// Spotify's Canvas then Apple Music's animated cover unless the user changed it.
 #define SGKeyMotionSources @"spotifyglass.motion.sources"
 NSArray<NSString *> *SGMotionSourceOrder(void);
 BOOL SGMotionAppleMusicOn(void);

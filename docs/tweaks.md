@@ -112,7 +112,9 @@ Shared:
                   player menu and the lock-screen star toggle that independently of the artist-name setting.
                   The Canvas lyrics switch stays visible even while full-screen artwork is off, so it can be
                   prepared before choosing Moving artwork or Every song.
-                  The sources are asked in the user's order (Apple Music, then Spotify Canvas until set, on the
+                  In Every song mode, Fallback album art size controls the square cover shown over the blurred
+                  fallback when no moving artwork or lyrics clip is available; 50% is the original size.
+                  The sources are asked in the user's order (Spotify Canvas, then Apple Music until set, on the
                   shared Settings/SGOrderPage the lyrics sources use too). Spotify's URL comes off canvas.url
                   in the played track's metadata, which Spotify's core fills whatever
                   ios-feature-canvas.canvas_enabled says, and failing that from spotify.canvaz.cache with the
@@ -215,12 +217,12 @@ Redesigned:
                   Offline or Private Session under the bar), so the now playing bar and the pages move up with it. Laid out on
                   the Mac against harness/tabbar/
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
-                  (BarConnect.x, its own key and its own Now playing page, apart from the native look's)
+                  (BarConnect.x); all redesigned now-playing options are grouped under Player > Mini player
     Player/       the redesigned full screen player (Player.h lists its files); its ⋯ opens a menu the way the
                   Music app draws one (PlayerMenu.x, SGRPlayerMenu.m): a pane of glass grown out of the button,
                   Add to playlist, Add to Queue and Share as three tiles across its top, groups of rows under
                   them, Speed and pitch opening onto Shared/Player's sliders in place, then the star-marked Canvas
-                  Lyrics switch and Background Style's five choices (Still, Colors, Fluid, Animated and Visualiser),
+                  Lyrics switch and Background Style's six choices (Still, Colors, Fluid, Animated, Visualiser and Fill),
                   everything else Spotify
                   offers under More, and Remove from this playlist last in red. What is in it and what each row
                   does stay Spotify's: its own sheet still opens, out of sight, and the menu is read off its
@@ -229,7 +231,14 @@ Redesigned:
                   sheet, and a sheet with no rows within 4 s is shown as it is. It opens on the rows the last
                   menu had, kept across launches, and moves to Spotify's as they come in, a tap meanwhile held
                   until they do. The Canvas field extends below the clip with a blurred poster bleed instead of
-                  stretched edge rows. Always on in the redesign.
+                  stretched edge rows; the clip begins at the top of the visible player, as in the previous layout.
+                  Fill keeps the cover crisp, then blends it through progressively stronger blur into a dark tint sampled
+                  from the artwork's bottom edge, adapting Pulse-Ice/EeveeImmersive's layered treatment; it hides
+                  Spotify's normal cover, including when Animated uses Fill as its fallback. Player settings let the
+                  user choose Still, Colors, Fluid, Visualiser or Fill, with Fill as the default, for when Canvas is
+                  unavailable or cannot play.
+                  Player settings expose separate opacity sliders for its artwork and Canvas/lyrics blur layers.
+                  Always on in the redesign.
                   Tested in the simulator against harness/playermenu/
                   With Sing on and its voice model downloaded (Mod Settings > Karaoke, Redesigned/Lyrics/SingSettings.m,
                   both applying at once), its microphone (Redesigned/Lyrics/SGRSingControl.m) sits in the
@@ -335,8 +344,11 @@ what the restart will bring. In the redesign Karaoke comes next, on a card of it
 voice model's download (Redesigned/Lyrics/SingSettings.m), with Off, On, No model or the download's percentage
                 beside the row, "Needs iOS 18" below iOS 18. Then a card of parts. Navbar: the tab editor of the stored look,
 each with its own list of tabs. Player: Gestures and Blocked artists (with the count on the row), which work
-with either look. The redesigned Player page also has independent Show Sing button and Show Translate button
-switches, the five background styles (Still, Colors, Fluid, Animated and Visualiser), and its volume controls.
+with either look. In the redesigned look Appearance holds the profile-photo toggle and accent colour.
+The redesigned Player page also has independent Show Sing button and Show Translate button
+switches, the six background styles (Still, Colors, Fluid, Animated, Visualiser and Fill), an Animated fallback
+choice (Still, Colors, Fluid, Visualiser or Fill, default Fill), background opacity sliders for the artwork
+and each player blur layer, and its volume controls.
 Lyrics: the ordered list of lyrics sources, lyrics for every track,
 naming the source in the redesign, artist-name replacement on the lock screen (independent of Canvas lyrics),
 and glass lyrics in the native look; in the redesign also
@@ -350,9 +362,11 @@ Audio effects follows Lock Screen, which appears between Lyrics and Audio effect
 In the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
-buttons to hide); in the redesign instead Now Playing (its device button and moving background, the volume slider
-visible by default with its thumb hidden by default, each independently switchable). Then Vibrations
-under either look, a card for
+buttons to hide); in the redesign the Player page's Mini player section groups the device button, moving
+background, mini-player merge/transition toggle and rounded-square artwork option, the latter off by default.
+An optional volume slider is off by default, with its thumb hidden if enabled. The taurus settings page
+credits @Pulse-Ice for the Fill background treatment adapted from EeveeImmersive.
+Vibrations follows under either look, a card for
 Controls (on until switched off) and one for Music Haptics (off until switched on, with an ⓘ saying it
 follows the sound this iPhone plays while Spotify is open), each opening out while its switch is on:
 Controls into its Strength (10 to 100%, a tap at the new strength with each step), Music Haptics into its
@@ -387,12 +401,21 @@ forced and take no touch. `Redesigned/Kit/SGRGlassDesign.x` holds the list; what
 registers in `Core/SGFlagForce.h`. A change shows after Spotify restarts.
 
 The tab editor on the Navbar page is the exception and applies as soon as the bar lays out again. It lists the tabs in the order
-the bar shows them: drag to reorder, tap to hide or show, and Add a tab puts a page of Spotify's or
-any `spotify:` link on the bar with one of Encore's own glyphs. Spotify's own tabs are kept by the
-name under their icon, so they can be hidden but never removed, and switching the app's language
+the bar shows them: drag to reorder, use each row's switch to hide or show it, swipe to remove it, and tap a row to edit its name and icon.
+That works for Spotify's own tabs as well as tabs of the mod's own; icons can be Encore glyphs or SF Symbols.
+Built-in tabs keep their own Spotify Encore glyphs unless given a custom icon. Apple Music tab icons,
+off by default, uses Apple-style SF Symbols for built-in tabs unless that tab has a custom icon.
+Add a tab puts a page of Spotify's or any `spotify:` link on the bar. Spotify's own tabs are kept by the
+name under their icon, so removing one hides it until Use Spotify's order restores it; switching the app's language
 starts the order over. A tab of the mod's own opens its link through Spotify's link dispatcher, so it
 never lights up as the tab you are on. Hide labels, on the same page, leaves the glass bar with its
-icons alone and applies straight away too.
+icons alone and applies straight away too. Spotify tabs can be hidden with their switches or removed from
+the editor; Use Spotify's order restores them. Compact player and tabs is on by default: while scroll-minimization
+is active, the glass bar narrows to the current tab and the wider mini-player fills the remaining row; it
+can be switched off independently from Player > Mini player > Mini player transition animations. That
+setting controls whether the bar merges into the compact tab while scrolling. The minimized tab uses its
+own square glass button, sized within the available row and aligned to the mini-player card, so UIKit's
+safe-area-dependent tab-item shape cannot squash it on different devices.
 
 ## Adding a feature
 

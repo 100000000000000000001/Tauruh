@@ -16,3 +16,5 @@ void SGPresentAddTabSheet(UIViewController *owner, NSArray<NSDictionary *> *pres
 // Tab row under the rest runs `remove` once an action sheet has asked.
 void SGPresentEditTabSheet(UIViewController *owner, NSArray<NSDictionary *> *presets, NSDictionary *tab,
                            void (^save)(NSDictionary *tab), void (^remove)(void));
+// The same editor limited to a tab's name and icon, for tabs whose destination Spotify owns.
+void SGPresentEditTabAppearanceSheet(UIViewController *owner, NSDictionary *tab, void (^save)(NSDictionary *tab));

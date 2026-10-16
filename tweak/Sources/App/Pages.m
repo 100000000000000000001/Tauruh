@@ -92,6 +92,8 @@ UIViewController *SGLyricsSettingsPage(void) {
         [sections addObject:SGSection(@"Display", @[landscape,
             SGSwitchRow(@"Auto-hide landscape controls", @"Bring them back with a tap after a few seconds",
                         SGRKeyLyricsLandscapeAutoHide),
+            SGSwitchRow(@"Auto-hide portrait controls", @"Bring them back with a tap after a few seconds",
+                        SGRKeyLyricsAutoHide),
             SGLyricsWordTimingRow(), SGLyricsRomanisedRow(), SGLyricsDelayRow(),
             SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow(), SGLyricsMeaningMarkersRow()])];
         [sections addObject:SGSection(@"Translation", @[SGTranslateEverySongRow(), SGGeminiKeyRow(), SGSavedTranslationsRow()])];
@@ -116,10 +118,8 @@ UIViewController *SGPlayerSettingsPage(void) {
     if (native) {
         [pages addObject:SGWithSymbol(SGPageRow(@"Now playing bar", ^UIViewController *{ return SGNowPlayingBarSettingsPage(); }), @"rectangle.bottomthird.inset.filled")];
         [pages addObject:SGWithSymbol(SGPageRow(@"Queue & devices", ^UIViewController *{ return SGQueueSettingsPage(); }), @"text.line.first.and.arrowtriangle.forward")];
-    } else {
-        [pages addObject:SGWithSymbol(SGPageRow(@"Now playing", ^UIViewController *{ return SGRNowPlayingBarSettingsPage(); }), @"rectangle.bottomthird.inset.filled")];
     }
-    [sections addObject:SGSection(nil, pages)];
+    if (pages.count) [sections addObject:SGSection(nil, pages)];
     [sections addObject:SGNotedSection(@"Lossless", @[
         SGOptionRow(@"Lossless files", @"Play matching FLAC or ALAC files instead of Spotify's stream", SGKeyLossless),
     ], @"Put matching files in Files › Spotify › Lossless. Applies after you restart Spotify.")];

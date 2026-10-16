@@ -1,4 +1,5 @@
 #import "Core/SGCore.h"
+#import "Redesigned/Navbar/Navbar.h"
 #import "Redesigned/Kit/SGRRepaint.h"
 #import "NowPlayingBar.h"
 
@@ -6,6 +7,10 @@ static const CGFloat kCardRadius = 24;
 static char kGlassKey;
 static __weak UIVisualEffectView *sg_cardGlass;
 static __weak UIView *sg_cardArtwork;
+static __weak UIViewController *sg_barContainer;
+static __weak UIView *sg_inlineBar;
+static NSMapTable<NSLayoutConstraint *, NSNumber *> *sg_savedEdgeConstants;
+static CGRect sg_fullBarFrame, sg_narrowBarFrame;
 
 CGRect SGRNowPlayingCardFrameIn(UIView *host, CGFloat *radius) {
     UIVisualEffectView *glass = sg_cardGlass;
@@ -50,18 +55,84 @@ static void roundView(UIView *view, CGFloat radius) {
     view.layer.cornerCurve = kCACornerCurveContinuous;
 }
 
+static void restoreBarEdges(UIView *bar) {
+    for (NSLayoutConstraint *constraint in sg_savedEdgeConstants)
+        constraint.constant = [[sg_savedEdgeConstants objectForKey:constraint] doubleValue];
+    [sg_savedEdgeConstants removeAllObjects];
+    if (bar.translatesAutoresizingMaskIntoConstraints && CGRectEqualToRect(bar.frame, sg_narrowBarFrame))
+        bar.frame = sg_fullBarFrame;
+    sg_narrowBarFrame = CGRectNull;
+}
+
+static BOOL setBarEdges(UIView *bar, CGFloat left, CGFloat right) {
+    UIView *superview = bar.superview;
+    if (bar.translatesAutoresizingMaskIntoConstraints) {
+        CGRect frame = CGRectMake(left, bar.frame.origin.y, right - left, bar.frame.size.height);
+        if (!CGRectEqualToRect(bar.frame, sg_narrowBarFrame)) sg_fullBarFrame = bar.frame;
+        sg_narrowBarFrame = frame;
+        if (!CGRectEqualToRect(bar.frame, frame)) bar.frame = frame;
+        return YES;
+    }
+    if (superview.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft) return NO;
+    if (!sg_savedEdgeConstants) sg_savedEdgeConstants = [NSMapTable weakToStrongObjectsMapTable];
+    NSUInteger held = 0;
+    for (NSLayoutConstraint *constraint in superview.constraints) {
+        NSLayoutAttribute attribute = constraint.firstAttribute;
+        BOOL barFirst = constraint.firstItem == bar && constraint.secondItem == superview;
+        if (!constraint.active || constraint.relation != NSLayoutRelationEqual || constraint.multiplier != 1
+            || attribute != constraint.secondAttribute || (!barFirst && !(constraint.secondItem == bar && constraint.firstItem == superview))) continue;
+        BOOL isLeft = attribute == NSLayoutAttributeLeading || attribute == NSLayoutAttributeLeft;
+        if (!isLeft && attribute != NSLayoutAttributeTrailing && attribute != NSLayoutAttributeRight) continue;
+        if (![sg_savedEdgeConstants objectForKey:constraint])
+            [sg_savedEdgeConstants setObject:@(constraint.constant) forKey:constraint];
+        CGFloat edge = isLeft ? 0 : superview.bounds.size.width;
+        CGFloat value = isLeft ? left : right;
+        constraint.constant = barFirst ? value - edge : edge - value;
+        held |= isLeft ? 1 : 2;
+    }
+    if (held == 3) return YES;
+    restoreBarEdges(bar);
+    return NO;
+}
+
+static void placeInlineBar(UIViewController *container) {
+    UIView *view = container.view;
+    UIView *bar = container.childViewControllers.firstObject.viewIfLoaded;
+    CGRect slot = !bar || bar.superview != view
+        ? CGRectNull : SGRTabBarInlineSlot(view.superview, bar.bounds.size.height);
+    CGPoint origin = CGPointMake(view.center.x - view.bounds.size.width / 2,
+                                 view.center.y - view.bounds.size.height / 2);
+    if (CGRectIsNull(slot) || !setBarEdges(bar, CGRectGetMinX(slot) - origin.x, CGRectGetMaxX(slot) - origin.x)) {
+        if (sg_inlineBar) restoreBarEdges(bar);
+        sg_inlineBar = nil;
+        if (!CGAffineTransformIsIdentity(view.transform)) view.transform = CGAffineTransformIdentity;
+        return;
+    }
+    CGAffineTransform transform = CGAffineTransformMakeTranslation(
+        0, CGRectGetMidY(slot) - origin.y - CGRectGetMidY(bar.frame));
+    if (!CGAffineTransformEqualToTransform(view.transform, transform)) view.transform = transform;
+    sg_inlineBar = view;
+}
+
+void SGRNowPlayingBarFollowTabBar(void) {
+    UIViewController *container = sg_barContainer;
+    if (!container.isViewLoaded) return;
+    placeInlineBar(container);
+    [container.view setNeedsLayout];
+    [container.view layoutIfNeeded];
+    SGRAlignCompactTabBarToNowPlayingCard();
+}
+
 static void restyleCardContent(UIView *card) {
     SGForEachView(card, ^(UIView *v) {
         CGSize size = v.bounds.size;
         BOOL square = size.width >= 36 && size.width <= 48 && fabs(size.width - size.height) < 1;
         if (!square || v.layer.cornerRadius <= 0) return;
-        if (v.layer.cornerRadius >= size.width / 2) {
-            if (!sg_cardArtwork) sg_cardArtwork = v;
-            return;
-        }
+        CGFloat artworkRadius = SGFlag(SGRKeyNowPlayingRoundedArtwork, NO)
+            ? MIN(9, size.width * 0.22) : size.width / 2;
         UIView *outer = v;
         for (UIView *u = v; u && u != card && CGSizeEqualToSize(u.bounds.size, size); u = u.superview) {
-            roundView(u, size.width / 2);
+            roundView(u, artworkRadius);
             u.clipsToBounds = YES;
             outer = u;
         }
@@ -81,6 +152,7 @@ static void restyleCardContent(UIView *card) {
 static void styleNowPlayingBar(UIViewController *container) {
     UIViewController *barVC = container.childViewControllers.firstObject;
     UIView *bar = barVC.viewIfLoaded ?: container.view;
+    sg_barContainer = container;
     sgr_nowPlayingRoot = bar;
 
     UIView *card = sgr_nowPlayingCard;
@@ -88,6 +160,7 @@ static void styleNowPlayingBar(UIViewController *container) {
 
     container.view.layer.backgroundColor = NULL;
     SGStripBackgrounds(bar);
+    placeInlineBar(container);
 
     CGRect frame = card ? SGFrameIn(card, container.view) : contentBounds(bar, container.view);
     if (CGRectIsNull(frame)) return;
@@ -105,12 +178,17 @@ static void styleNowPlayingBar(UIViewController *container) {
     sg_cardGlass = glass;
     glass.frame = frame;
     SGShapeGlass(glass, radius, NO);
+    SGRAlignCompactTabBarToNowPlayingCard();
 
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         SGLog(@"now playing card %@ at %@ (bar %@, container %@)", card.class, NSStringFromCGRect(frame),
               NSStringFromCGRect(bar.frame), NSStringFromCGRect(container.view.bounds));
     });
+}
+
+void SGRNowPlayingBarRefresh(void) {
+    if (sg_barContainer) styleNowPlayingBar(sg_barContainer);
 }
 
 %hook _TtC18NowPlaying_BarImpl36NowPlayingBarContainerViewController
@@ -128,11 +206,22 @@ static void styleNowPlayingBar(UIViewController *container) {
 }
 %end
 
+%hook _TtC22NowPlaying_BarPageImplP33_CCC0D2EEA6D4725EECD8965E8C38C86D20TouchPassthroughView
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *hit = %orig;
+    UIView *moved = sg_inlineBar;
+    if ((hit && hit != (UIView *)self) || ![moved isDescendantOfView:(UIView *)self]) return hit;
+    UIView *inside = [moved hitTest:[(UIView *)self convertPoint:point toView:moved] withEvent:event];
+    return inside && inside != moved ? inside : hit;
+}
+%end
+
 %ctor {
     if (!SGRedesignedUI()) return;
     %init;
     SGRequireClasses(@[
         @"_TtC18NowPlaying_BarImpl36NowPlayingBarContainerViewController",
         @"_TtC18NowPlaying_BarImpl27NowPlayingBarViewController",
+        @"_TtC22NowPlaying_BarPageImplP33_CCC0D2EEA6D4725EECD8965E8C38C86D20TouchPassthroughView",
     ]);
 }
