@@ -30,5 +30,8 @@ NSString *SGRegisterCustomFont(void);
 // The family name the faces share, or nil when they differ, one has none, or there are none.
 NSString *SGFontSingleFamily(NSArray<NSString *> *names);
 
+// Opens Files to import a font family for the lyrics alone; `done` runs once the files are in or refused.
+void SGPickFontForLyrics(void (^done)(void));
+
 @class SGModRow;
 NSArray<SGModRow *> *SGAppFontRows(void);   // the Font row, opening the page of choices

@@ -18,8 +18,7 @@ static NSString *aboutSize(void) {
 }
 
 static NSString *footer(void) {
-    return @"Sing separates the song into its background and vocals. Slide from background-only through the full track "
-           "to vocals-only, from the microphone in the lyrics. "
+    return @"Sing turns the vocals of the song playing down to sing over, from the microphone in its lyrics. "
            "It works on iOS 18 or later. Choose the full model for the best separation (210 MB) or the light "
            "model for a smaller download (31 MB). Each runs only on this iPhone. The switch and the download apply straight away.";
 }

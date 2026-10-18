@@ -2,7 +2,7 @@
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
 #import "SGRAccent.h"
-#import "Redesigned/Navbar/Navbar.h"
+#import "Redesigned/Home/Home.h"
 
 static void chooseAccent(void) {
     if (!SGRAccentColor()) {
@@ -24,7 +24,7 @@ static void chooseAccent(void) {
 NSArray<SGModRow *> *SGRAppearanceRows(void) {
     SGModRow *profile = SGSwitchRow(@"Show profile photo", @"Show the profile photo at the top right",
                                     SGRKeyNavbarProfilePhoto);
-    profile.changed = ^(BOOL on) { SGRNavbarRefreshProfilePhotos(); };
+    profile.changed = ^(BOOL on) { SGRHomeProfilePhotoPreferenceChanged(); };
     return @[
         profile,
         SGWithSymbol(SGStatActionRow(@"Accent colour", nil, ^NSString *{ return SGRAccentLabel(); }, ^{ chooseAccent(); }), @"paintpalette"),

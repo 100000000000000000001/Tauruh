@@ -10,6 +10,8 @@ const CGFloat SGRHeaderInfoTitleRise = 56;
 // The text kSide in from the edges; Play at least kPlayWidth wide, the Music app's; the gaps between.
 static const CGFloat kSide = 20, kPlayWidth = 148, kRowSpacing = 16, kRowAbove = 16, kAboutAbove = 14;
 static const CGFloat kLogoWidthShare = 0.8, kLogoMaxHeight = 64;
+// The card under the row: the gap above it and the widest it goes.
+static const CGFloat kCardAbove = 20, kCardMaxWidth = 440;
 
 static UILabel *infoLabel(UIView *parent, UIFont *font, UIColor *color, NSInteger lines, NSTextAlignment alignment) {
     UILabel *label = [UILabel new];
@@ -34,6 +36,7 @@ static BOOL setText(UILabel *label, NSString *text) {
     UILabel *_title, *_creator, *_length, *_about;
     UIImageView *_logo;
     UIImage *_titleImage;
+    UIView *_card;
     SGRMirrorButton *_shuffle, *_trailing;
     SGRPlayCapsule *_play;
     __weak UIView *_creatorLink;
@@ -189,6 +192,30 @@ static BOOL setText(UILabel *label, NSString *text) {
     if (_trailing.source) [_trailing feedFrom:_trailing.source];
 }
 
+- (void)showCard:(UIView *)card {
+    if (_card == card) return;
+    [_card removeFromSuperview];
+    _card = card;
+    if (card) {
+        [self addSubview:card];
+        if (self.window) {
+            card.alpha = 0;
+            SGRAnimate(SGRMotionFade, ^{ card.alpha = 1; }, nil);
+        }
+    }
+    [self setNeedsLayout];
+}
+
+- (CGFloat)cardWidthForWidth:(CGFloat)width {
+    return MIN(MAX(0, width - 2 * kSide), kCardMaxWidth);
+}
+
+// The card with the gap above it, or 0 with none.
+- (CGFloat)cardBlockForWidth:(CGFloat)width {
+    if (!_card) return 0;
+    return kCardAbove + ceil([_card sizeThatFits:CGSizeMake([self cardWidthForWidth:width], CGFLOAT_MAX)].height);
+}
+
 - (CGFloat)contentHeightForWidth:(CGFloat)width {
     CGFloat text = MAX(0, width - 2 * kSide), height = 0;
     UILabel *previous = nil;
@@ -207,7 +234,7 @@ static BOOL setText(UILabel *label, NSString *text) {
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGFloat width = self.bounds.size.width, text = MAX(0, width - 2 * kSide);
-    CGFloat y = round(self.bounds.size.height - SGRHeaderInfoBottom - [self contentHeightForWidth:width]);
+    CGFloat y = round(self.bounds.size.height - SGRHeaderInfoBottom - [self contentHeightForWidth:width] - [self cardBlockForWidth:width]);
 
     UILabel *previous = nil;
     for (UILabel *label in @[_title, _creator, _length]) {
@@ -236,6 +263,14 @@ static BOOL setText(UILabel *label, NSString *text) {
     if (!_about.hidden) {
         y += kAboutAbove;
         _about.frame = CGRectMake(kSide, y, text, ceil([_about sizeThatFits:CGSizeMake(text, CGFLOAT_MAX)].height));
+    }
+
+    if (_card) {
+        CGFloat cardWidth = [self cardWidthForWidth:width];
+        CGFloat cardHeight = ceil([_card sizeThatFits:CGSizeMake(cardWidth, CGFLOAT_MAX)].height);
+        y += kCardAbove;
+        _card.frame = CGRectMake(round((width - cardWidth) / 2), y, cardWidth, cardHeight);
+        y += cardHeight;
     }
 }
 

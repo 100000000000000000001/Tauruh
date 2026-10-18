@@ -10,12 +10,14 @@
 // the track names, so an album's songs share one.
 //
 // The choice is read on every track, and a change applies at once: Off takes the clip away, Moving artwork
-// and Every song look the playing track up. Lyrics is LyricsArtwork.x's, which reads it only at launch, so
-// a launch with Lyrics leaves this off until the next one.
+// and Every song look the playing track up, and Fill makes a generated sharp-to-blurred cover clip.
+// Lyrics is LyricsArtwork.x's, which reads it only at launch, so a launch with Lyrics leaves this off until
+// the next one.
 #import <MediaPlayer/MediaPlayer.h>
 #import "Core/SGCore.h"
 #import "AnimatedArtwork.h"
 #import "SGFluidClip.h"
+#import "SGFillClip.h"
 #import "SGMotionClip.h"
 #import "Shared/LockScreenLyrics/LockScreenLyrics.h"
 #import "Shared/LockScreenLyrics/SGLyricsClip.h"
@@ -155,6 +157,43 @@ static void showCover(NSString *picture) {
     SGLog(@"lock motion: no moving artwork, the cover's clip offered as %@", file.lastPathComponent);
 }
 
+API_AVAILABLE(ios(26.0))
+static void showFill(NSString *picture) {
+    if (![MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys containsObject:MPNowPlayingInfoProperty3x4AnimatedArtwork]) return;
+    NSString *title = sg_title;
+    CGSize size = SGLyricsClipSize(SGMotionPixels());
+    NSURL *file = SGMotionMadeFile([NSString stringWithFormat:@"fill\nv5\n%@\n%.0fx%.0f", picture, size.width, size.height]);
+    __block UIImage *renderedFrame;
+    MPMediaItemAnimatedArtwork *artwork = [[MPMediaItemAnimatedArtwork alloc] initWithArtworkID:file.lastPathComponent
+        previewImageRequestHandler:^(CGSize wanted, void (^completion)(UIImage *)) {
+            withCover(title, ^(CGImageRef cover) {
+                if (!renderedFrame) {
+                    CGImageRef frame = SGFillClipFrame(cover, size);
+                    if (frame) renderedFrame = [UIImage imageWithCGImage:frame];
+                    if (frame) CGImageRelease(frame);
+                }
+                completion(renderedFrame ? filled(renderedFrame, wanted) : nil);
+            });
+        }
+        videoAssetFileURLRequestHandler:^(CGSize wanted, void (^completion)(NSURL *)) {
+            withCover(title, ^(CGImageRef cover) {
+                if (!renderedFrame) {
+                    CGImageRef frame = SGFillClipFrame(cover, size);
+                    if (frame) renderedFrame = [UIImage imageWithCGImage:frame];
+                    if (frame) CGImageRelease(frame);
+                }
+                CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
+                BOOL ok = [NSFileManager.defaultManager fileExistsAtPath:file.path]
+                    || (renderedFrame && SGFillClipWriteFrame(file, renderedFrame.CGImage, size));
+                SGLog(@"lock motion: Fill clip %@ %@ in %.0f ms", file.lastPathComponent,
+                      ok ? @"ready" : @"not written", (CFAbsoluteTimeGetCurrent() - start) * 1000);
+                completion(ok ? file : nil);
+            });
+        }];
+    SGNowPlayingSetExtras(@"motion", @{MPNowPlayingInfoProperty3x4AnimatedArtwork: artwork}, title);
+    SGLog(@"lock motion: Fill cover offered as %@", file.lastPathComponent);
+}
+
 void SGLockMotionShowPlain(BOOL plain) {
     if (@available(iOS 26.0, *)) {
         sg_plain = plain;
@@ -183,6 +222,10 @@ void SGLockMotionShowPlain(BOOL plain) {
             sg_title = state.track.trackTitle;
             sg_picture = pictureOf(state.track, metadata);
             sg_choice = SGLockScreenArtwork();
+            if (sg_choice == SGLockArtworkFill) {
+                showFill(sg_picture);
+                return NO;
+            }
             return motionOn(sg_choice);
         } found:^(NSString *uri, NSURL *file) {
             if (SGLockScreenCanvasLyricsEnabled() && motionOn(sg_choice)) {

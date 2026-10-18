@@ -108,10 +108,12 @@ Shared:
                   artwork, from iOS 26 (Apple takes an MPMediaItemAnimatedArtwork under one of
                   MPNowPlayingInfoCenter's animated artwork keys, and the mod puts one there through a second
                   hook on setNowPlayingInfo:, so the lock screen artwork and lyric clips' rewrites of the same dictionary carry
-                  it). With Canvas lyrics on, each lyric clip is composited over the moving video; the
-                  player menu and the lock-screen star toggle that independently of the artist-name setting.
-                  The Canvas lyrics switch stays visible even while full-screen artwork is off, so it can be
-                  prepared before choosing Moving artwork or Every song.
+                  it). With Canvas lyrics on, each lyric clip is composited over the moving video; Fill
+                  generates a clip with a sharp cover fading into four progressive blur layers. The player
+                  menu toggles Canvas lyrics; the lock-screen star cycles through its configured views,
+                  independently of the artist-name setting.
+                  The Canvas lyrics switch stays visible even while full-screen artwork is off. The star can
+                  cycle through Canvas, Canvas with lyrics and Fill; its order and enabled views are configurable.
                   In Every song mode, Fallback album art size controls the square cover shown over the blurred
                   fallback when no moving artwork or lyrics clip is available; 50% is the original size.
                   The sources are asked in the user's order (Spotify Canvas, then Apple Music until set, on the
@@ -344,7 +346,8 @@ what the restart will bring. In the redesign Karaoke comes next, on a card of it
 voice model's download (Redesigned/Lyrics/SingSettings.m), with Off, On, No model or the download's percentage
                 beside the row, "Needs iOS 18" below iOS 18. Then a card of parts. Navbar: the tab editor of the stored look,
 each with its own list of tabs. Player: Gestures and Blocked artists (with the count on the row), which work
-with either look. In the redesigned look Appearance holds the profile-photo toggle and accent colour.
+with either look. In the redesigned look Appearance holds the profile-photo toggle and accent colour;
+Home page style and the Top picks first-shelf size are independent switches.
 The redesigned Player page also has independent Show Sing button and Show Translate button
 switches, the six background styles (Still, Colors, Fluid, Animated, Visualiser and Fill), an Animated fallback
 choice (Still, Colors, Fluid, Visualiser or Fill, default Fill), background opacity sliders for the artwork
@@ -353,17 +356,19 @@ Lyrics: the ordered list of lyrics sources, lyrics for every track,
 naming the source in the redesign, artist-name replacement on the lock screen (independent of Canvas lyrics),
 and glass lyrics in the native look; in the redesign also
 which of the lyrics, their pronunciation and their translation is set largest, Genius meaning marks (which can
-be hidden without losing the hold-on-a-line meaning sheet), the translation's language, and whether landscape
-lyrics controls auto-hide (on by default, under Lyrics > Display). Lock Screen: its controls and, under Artwork,
+be hidden without losing the hold-on-a-line meaning sheet), the translation's language, and whether portrait
+or landscape lyrics controls auto-hide (both under Lyrics > Display). Lock Screen: its controls and, under Artwork,
 Animated lock screen, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls,
 with optional Canvas lyrics toggled from the redesigned player's ⋯ menu or the lock-screen star, a Sources page for
-their order, and a "Needs iOS 26" row below that; Canvas lyrics and artist-name replacement remain independent.
+their order, Fill artwork, and configurable lock-screen star cycling, and a "Needs iOS 26" row below that;
+Canvas lyrics and artist-name replacement remain independent.
 Audio effects follows Lock Screen, which appears between Lyrics and Audio effects on the root page.
 In the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
 buttons to hide); in the redesign the Player page's Mini player section groups the device button, moving
-background, mini-player merge/transition toggle and rounded-square artwork option, the latter off by default.
+background, mini-player merge/transition toggle and rounded-square artwork option for both the card and
+docked pill, the latter off by default.
 An optional volume slider is off by default, with its thumb hidden if enabled. The taurus settings page
 credits @Pulse-Ice for the Fill background treatment adapted from EeveeImmersive.
 Vibrations follows under either look, a card for

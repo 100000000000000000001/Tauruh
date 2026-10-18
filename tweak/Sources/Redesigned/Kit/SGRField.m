@@ -51,7 +51,13 @@ static CAGradientLayer *fillRamp(CGFloat start, CGFloat end, BOOL rising) {
     return ramp;
 }
 
+// How much of the material's blur the lyrics add over the Fill artwork: a little, not enough to lose the cover.
+static const CGFloat kLyricsBlur = 0.3;
+
 @implementation SGRArtworkField {
+    UIVisualEffectView *_lyricsBlur;
+    UIViewPropertyAnimator *_lyricsBlurAnimator;
+    BOOL _lyricsBlurred;
     CALayer *_solid;
     CAGradientLayer *_black;
     CALayer *_backdrop;
@@ -169,6 +175,7 @@ static CAGradientLayer *fillRamp(CGFloat start, CGFloat end, BOOL rising) {
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     _solid.frame = painted;
+    _lyricsBlur.frame = painted;
     CGFloat height = windowHeight(self), total = MAX(1, painted.size.height);
     CGFloat from = height * kBlackFrom + bleed.top;
     CGFloat to = MAX(from + 1, height * kBlackTo + bleed.top);
@@ -233,6 +240,46 @@ static CAGradientLayer *fillRamp(CGFloat start, CGFloat end, BOOL rising) {
     [self setNeedsLayout];
 }
 
+- (void)setLyricsBlurred:(BOOL)blurred animated:(BOOL)animated {
+    if (_lyricsBlurred == blurred) return;
+    _lyricsBlurred = blurred;
+    [self applyLyricsBlurAnimated:animated];
+}
+
+- (void)applyLyricsBlurAnimated:(BOOL)animated {
+    BOOL on = _lyricsBlurred && _fills;
+    if (!on && !_lyricsBlur) return;
+    if (!_lyricsBlur) {
+        _lyricsBlur = [[UIVisualEffectView alloc] initWithEffect:nil];
+        _lyricsBlur.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+        _lyricsBlur.userInteractionEnabled = NO;
+        _lyricsBlur.accessibilityElementsHidden = YES;
+        _lyricsBlur.frame = self.bounds;
+        [self addSubview:_lyricsBlur];
+    }
+    [self bringSubviewToFront:_lyricsBlur];
+    CGFloat intensity = on ? kLyricsBlur : 0;
+    void (^apply)(void) = ^{
+        UIViewPropertyAnimator *old = self->_lyricsBlurAnimator;
+        if (old && old.state != UIViewAnimatingStateInactive) [old stopAnimation:YES];
+        self->_lyricsBlurAnimator = nil;
+        self->_lyricsBlur.effect = nil;
+        if (intensity <= 0) return;
+        __weak UIVisualEffectView *weak = self->_lyricsBlur;
+        UIViewPropertyAnimator *fractional = [[UIViewPropertyAnimator alloc] initWithDuration:1
+                                                                                        curve:UIViewAnimationCurveLinear
+                                                                                   animations:^{
+            weak.effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark];
+        }];
+        [fractional startAnimation];
+        [fractional pauseAnimation];
+        fractional.fractionComplete = intensity;
+        self->_lyricsBlurAnimator = fractional;
+    };
+    if (animated && self.window) SGRAnimate(SGRMotionFade, apply, nil);
+    else apply();
+}
+
 - (void)setFills:(BOOL)fills {
     if (fills == _fills) return;
     _fills = fills;
@@ -241,6 +288,7 @@ static CAGradientLayer *fillRamp(CGFloat start, CGFloat end, BOOL rising) {
     _backdrop.hidden = fills || _fluid || _flows;
     _fillBackground.hidden = !fills || _fluid || _flows;
     _fill.hidden = !fills || _fluid || _flows || !_image.CGImage;
+    [self applyLyricsBlurAnimated:NO];
 }
 
 - (void)setBackdropOpacity:(CGFloat)opacity {

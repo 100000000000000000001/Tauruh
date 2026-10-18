@@ -125,6 +125,7 @@ static SGRArtworkField *fieldIn(UIView *plane) {
     SGRPlayerApplyBackgroundToField(field, background);
     field.motionHeld = fieldHeld();
     field.bleed = kBleed;
+    [field setLyricsBlurred:SGRPlayerLyricsOpen() animated:NO];
     objc_setAssociatedObject(plane, &kFieldKey, field, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     sg_field = field;
     [field setProvisionalColor:sg_spotifyColor];

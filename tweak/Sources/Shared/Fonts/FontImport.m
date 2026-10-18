@@ -99,6 +99,8 @@ static void tell(NSString *title, NSString *message, BOOL restart) {
 
 // The files are checked and copied aside before the ones in use are touched, so files Core Text will not read,
 // of more than one family, or that fail to copy change nothing.
+static BOOL sg_lyricsOnly;   // an import for the lyrics' font alone leaves the app's font as it is
+
 static void import(NSArray<NSURL *> *picked) {
     NSMutableArray<NSURL *> *scoped = [NSMutableArray array];
     NSMutableArray<NSString *> *families = [NSMutableArray array];
@@ -134,6 +136,10 @@ static void import(NSArray<NSURL *> *picked) {
         [store setObject:copied forKey:SGKeyAppFontFiles];
         [store setObject:family forKey:SGKeyAppFontName];
         if (SGRegisterCustomFont()) {
+            if (sg_lyricsOnly) {
+                tell(@"Font imported", [NSString stringWithFormat:@"%@ is in the lyrics' Font list.", family], NO);
+                return;
+            }
             SGSetInt(SGKeyAppFont, SGAppFontCustom);
             tell(@"Font imported", [NSString stringWithFormat:@"%@ becomes the app's font when Spotify starts again.", family], YES);
             return;
@@ -169,6 +175,15 @@ static void pickFont(void (^done)(void)) {
     picker.delegate = delegate;
     picker.allowsMultipleSelection = YES;
     [SGTopController() presentViewController:picker animated:YES completion:nil];
+}
+
+// The Lyrics page's Import: the same picker and checks, without making the font the app's.
+void SGPickFontForLyrics(void (^done)(void)) {
+    sg_lyricsOnly = YES;
+    pickFont(^{
+        sg_lyricsOnly = NO;
+        if (done) done();
+    });
 }
 
 #pragma mark - the page

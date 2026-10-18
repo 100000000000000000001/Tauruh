@@ -1,5 +1,7 @@
 // The lyrics' look as stored, its presets and the preview's lines. The page is LyricsLookSettings.m.
 #import "LyricsLook.h"
+#import "Core/SGCore.h"
+#import "Shared/Fonts/Fonts.h"
 
 NSNotificationName const SGRLyricsLookDidChangeNotification = @"spotifyglass.redesign.lyricsLookDidChange";
 
@@ -66,6 +68,86 @@ NSInteger SGRLyricsLookPresetIndex(SGRLyricsLook look) {
             && same(look.glow, preset.glow) && same(look.wave, preset.wave)) return (NSInteger)i;
     }
     return -1;
+}
+
+#pragma mark - the animation
+
+NSArray<NSString *> *SGRLyricsAnimationNames(void) {
+    return @[@"Wave", @"Glow", @"Bounce", @"Ripple", @"Float", @"Apple Music", @"Snappy"];
+}
+
+static const SGRLyricsAnimation animations[] = {
+    // letters wordLift letterLift glow spread bounce feather dim  riseMs move damp stagger fade
+    {YES, 0,  5,   8,  0.5,  NO,  22, 0.97, 700,  0.7, 0.86, 0.04, 0.35},   // Wave: letters rise and glow one after another
+    {YES, 0,  1.5, 14, 0.7,  NO,  26, 0.97, 700,  0.7, 0.86, 0.04, 0.35},   // Glow: hardly rise, shine
+    {YES, 0,  9,   6,  0.45, YES, 14, 0.94, 700,  0.8, 0.6,  0.05, 0.3},    // Bounce: letters spring up and overshoot
+    {YES, 0,  7,   10, 0.9,  NO,  40, 0.96, 1100, 0.9, 0.9,  0.08, 0.5},    // Ripple: a slow, wide wave through the word
+    {NO,  10, 0,   0,  0,    NO,  44, 0.97, 1600, 0.9, 0.9,  0.05, 0.6},    // Float: the whole word drifts up
+    {NO,  2.5, 0,  0,  0,    NO,  22, 0.97, 700,  0.7, 0.86, 0.04, 0.35},   // Apple Music
+    {NO,  1,  0,   0,  0,    NO,  10, 0.97, 500,  0.3, 1.0,  0,    0.12},   // Snappy: nearly at once
+};
+
+void SGRResetLyricsLook(id changer) {
+    NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
+    [store removeObjectForKey:SGRKeyLyricsLook];
+    [store removeObjectForKey:SGRKeyLyricsFont];
+    [store removeObjectForKey:SGRKeyLyricsAnimation];
+    [NSNotificationCenter.defaultCenter postNotificationName:SGRLyricsLookDidChangeNotification object:changer];
+}
+
+NSInteger SGRLyricsAnimationIndex(void) {
+    NSInteger index = [NSUserDefaults.standardUserDefaults integerForKey:SGRKeyLyricsAnimation];
+    return index >= 0 && index < (NSInteger)SGRLyricsAnimationNames().count ? index : 0;
+}
+
+void SGRSetLyricsAnimationIndex(NSInteger index, id changer) {
+    [NSUserDefaults.standardUserDefaults setInteger:index forKey:SGRKeyLyricsAnimation];
+    [NSNotificationCenter.defaultCenter postNotificationName:SGRLyricsLookDidChangeNotification object:changer];
+}
+
+SGRLyricsAnimation SGRLyricsAnimationNow(void) {
+    return animations[SGRLyricsAnimationIndex()];
+}
+
+#pragma mark - the font
+
+NSArray<NSString *> *SGRLyricsFontChoices(void) {
+    NSMutableArray<NSString *> *choices = [@[@"System", @"Rounded", @"Serif", @"Mono"] mutableCopy];
+    NSString *imported = [NSUserDefaults.standardUserDefaults stringForKey:SGKeyAppFontName];
+    if (imported.length && SGRegisterCustomFont()) [choices addObject:imported];
+    for (NSString *family in SGAppFontFamilies()) if (![choices containsObject:family]) [choices addObject:family];
+    return choices;
+}
+
+NSString *SGRLyricsFontChoice(void) {
+    NSString *saved = [NSUserDefaults.standardUserDefaults stringForKey:SGRKeyLyricsFont];
+    return saved.length && [SGRLyricsFontChoices() containsObject:saved] ? saved : @"System";
+}
+
+void SGRSetLyricsFontChoice(NSString *choice, id changer) {
+    [NSUserDefaults.standardUserDefaults setObject:choice forKey:SGRKeyLyricsFont];
+    [NSNotificationCenter.defaultCenter postNotificationName:SGRLyricsLookDidChangeNotification object:changer];
+}
+
+UIFont *SGRLyricsFont(CGFloat size, UIFontWeight weight) {
+    NSString *choice = SGRLyricsFontChoice();
+    UIFontDescriptorSystemDesign design = nil;
+    if ([choice isEqualToString:@"Rounded"]) design = UIFontDescriptorSystemDesignRounded;
+    else if ([choice isEqualToString:@"Serif"]) design = UIFontDescriptorSystemDesignSerif;
+    else if ([choice isEqualToString:@"Mono"]) design = UIFontDescriptorSystemDesignMonospaced;
+    UIFont *system = [UIFont systemFontOfSize:size weight:weight];
+    if (design) {
+        UIFontDescriptor *descriptor = [system.fontDescriptor fontDescriptorWithDesign:design];
+        return descriptor ? [UIFont fontWithDescriptor:descriptor size:size] : system;
+    }
+    if ([choice isEqualToString:@"System"]) return system;
+    // A family: its upright face nearest the weight; the system's font where the family has none.
+    UIFontDescriptor *descriptor = [UIFontDescriptor fontDescriptorWithFontAttributes:@{
+        UIFontDescriptorFamilyAttribute: choice,
+        UIFontDescriptorTraitsAttribute: @{UIFontWeightTrait: @(weight), UIFontSlantTrait: @0},
+    }];
+    UIFont *font = [UIFont fontWithDescriptor:descriptor size:size];
+    return font ?: system;
 }
 
 #pragma mark - the preview's song

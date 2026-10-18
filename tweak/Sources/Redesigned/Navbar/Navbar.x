@@ -4,14 +4,12 @@
 #import "Shared/Navigation/Links.h"
 #import "Shared/Navigation/TabIcons.h"
 #import <objc/message.h>
-#import <objc/runtime.h>
 
 static const CGFloat kIconSize = 24;
 static const CGFloat kIconTop = 12.5;
 static const CGFloat kLabelTop = 35;
 static const CGFloat kLabelHeight = 14;
 static char kCustomKey, kOrderKey;
-static NSHashTable<UIView *> *sg_profilePhotos;
 
 static CGRect sg_iconBox = {{0, kIconTop}, {kIconSize, kIconSize}};
 static CGRect sg_labelBox = {{0, kLabelTop}, {0, kLabelHeight}};
@@ -22,31 +20,22 @@ static __weak UIStackView *sg_row;
 static UIFont *sg_tabFont;
 static NSMutableArray<NSString *> *sg_stockOrder;
 
+static UIColor *itemColor(void) { return [UIColor colorWithWhite:0xB3 / 255.0 alpha:1]; }
+
 void SGRNavbarSetProfilePhotoVisible(UIView *face) {
     if (!face) return;
-    if (!sg_profilePhotos) sg_profilePhotos = [NSHashTable weakObjectsHashTable];
-    [sg_profilePhotos addObject:face];
-    if (SGFlag(SGRKeyNavbarProfilePhoto, YES)) {
-        face.alpha = 1;
-        face.userInteractionEnabled = YES;
-        face.accessibilityElementsHidden = NO;
-    } else {
-        face.alpha = 0;
-        face.userInteractionEnabled = NO;
-        face.accessibilityElementsHidden = YES;
-    }
+    BOOL visible = SGFlag(SGRKeyNavbarProfilePhoto, YES);
+    face.alpha = visible ? 1 : 0;
+    face.userInteractionEnabled = visible;
+    face.accessibilityElementsHidden = !visible;
 }
-
-void SGRNavbarRefreshProfilePhotos(void) {
-    for (UIView *face in sg_profilePhotos.allObjects) SGRNavbarSetProfilePhotoVisible(face);
-}
-
-static UIColor *itemColor(void) { return [UIColor colorWithWhite:0xB3 / 255.0 alpha:1]; }
 
 #pragma mark - the mod's own items
 
 static UIView *iconView(NSDictionary *entry) {
-    return SGTabIconView(entry[SGRNavbarIcon], [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols], itemColor());
+    NSString *name = entry[SGRNavbarIcon] ?: @"star";
+    BOOL symbol = [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols];
+    return SGTabIconView(name, symbol, itemColor());
 }
 
 @interface SGRTabItemView : UIControl
@@ -74,13 +63,14 @@ static UIView *iconView(NSDictionary *entry) {
 
 - (void)applyEntry:(NSDictionary *)entry {
     self.uri = entry[SGRNavbarURI];
-    self.accessibilityIdentifier = [NSString stringWithFormat:@"%@:%@:%@", entry[SGRNavbarIconSet] ?: @"encore",
-                                    entry[SGRNavbarIcon] ?: @"star", entry[SGRNavbarTitle] ?: @""];
     _title.text = entry[SGRNavbarTitle];
-    NSString *name = [NSString stringWithFormat:@"%@ %@", entry[SGRNavbarIconSet] ?: @"encore", entry[SGRNavbarIcon] ?: @"star"];
-    if ([name isEqualToString:_iconName]) return;
+    NSString *name = entry[SGRNavbarIcon] ?: @"star";
+    NSString *set = [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols] ? @"symbols" : @"encore";
+    NSString *identity = [NSString stringWithFormat:@"%@:%@", set, name];
+    self.accessibilityIdentifier = [NSString stringWithFormat:@"%@:%@", identity, entry[SGRNavbarTitle] ?: @""];
+    if ([identity isEqualToString:_iconName]) return;
     [_icon removeFromSuperview];
-    _iconName = [name copy];
+    _iconName = identity;
     _icon = iconView(entry);
     // Encore's views lay themselves out from constraints; this one is placed by frame.
     _icon.translatesAutoresizingMaskIntoConstraints = YES;
@@ -170,13 +160,12 @@ void SGRComposeTabBar(UIView *tabBar) {
     NSMutableArray<UIView *> *wanted = [NSMutableArray array];
     NSMutableSet<NSString *> *placed = [NSMutableSet set];
     NSMutableSet<NSString *> *keep = [NSMutableSet set];
-    NSSet<NSString *> *removed = [NSSet setWithArray:SGRNavbarRemovedStock()];
+    NSSet<NSString *> *removedStock = [NSSet setWithArray:SGRNavbarRemovedStock()];
 
     if (SGEnabled(SGRKeyNavbar)) {
         for (NSDictionary *entry in SGRNavbarLayout()) {
             NSString *ident = entry[SGRNavbarID];
             if (![ident isKindOfClass:NSString.class] || [placed containsObject:ident]) continue;
-            if (!entry[SGRNavbarURI] && [removed containsObject:ident]) continue;
             [placed addObject:ident];
             BOOL hidden = [entry[SGRNavbarHidden] boolValue];
             if (entry[SGRNavbarURI]) {
@@ -194,11 +183,11 @@ void SGRComposeTabBar(UIView *tabBar) {
     }
     for (NSString *ident in sg_stockOrder) {
         UIView *item = stockViews[ident];
-        if ([removed containsObject:ident]) {
+        if (!item || [wanted containsObject:item]) continue;
+        if (SGEnabled(SGRKeyNavbar) && [removedStock containsObject:ident]) {
             item.hidden = YES;
             continue;
         }
-        if (!item || [wanted containsObject:item]) continue;
         item.hidden = NO;
         [wanted addObject:item];
     }

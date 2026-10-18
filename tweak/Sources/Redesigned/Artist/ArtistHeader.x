@@ -248,6 +248,11 @@ static void applyHeader(UIView *header) {
     [info showTitle:name creator:nil length:listening about:nil];
     showLogo(info, name);
 
+    __weak UIView *concertsHeader = header;
+    SGRArtistConcerts(info, page, name, ^{
+        if (concertsHeader) applyHeader(concertsHeader);
+    });
+
     UIView *shuffle = SGRFindByIdentifier(header, @"Components.UI.ShuffleButton", &kShuffleKey);
     UIView *play = SGRFindByIdentifier(header, @"header-play-button", &kPlayKey);
     UIView *follow = SGRFindByIdentifier(header, @"Curation.FollowButtonElementKit.FollowButton", &kFollowKey);

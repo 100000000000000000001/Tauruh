@@ -1,3 +1,15 @@
+// Home redesign, FLEX builds only: what a scroll of Home costs. While Home's list is dragged or
+// decelerating, a display link at the screen's own rate times each frame, and the Home hooks add up
+// the calls and the time spent in them (SGRHomeProbeBegin/End). When the list settles, one log line
+// says the scroll's frames, its hitches (a frame late by half a frame or more), the worst frame and
+// each hook's share. A hitch the hooks do not account for is Spotify's main thread; lag with no
+// hitches here is the render server (masks, clipping), which a display link does not see.
+//
+// Main thread stalls over 120 ms are sampled too (Diagnostics/SGHangSampler.h): for 90 s once Home is
+// up, and during every scroll.
+//
+// The hooks install with the rest of the redesign and return at once outside a FLEX build: FLEX is
+// injected after the tweak, so whether it is there is only known once the app runs.
 #import <QuartzCore/QuartzCore.h>
 #import "Core/SGCore.h"
 #import "Diagnostics/Diagnostics.h"
@@ -88,6 +100,8 @@ void SGRHomeProbeEnd(SGRHomeProbe probe, CFTimeInterval began) {
     if (++_settled >= kSettledFrames) [self finish];
 }
 
+// What was on screen around a long frame: each section in sight, top down, by the class of its root, and
+// whether HomeSections.x collapsed it.
 - (void)describeLongFrame:(CFTimeInterval)gap {
     UICollectionView *list = (UICollectionView *)_list;
     if (![list isKindOfClass:UICollectionView.class]) return;

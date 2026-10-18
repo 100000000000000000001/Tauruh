@@ -59,23 +59,20 @@ NSString *SGRNavbarDefaultIcon(NSString *stockID) {
 
 BOOL SGRNavbarEntryHasCustomIcon(NSDictionary *entry) {
     if ([entry[SGRNavbarCustomIcon] boolValue] || entry[SGRNavbarIconSet] != nil) return YES;
-
     id iconValue = entry[SGRNavbarIcon];
     if (![iconValue isKindOfClass:NSString.class]) return NO;
     NSString *icon = iconValue;
     NSString *defaultIcon = SGRNavbarDefaultIcon(entry[SGRNavbarID]);
     if (!icon.length || [icon isEqualToString:@"star"] || [icon isEqualToString:defaultIcon]) return NO;
-
-    NSUInteger duplicateLegacyIcons = 0;
+    NSUInteger duplicates = 0;
     for (NSDictionary *candidate in SGRNavbarLayout()) {
         id candidateIcon = candidate[SGRNavbarIcon];
         if ([candidate[SGRNavbarID] isEqual:entry[SGRNavbarID]] || candidate[SGRNavbarURI]
             || candidate[SGRNavbarCustomIcon] || candidate[SGRNavbarIconSet] != nil
             || ![candidateIcon isKindOfClass:NSString.class] || ![candidateIcon isEqualToString:icon]) continue;
-        NSString *candidateDefault = SGRNavbarDefaultIcon(candidate[SGRNavbarID]);
-        if (![icon isEqualToString:candidateDefault]) duplicateLegacyIcons++;
+        if (![icon isEqualToString:SGRNavbarDefaultIcon(candidate[SGRNavbarID])]) duplicates++;
     }
-    return duplicateLegacyIcons == 0;
+    return duplicates == 0;
 }
 
 NSArray<NSString *> *SGRNavbarStock(void) {

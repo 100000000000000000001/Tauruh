@@ -1,4 +1,4 @@
-// What minimizes the glass bar and what brings it back (TabBar.x draws it): a page scrolled down by a
+// What minimizes the glass bar and what brings it back (TabBar.x draws it, and NowPlayingBar.x docks the card): a page scrolled down by a
 // finger or the fling after it, and scrolled back up or to its top (MinimizeStep.h). After the bar changes some
 // other way (a tap on its circle, a tab, the player), only a new touch minimizes it again: the fling still
 // running would otherwise undo the tap at once; another tab (TabBar.x);
@@ -11,6 +11,7 @@
 #import "Navbar.h"
 #import "MinimizeStep.h"
 #import "Shared/Player/PlayerEvents.h"
+#import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 
 static Class sg_containerClass;
 static __weak UIScrollView *sg_page, *sg_other;
@@ -24,6 +25,8 @@ static BOOL inContainer(UIView *view) {
 
 static void scrolled(UIScrollView *scrollView) {
     if ((!scrollView.isTracking && !scrollView.isDecelerating) || scrollView == sg_other) return;
+    // Nothing playing: the pill has nothing to show, so the bar is never minimized (one already minimized can come back).
+    if (!SGRTabBarMinimized() && !SGRNowPlayingAvailable()) return;
     CGFloat offset = scrollView.contentOffset.y;
     if (scrollView != sg_page) {
         if (!inContainer(scrollView)) {

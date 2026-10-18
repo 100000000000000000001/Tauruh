@@ -186,11 +186,11 @@ static CGImageRef newBlurred(CGImageRef image, size_t width, size_t height, CGFl
 }
 
 static NSArray<UIImage *> *fillBlursOf(CGImageRef image) {
-    CGFloat scale = MAX(1, (CGFloat)CGImageGetWidth(image) / 640.0);
     static const CGFloat radii[] = {2.5, 6.0, 12.0, 22.0};
     NSMutableArray<UIImage *> *images = [NSMutableArray arrayWithCapacity:sizeof radii / sizeof *radii];
     for (NSUInteger index = 0; index < sizeof radii / sizeof *radii; index++) {
-        CGImageRef blurred = newBlurred(image, 640, 640, radii[index] * scale);
+        // newBlurred normalizes the cover to 640px before applying the matching v5 blur radius.
+        CGImageRef blurred = newBlurred(image, 640, 640, radii[index]);
         if (!blurred) return nil;
         [images addObject:[UIImage imageWithCGImage:blurred scale:1 orientation:UIImageOrientationUp]];
         CGImageRelease(blurred);

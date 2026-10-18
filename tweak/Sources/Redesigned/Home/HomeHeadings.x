@@ -1,3 +1,23 @@
+// Home redesign: a shelf's heading at the Music app's size, the title 2 style in bold (22pt at the default
+// text size) over Spotify's 17pt. The title is a label of the Kit's own on the same baseline, drawn over
+// Spotify's, which goes transparent: Spotify's label measures the heading, so the shelf keeps its layout,
+// and the heading button keeps its touch and its accessibility label. The larger title reaches a few
+// points up into the gap above the shelf. A small line over the title ("For fans of") and the artist's
+// picture beside it stay Spotify's.
+//
+// The label is held on Spotify's by constraints, not by a frame worked out here: a heading with a picture lays
+// its labels out in a stack of its own, which is positioned after this hook has run, so a frame taken here put
+// the title over the artist's picture at the leading edge, and a cell reused for a plain heading kept the
+// place the picture had left (trees/continuous/1.txt:2533 and :2291, 2026-09-17). Spotify's label can also have
+// no text yet when the button lays out, which left three of that tree's headings at Spotify's own size, so a
+// heading with nothing to draw on is looked at again on the next turn of the run loop, a few times at most.
+//
+// Tree (trees/continuous/1.txt:2289-2312, 2026-09-17): Element_List.SupplementaryItemView 370x48 >
+// ... > UIView id=Components.UI.SectionHeadingHome > AutoLayoutStackView > UIView > NoIntrinsicContentSizeButton
+// (a11y "For fans of  Yzomandias"), under which an ImageViewHolder 48x48 and a stack of SPTEncoreLabels:
+// "For fans of " 11pt #B3B3B3, "Yzomandias" 17pt #FFFFFF at {0, 19.3} 91x20.7, and a hidden one. A heading
+// of a title alone is 20.7 tall (10.txt:2363). "Show all" is Components.UI.NavigationButtonHome, a sibling
+// of the button's stack, 0 wide while it is not offered.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"
@@ -32,6 +52,8 @@ static BOOL shown(UIView *view, UIView *root) {
     return YES;
 }
 
+// The label that is the title: the largest text showing under the button, its own label aside. A label the stack
+// has not sized yet counts, since the constraints take its place from the layout rather than from its bounds.
 static UILabel *titleLabelIn(UIView *button, UILabel *mine) {
     __block UILabel *title = nil;
     SGForEachView(button, ^(UIView *v) {
@@ -41,6 +63,16 @@ static UILabel *titleLabelIn(UIView *button, UILabel *mine) {
         if (!title || label.font.pointSize > title.font.pointSize) title = label;
     });
     return title;
+}
+
+// Headings the Home page does without: the "Jump back in" shelf's, in the languages Spotify writes it in.
+static BOOL unwanted(NSString *title) {
+    NSString *lower = title.lowercaseString;
+    for (NSString *marker in @[@"jump back in", @"recently played", @"recents", @"sumérgete", @"sumergete", @"vuelve a sumergirte",
+                               @"escuchado recientemente", @"recientes", @"reprendre", @"weiter hören", @"riprendi"]) {
+        if ([lower containsString:marker]) return YES;
+    }
+    return NO;
 }
 
 static void restyle(UIView *button) {
@@ -55,6 +87,18 @@ static void restyle(UIView *button) {
         if (held.constraints) [NSLayoutConstraint deactivateConstraints:held.constraints];
         objc_setAssociatedObject(button, &kHeldKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return;
+    }
+    if (unwanted(theirs.text)) {
+        // Taken out of sight: the heading and the title drawn over it.
+        mine.hidden = YES;
+        if (theirs.alpha != 0) theirs.alpha = 0;
+        if (heading.alpha != 0) heading.alpha = 0;
+        heading.accessibilityElementsHidden = YES;
+        return;
+    }
+    if (heading.alpha != 1) {   // a heading view reused for another shelf
+        heading.alpha = 1;
+        heading.accessibilityElementsHidden = NO;
     }
     if (!mine) {
         mine = [UILabel new];
@@ -74,6 +118,10 @@ static void restyle(UIView *button) {
     if (![mine.textColor isEqual:theirs.textColor]) mine.textColor = theirs.textColor;
     if (theirs.alpha != 0) theirs.alpha = 0;
 
+    // The leading edge and the baseline are Spotify's label's; the title ends before "Show all", or before the
+    // heading's trailing edge while there is none, and truncates rather than push anything.
+    // Whether "Show all" is offered is read off the hidden flags, not off its width: it has none to go by until
+    // the layout resolves, and a title held to the heading's own edge then ran under it.
     UIView *showAll = SGRFindByIdentifier(heading, @"Components.UI.NavigationButtonHome", &kShowAllKey);
     BOOL offered = showAll && shown(showAll, heading);
     UIView *limit = offered ? showAll : heading;

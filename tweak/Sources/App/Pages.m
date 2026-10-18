@@ -2,7 +2,9 @@
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
 #import "Pages.h"
+#import "Shared/AlphaIndex/AlphaIndex.h"
 #import "Shared/ArtistBlock/ArtistBlock.h"
+#import "Shared/Concerts/Concerts.h"
 #import "Shared/Gestures/Gestures.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/LyricsMeanings/Meanings.h"
@@ -18,6 +20,7 @@
 #import "Shared/Haptics/Haptics.h"
 #import "Shared/LiveActivity/LiveActivity.h"
 #import "Redesigned/Lyrics/LyricsText.h"
+#import "Redesigned/Lyrics/LyricsLook.h"
 #import "Redesigned/Home/Home.h"
 #import "Redesigned/Navbar/Navbar.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
@@ -66,6 +69,7 @@ UIViewController *SGAppearanceSettingsPage(void) {
         [rows addObject:SGWithSymbol(redesign, @"sparkles")];
         if (SGRedesignedUIStored()) {
             [rows addObjectsFromArray:SGRAppearanceRows()];
+            [rows addObject:SGRHomeStyleRow()];
             [rows addObject:SGRHomeTopPicksRow()];
         } else {
             [rows addObjectsFromArray:SGNativeAppearanceRows()];
@@ -99,6 +103,9 @@ UIViewController *SGLyricsSettingsPage(void) {
         [sections addObject:SGSection(@"Translation", @[SGTranslateEverySongRow(), SGGeminiKeyRow(), SGSavedTranslationsRow()])];
     }
     [sections addObject:SGSection(nil, more)];
+    // The redesign's page leads with a live preview of the lyrics, a glass pill to search the song it plays,
+    // the presets and the sliders and font behind the Adjust button; every change applies to the app's lyrics at once.
+    if (redesigned) return SGRLyricsSettingsPage(@"Lyrics", SGRestartNote, sections);
     return [[SGModPage alloc] initWithTitle:@"Lyrics" intro:SGRestartNote sections:sections footer:nil];
 }
 
@@ -118,8 +125,16 @@ UIViewController *SGPlayerSettingsPage(void) {
     if (native) {
         [pages addObject:SGWithSymbol(SGPageRow(@"Now playing bar", ^UIViewController *{ return SGNowPlayingBarSettingsPage(); }), @"rectangle.bottomthird.inset.filled")];
         [pages addObject:SGWithSymbol(SGPageRow(@"Queue & devices", ^UIViewController *{ return SGQueueSettingsPage(); }), @"text.line.first.and.arrowtriangle.forward")];
+    } else {
+        [pages addObject:SGWithSymbol(SGPageRow(@"Now playing", ^UIViewController *{ return SGRNowPlayingBarSettingsPage(); }), @"rectangle.bottomthird.inset.filled")];
     }
-    if (pages.count) [sections addObject:SGSection(nil, pages)];
+    [sections addObject:SGSection(nil, pages)];
+    // Playlists and artist pages: the alphabet index works with either look, the concerts card is the redesign's.
+    NSMutableArray<SGModRow *> *browsing = [NSMutableArray arrayWithObject:SGWithSymbol(SGAlphaIndexRow(), @"textformat.abc")];
+    if (!native) {
+        [browsing addObject:SGWithSymbol(SGSwitchRow(@"Upcoming concerts", @"Show an artist's tour dates under their name", SGKeyConcerts), @"ticket")];
+    }
+    [sections addObject:SGNotedSection(@"Browsing", browsing, @"Applies after you restart Spotify.")];
     [sections addObject:SGNotedSection(@"Lossless", @[
         SGOptionRow(@"Lossless files", @"Play matching FLAC or ALAC files instead of Spotify's stream", SGKeyLossless),
     ], @"Put matching files in Files › Spotify › Lossless. Applies after you restart Spotify.")];

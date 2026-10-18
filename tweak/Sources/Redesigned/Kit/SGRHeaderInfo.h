@@ -8,6 +8,9 @@ extern const CGFloat SGRHeaderInfoTitleRise;  // 56, of the content over the pic
 - (BOOL)showTitle:(NSString *)title creator:(NSString *)creator length:(NSString *)length about:(NSString *)about;
 // A title image such as an artist's logo; nil restores the spoken title.
 - (void)showTitleImage:(UIImage *)image;
+// A card under the row (the artist page's upcoming concerts), or nil to take it away. It sizes itself with
+// sizeThatFits:. The page's picture is laid out without it, so it rises over the picture rather than shortening it.
+- (void)showCard:(UIView *)card;
 - (void)showCreatorLink:(UIView *)control;
 @property (nonatomic, copy) BOOL (^trailingState)(BOOL *on);
 @property (nonatomic, copy) NSString *trailingOffSymbol;
