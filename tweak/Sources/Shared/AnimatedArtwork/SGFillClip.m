@@ -5,7 +5,7 @@
 #import <stdint.h>
 #import "SGFillClip.h"
 
-static const CGFloat kCoverHeight = 0.625;
+static const CGFloat kCoverHeight = 0.625, kCoverLift = 0.06;
 static const CGFloat kFadeStart = 0.76, kFadeEnd = 0.985;
 static const CGFloat kBlurBands[4][2] = {{0.74, 0.84}, {0.79, 0.89}, {0.84, 0.94}, {0.89, 0.985}};
 static const CGFloat kBlurRadii[4] = {2.5, 6.0, 12.0, 22.0};
@@ -98,6 +98,17 @@ static void drawFilling(CGContextRef context, CGImageRef image, CGRect rect) {
     CGContextDrawImage(context, destination, image);
 }
 
+static CGImageRef fullFrameLayer(CGImageRef image, CGSize size) CF_RETURNS_RETAINED {
+    CGContextRef context = bitmapContext(size);
+    if (!context) return NULL;
+    CGContextTranslateCTM(context, 0, size.height);
+    CGContextScaleCTM(context, 1, -1);
+    drawFilling(context, image, CGRectMake(0, 0, size.width, size.height));
+    CGImageRef result = CGBitmapContextCreateImage(context);
+    CGContextRelease(context);
+    return result;
+}
+
 static void addRampStop(CGFloat *components, CGFloat *locations, NSUInteger *count, CGFloat location, CGFloat alpha) {
     locations[*count] = location;
     components[*count * 4] = 1;
@@ -121,12 +132,12 @@ static CGGradientRef alphaRamp(CGFloat start, CGFloat end, BOOL rising) {
     return CGGradientCreateWithColorComponents(fillColorSpace(), components, locations, count);
 }
 
-static void applyRamp(CGContextRef context, CGFloat height, CGFloat start, CGFloat end, BOOL rising) {
+static void applyRamp(CGContextRef context, CGFloat originY, CGFloat height, CGFloat start, CGFloat end, BOOL rising) {
     CGGradientRef gradient = alphaRamp(start, end, rising);
     if (!gradient) return;
     CGContextSaveGState(context);
     CGContextSetBlendMode(context, kCGBlendModeDestinationIn);
-    CGContextDrawLinearGradient(context, gradient, CGPointMake(0, start * height), CGPointMake(0, end * height),
+    CGContextDrawLinearGradient(context, gradient, CGPointMake(0, originY + start * height), CGPointMake(0, originY + end * height),
                                 kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
     CGContextRestoreGState(context);
     CGGradientRelease(gradient);
@@ -141,8 +152,8 @@ static CGImageRef maskedLayer(CGImageRef image, CGSize size, CGRect artworkRect,
     // Aspect-fill can overdraw the short artwork region; keep each sharp/blur layer inside its bounds.
     CGContextClipToRect(context, artworkRect);
     drawFilling(context, image, artworkRect);
-    applyRamp(context, artworkRect.size.height, kFadeStart, kFadeEnd, NO);
-    if (blurred) applyRamp(context, artworkRect.size.height, bandStart, bandEnd, YES);
+    applyRamp(context, artworkRect.origin.y, artworkRect.size.height, kFadeStart, kFadeEnd, NO);
+    if (blurred) applyRamp(context, artworkRect.origin.y, artworkRect.size.height, bandStart, bandEnd, YES);
     CGImageRef result = CGBitmapContextCreateImage(context);
     CGContextRelease(context);
     return result;
@@ -150,8 +161,9 @@ static CGImageRef maskedLayer(CGImageRef image, CGSize size, CGRect artworkRect,
 
 CGImageRef SGFillClipFrame(CGImageRef cover, CGSize size) {
     if (!cover || size.width < 1 || size.height < 1) return NULL;
-    CGFloat height = MIN(size.height, round(size.height * kCoverHeight));
-    CGRect artworkRect = CGRectMake(0, 0, size.width, height);
+    CGFloat lift = round(size.height * kCoverLift);
+    CGFloat height = MIN(size.height + lift, round(size.height * kCoverHeight) + lift);
+    CGRect artworkRect = CGRectMake(0, -lift, size.width, height);
     CGFloat blurScale = MAX(1.0, (CGFloat)CGImageGetWidth(cover) / 640.0);
 
     CGImageRef layers[5] = {0};
@@ -170,7 +182,17 @@ CGImageRef SGFillClipFrame(CGImageRef cover, CGSize size) {
             return NULL;
         }
     }
+    CGImageRef backdropBlur = blurredCover(cover, kBlurRadii[3] * blurScale);
+    CGImageRef backdrop = backdropBlur ? fullFrameLayer(backdropBlur, size) : NULL;
+    if (backdropBlur) CGImageRelease(backdropBlur);
+    if (!backdrop) {
+        for (NSUInteger index = 0; index < 5; index++) {
+            if (layers[index]) CGImageRelease(layers[index]);
+        }
+        return NULL;
+    }
     if (!layers[0]) {
+        CGImageRelease(backdrop);
         for (NSUInteger index = 1; index < 5; index++) {
             if (layers[index]) CGImageRelease(layers[index]);
         }
@@ -179,6 +201,7 @@ CGImageRef SGFillClipFrame(CGImageRef cover, CGSize size) {
 
     CGContextRef context = bitmapContext(size);
     if (!context) {
+        CGImageRelease(backdrop);
         for (NSUInteger index = 0; index < 5; index++) CGImageRelease(layers[index]);
         return NULL;
     }
@@ -186,6 +209,8 @@ CGImageRef SGFillClipFrame(CGImageRef cover, CGSize size) {
     CGContextFillRect(context, CGRectMake(0, 0, size.width, size.height));
     CGContextTranslateCTM(context, 0, size.height);
     CGContextScaleCTM(context, 1, -1);
+    CGContextDrawImage(context, CGRectMake(0, 0, size.width, size.height), backdrop);
+    CGImageRelease(backdrop);
     for (NSUInteger index = 0; index < 5; index++) {
         CGContextDrawImage(context, CGRectMake(0, 0, size.width, size.height), layers[index]);
         CGImageRelease(layers[index]);
