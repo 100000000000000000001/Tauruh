@@ -163,7 +163,7 @@ static void showFill(NSString *picture) {
     if (![MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys containsObject:MPNowPlayingInfoProperty3x4AnimatedArtwork]) return;
     NSString *title = sg_title;
     CGSize size = SGLyricsClipSize(SGMotionPixels());
-    NSURL *file = SGMotionMadeFile([NSString stringWithFormat:@"fill\nv8\n%@\n%.0fx%.0f", picture, size.width, size.height]);
+    NSURL *file = SGMotionMadeFile([NSString stringWithFormat:@"fill\nv9\n%@\n%.0fx%.0f", picture, size.width, size.height]);
     __block UIImage *renderedFrame;
     MPMediaItemAnimatedArtwork *artwork = [[MPMediaItemAnimatedArtwork alloc] initWithArtworkID:file.lastPathComponent
         previewImageRequestHandler:^(CGSize wanted, void (^completion)(UIImage *)) {
