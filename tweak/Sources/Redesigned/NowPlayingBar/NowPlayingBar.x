@@ -3,8 +3,10 @@
 #import "Redesigned/Kit/SGRTokens.h"
 #import "Redesigned/Navbar/Navbar.h"
 #import "Shared/Lyrics/Lyrics.h"
+#import "Shared/Player/NowPlayingExtras.h"
 #import "Shared/Player/PlayerState.h"
 #import "NowPlayingBar.h"
+#import <MediaPlayer/MediaPlayer.h>
 #import <objc/message.h>
 
 static const CGFloat kCardRadius = 24;
@@ -162,8 +164,10 @@ static void togglePlayback(void);
     CGRect bounds = self.bounds;
     CGFloat side = bounds.size.height - 2 * kPillInset;
     _open.frame = bounds;
-    _cover.frame = CGRectMake(kPillInset, kPillInset, side, side);
-    _cover.layer.cornerRadius = SGFlag(SGRKeyNowPlayingRoundedArtwork, NO) ? MIN(9, side * 0.22) : side / 2;
+    BOOL rounded = SGFlag(SGRKeyNowPlayingRoundedArtwork, NO);
+    CGFloat coverX = kPillInset + (rounded ? 2 : 0);
+    _cover.frame = CGRectMake(coverX, kPillInset, side, side);
+    _cover.layer.cornerRadius = rounded ? MIN(9, side * 0.22) : side / 2;
     _cover.layer.cornerCurve = kCACornerCurveContinuous;
     CGFloat toggleWidth = MIN(kToggleWidth, bounds.size.width / 3);
     _toggle.frame = CGRectMake(bounds.size.width - toggleWidth - 6, 0, toggleWidth, bounds.size.height);
@@ -240,7 +244,7 @@ static const CGFloat kMarqueeSpeed = 32, kMarqueePause = 1.4, kMarqueeFade = 18;
         [self setNeedsLayout];
     }
     _open.accessibilityLabel = _title.text;
-    if (cover && _cover.image != cover) _cover.image = cover;
+    if (_cover.image != cover) _cover.image = cover;
     if (_paused != paused) {
         // The glyph swaps in place, so the button does not jump while the track goes on.
         [UIView transitionWithView:_toggle duration:SGRReduceMotion() ? 0 : 0.15 options:UIViewAnimationOptionTransitionCrossDissolve
@@ -273,6 +277,18 @@ static UIImage *cardCover(void) {
     return image;
 }
 
+static UIImage *currentCover(void) {
+    SPTPlayerState *state = SGPlayerState();
+    NSDictionary *info = MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo;
+    MPMediaItemArtwork *artwork = info[MPMediaItemPropertyArtwork];
+    if (SGNowPlayingTitlesMatch(info[MPMediaItemPropertyTitle], state.track.trackTitle)
+        && [artwork isKindOfClass:MPMediaItemArtwork.class]) {
+        UIImage *image = [artwork imageWithSize:CGSizeMake(600, 600)];
+        if (image) return image;
+    }
+    return cardCover();
+}
+
 static BOOL hasTrack(void) {
     return SGPlayerState().track.trackTitle.length > 0;
 }
@@ -292,7 +308,7 @@ static void refreshMini(void) {
     SGRMiniPlayer *mini = sg_mini;
     if (!mini) return;
     SPTPlayerState *state = SGPlayerState();
-    [mini showTitle:state.track.trackTitle cover:cardCover() paused:state.isPaused];
+    [mini showTitle:state.track.trackTitle cover:currentCover() paused:state.isPaused];
 }
 
 static void togglePlayback(void) {

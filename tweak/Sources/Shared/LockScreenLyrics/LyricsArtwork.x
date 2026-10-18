@@ -268,7 +268,8 @@ static void tick(void) {
         if (!sg_cover) {
             NSDictionary *info = MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo;
             MPMediaItemArtwork *artwork = info[MPMediaItemPropertyArtwork];
-            if ([info[MPMediaItemPropertyTitle] isEqual:state.track.trackTitle] && [artwork isKindOfClass:MPMediaItemArtwork.class]) {
+            if (SGNowPlayingTitlesMatch(info[MPMediaItemPropertyTitle], state.track.trackTitle)
+                && [artwork isKindOfClass:MPMediaItemArtwork.class]) {
                 sg_cover = [artwork imageWithSize:CGSizeMake(600, 600)];
             }
         }

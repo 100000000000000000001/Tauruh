@@ -10,6 +10,31 @@ static NSMutableDictionary<NSString *, NSString *> *sg_titles;       // by owner
 static double sg_elapsed, sg_rate;
 static CFAbsoluteTime sg_clockAt;
 
+static NSString *titleWithoutTrackNumber(NSString *title) {
+    NSString *trimmed = [title stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    NSUInteger index = 0;
+    while (index < trimmed.length) {
+        unichar character = [trimmed characterAtIndex:index];
+        if (character < '0' || character > '9') break;
+        index++;
+    }
+    if (!index || index == trimmed.length) return trimmed;
+    unichar separator = [trimmed characterAtIndex:index];
+    if (separator != '.' && separator != ')' && separator != '-' && separator != ':') return trimmed;
+    index++;
+    NSUInteger numberEnd = index;
+    while (index < trimmed.length && [[NSCharacterSet whitespaceAndNewlineCharacterSet] characterIsMember:[trimmed characterAtIndex:index]]) index++;
+    return index > numberEnd && index < trimmed.length ? [trimmed substringFromIndex:index] : trimmed;
+}
+
+BOOL SGNowPlayingTitlesMatch(id left, id right) {
+    if (![left isKindOfClass:NSString.class] || ![right isKindOfClass:NSString.class]) return NO;
+    NSString *leftTitle = left;
+    NSString *rightTitle = right;
+    if ([leftTitle isEqualToString:rightTitle]) return YES;
+    return [titleWithoutTrackNumber(leftTitle) isEqualToString:titleWithoutTrackNumber(rightTitle)];
+}
+
 // `stale` are an owner's old keys: the info the getter gives back can still carry them, and the hook puts
 // back only the extras that are current.
 static void resend(NSArray *stale) {
@@ -57,7 +82,7 @@ void SGNowPlayingSetExtras(NSString *owner, NSDictionary *extras, NSString *titl
         }
         id title = info[MPMediaItemPropertyTitle];
         for (NSString *owner in sg_extras) {
-            if (![title isEqual:sg_titles[owner]]) continue;
+            if (!SGNowPlayingTitlesMatch(title, sg_titles[owner])) continue;
             if (!added) added = [NSMutableDictionary dictionary];
             [added addEntriesFromDictionary:sg_extras[owner]];
         }

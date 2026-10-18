@@ -9,3 +9,4 @@
 
 // `extras` nil or empty clears the owner's. Main thread.
 void SGNowPlayingSetExtras(NSString *owner, NSDictionary *extras, NSString *title);
+BOOL SGNowPlayingTitlesMatch(id left, id right);
