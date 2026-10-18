@@ -138,6 +138,8 @@ static CGImageRef maskedLayer(CGImageRef image, CGSize size, CGRect artworkRect,
     if (!context) return NULL;
     CGContextTranslateCTM(context, 0, size.height);
     CGContextScaleCTM(context, 1, -1);
+    // Aspect-fill can overdraw the short artwork region; keep each sharp/blur layer inside its bounds.
+    CGContextClipToRect(context, artworkRect);
     drawFilling(context, image, artworkRect);
     applyRamp(context, artworkRect.size.height, kFadeStart, kFadeEnd, NO);
     if (blurred) applyRamp(context, artworkRect.size.height, bandStart, bandEnd, YES);
