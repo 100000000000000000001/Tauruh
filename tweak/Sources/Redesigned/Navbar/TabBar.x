@@ -3,6 +3,7 @@
 #import "Redesigned/Kit/SGRTokens.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Settings/SGPage.h"
+#import "Shared/Navigation/TabIcons.h"
 #import "Headers/SPTEncoreIconView.h"
 #import <objc/message.h>
 
