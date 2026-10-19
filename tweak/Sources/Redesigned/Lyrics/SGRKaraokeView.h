@@ -17,5 +17,9 @@
 @property (nonatomic) BOOL extrasEnabled;
 // Called as the user begins dragging the lines, for the player to bring its controls back.
 @property (nonatomic, copy) void (^browsingBegan)(void);
+// The preview's song: swaps in other lines, looped over `length` ms, from their start.
+- (void)setSampleLines:(NSArray<SGKaraokeLine *> *)lines length:(NSTimeInterval)length;
+// Freezes the preview's clock where it is, and lets it go on again from there.
+@property (nonatomic) BOOL samplePaused;
 - (instancetype)initWithSampleLines:(NSArray<SGKaraokeLine *> *)lines length:(NSTimeInterval)length;
 @end

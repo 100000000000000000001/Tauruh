@@ -1,5 +1,6 @@
-// Moving artwork for a track: its Canvas, or Apple Music's animated album cover where the album has one,
-// and for the lock screen, failing both, the cover over a moving blur of itself (SGFluidClip.h).
+// Moving artwork for a track: its Canvas, or Apple Music's animated album cover where the album has one.
+// The lock screen can also use the cover over a moving blur (SGFluidClip.h) or the progressive Fill field
+// (SGFillClip.h).
 // SGMotionCatalog.m looks covers and logos up in Apple Music's catalog. SGMotionStore.m keeps every video
 // as a local file, the form the system's lock screen takes.
 #import <UIKit/UIKit.h>
@@ -11,6 +12,7 @@
 #define SGKeyLegacyLockScreenArtwork @"spotifyglass.lockscreen.animatedartwork"
 #define SGKeyLockScreenCanvasLyrics @"spotifyglass.lockscreen.canvasLyrics"
 #define SGKeyLockScreenStar @"spotifyglass.lockscreen.star"
+#define SGKeyLockScreenStarViews @"spotifyglass.lockscreen.starViews"
 #define SGKeyLockScreenExclusiveLyrics @"spotifyglass.lockscreen.exclusiveLyrics"
 #define SGKeyLockScreenCoverArtworkScale @"spotifyglass.lockscreen.coverArtworkScale"
 typedef NS_ENUM(NSInteger, SGLockArtwork) {
@@ -18,9 +20,12 @@ typedef NS_ENUM(NSInteger, SGLockArtwork) {
     SGLockArtworkMotion,   // the Canvas, else Apple Music's animated cover (LockScreenMotion.x)
     SGLockArtworkLyrics,   // a clip per line of lyrics (Shared/LockScreenLyrics/LyricsArtwork.x)
     SGLockArtworkEverySong,   // Moving artwork, else the cover over a moving blur of it (LockScreenMotion.x)
+    SGLockArtworkFill,   // a sharp cover fading into progressively blurred artwork
 };
 // Off below iOS 26, which has no animated artwork on the lock screen.
 SGLockArtwork SGLockScreenArtwork(void);
+NSArray<NSString *> *SGLockScreenStarViewOrder(void);
+void SGLockScreenStarAdvanceView(void);
 CGFloat SGLockScreenCoverArtworkScale(void);
 BOOL SGLockScreenCanvasLyricsEnabled(void);
 void SGLockScreenCanvasLyricsSetEnabled(BOOL enabled);
@@ -97,6 +102,7 @@ void SGMotionPoster(NSURL *file, void (^done)(UIImage *poster));
 // SGLockScreenArtworkNeedsRow, which says the setting needs iOS 26 and, tapped, why.
 NSArray *SGLockScreenMotionRows(void);
 SGModRow *SGLockScreenArtworkNeedsRow(void);
+SGModRow *SGLockScreenStarViewsRow(void);
 
 // Pure steps, for the harness.
 NSString *SGMotionNameKey(NSString *name);

@@ -1,6 +1,5 @@
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
-#import "Redesigned/Navbar/Navbar.h"
 #import "Library.h"
 
 NSString *const SGRLibraryListIdentifier = @"YourLibraryContent.collectionView";
@@ -135,7 +134,6 @@ static NSArray<UIView *> *placeRoot(UIView *header) {
     SGForEachView(header, ^(UIView *view) {
         if (!face && isFace(view) && view.bounds.size.width > 1) face = view;
     });
-    SGRNavbarSetProfilePhotoVisible(face);
     if (face) [trailing addObject:face];
     if (!trailing.count) return trailing;
 

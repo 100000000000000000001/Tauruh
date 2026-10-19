@@ -11,16 +11,24 @@
 // Cells are reused across shelves, so each measuring sets or clears the mark on the layout it holds.
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
-#import "Settings/SGModPage.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"
 
-static const CGFloat kScale = 1.7, kSmallest = 120, kHeading = 40;
+static const CGFloat kScale = 1.4, kSmallest = 120, kHeading = 40;
+// Room added under a large card's text, so a long title or an author's name stays inside the glass card.
+static const CGFloat kTextRoom = 24;
+static char kAuraKey, kAuraShownKey, kAuraImageKey, kAuraTriesKey;
 static char kLargeKey, kNaturalKey, kWrappedKey, kWidthKey, kAskedKey;
 static _Thread_local BOOL sg_enlarging;
 // The narrowest size kSmallest or more wide the running provider made, at Spotify's width: its cards.
 static _Thread_local CGFloat sg_cardWidth;
 static NSInteger sg_topIndex = NSIntegerMax;
+// Where the shortcuts and the top shelf are in the page, to put the shelf first.
+static NSIndexPath *sg_shortcutsPath, *sg_topPath;
+static NSIndexPath *sg_headingPath;
+static __weak UICollectionViewLayout *sg_pageLayout;
+static _Thread_local BOOL sg_reordering;
+static void stripBase(UIView *cell, NSUInteger depth);
 
 // The layout a wrapped provider belongs to, set once the layout is made.
 @interface SGRLayoutBox : NSObject
@@ -66,7 +74,7 @@ static UICollectionViewCompositionalLayout *boxed(UICollectionViewCompositionalL
 
 // How much a card of Spotify's `width` grows: its picture is as wide as it is, so it grows as much in height.
 static CGFloat growth(CGFloat width) {
-    return round(width * kScale) - width;
+    return round(width * kScale) - width + kTextRoom;
 }
 
 %hook NSCollectionLayoutSize
@@ -84,7 +92,112 @@ static CGFloat growth(CGFloat width) {
 }
 %end
 
+
+// The page's layout, with the top shelf (and the heading just above it) laid out before the shortcuts: the two
+// blocks trade places, so the page is as tall as it was. Only frames change; the cells are Spotify's.
+static NSArray<NSIndexPath *> *pathsBetween(UICollectionView *list, NSIndexPath *from, NSIndexPath *to) {
+    NSMutableArray *paths = [NSMutableArray array];
+    for (NSInteger sec = from.section; sec <= to.section; sec++) {
+        NSInteger count = [list numberOfItemsInSection:sec];
+        for (NSInteger item = (sec == from.section ? from.item : 0); item < count; item++) {
+            NSIndexPath *path = [NSIndexPath indexPathForItem:item inSection:sec];
+            if ([path compare:to] == NSOrderedDescending) return paths;
+            [paths addObject:path];
+        }
+    }
+    return paths;
+}
+
+static NSDictionary<NSIndexPath *, NSValue *> *swappedFrames(UICollectionViewLayout *layout) {
+    UICollectionView *list = layout.collectionView;
+    if (!list || !sg_shortcutsPath || !sg_topPath || [sg_shortcutsPath compare:sg_topPath] != NSOrderedAscending) return nil;
+    if (sg_pageLayout != layout) return nil;
+    NSArray<NSIndexPath *> *paths = pathsBetween(list, sg_shortcutsPath, sg_topPath);
+    if (paths.count < 2) return nil;
+    sg_reordering = YES;
+    NSMutableArray<UICollectionViewLayoutAttributes *> *items = [NSMutableArray array];
+    for (NSIndexPath *path in paths) {
+        UICollectionViewLayoutAttributes *a = [layout layoutAttributesForItemAtIndexPath:path];
+        if (!a) { sg_reordering = NO; return nil; }
+        [items addObject:a];
+    }
+    sg_reordering = NO;
+    UICollectionViewLayoutAttributes *shortcuts = items.firstObject, *top = items.lastObject;
+    NSMutableArray<UICollectionViewLayoutAttributes *> *order = [NSMutableArray array];
+    NSMutableArray<UICollectionViewLayoutAttributes *> *rest = [NSMutableArray array];
+    UICollectionViewLayoutAttributes *heading = nil;
+    for (NSUInteger i = 1; i + 1 < items.count; i++) {
+        // A short cell right before the shelf is its heading.
+        if (i + 2 == items.count && items[i].frame.size.height < 80) heading = items[i];
+        else [rest addObject:items[i]];
+    }
+    sg_headingPath = heading.indexPath;
+    [order addObject:top];
+    [order addObject:shortcuts];
+    [order addObjectsFromArray:rest];
+    CGFloat gap = MAX(0, CGRectGetMinY(items[1].frame) - CGRectGetMaxY(shortcuts.frame));
+    // The top shelf's heading is gone; the room it had goes between the shelf and the shortcuts.
+    CGFloat spare = heading ? heading.frame.size.height + gap : 0;
+    CGFloat y = CGRectGetMinY(shortcuts.frame);
+    NSMutableDictionary *frames = [NSMutableDictionary dictionary];
+    for (UICollectionViewLayoutAttributes *a in order) {
+        CGRect frame = a.frame;
+        frame.origin.y = y;
+        frames[a.indexPath] = [NSValue valueWithCGRect:frame];
+        y += frame.size.height + gap + (a == top ? spare : 0);
+    }
+    if (heading) {
+        CGRect gone = heading.frame;
+        gone.size.height = 0;
+        gone.origin.y = CGRectGetMinY(shortcuts.frame);
+        frames[heading.indexPath] = [NSValue valueWithCGRect:gone];
+    }
+    return frames;
+}
+
+%hook UICollectionViewCompositionalLayout
+- (NSArray<UICollectionViewLayoutAttributes *> *)layoutAttributesForElementsInRect:(CGRect)rect {
+    if (sg_reordering || sg_pageLayout != (UICollectionViewLayout *)self) return %orig;
+    // Asked for the whole of the swapped range, so a block that moves into the rect is found.
+    NSDictionary *frames = swappedFrames((UICollectionViewLayout *)self);
+    if (!frames) return %orig;
+    sg_reordering = YES;
+    NSArray *all = %orig(CGRectInfinite);
+    sg_reordering = NO;
+    NSMutableArray *out = [NSMutableArray array];
+    for (UICollectionViewLayoutAttributes *item in all) {
+        UICollectionViewLayoutAttributes *a = item;
+        NSValue *moved = a.representedElementCategory == UICollectionElementCategoryCell ? frames[a.indexPath] : nil;
+        if (moved) {
+            a = [item copy];
+            a.frame = moved.CGRectValue;
+            if ([a.indexPath isEqual:sg_headingPath]) { a.hidden = YES; a.alpha = 0; }
+        }
+        if (CGRectIntersectsRect(a.frame, rect)) [out addObject:a];
+    }
+    return out;
+}
+
+- (UICollectionViewLayoutAttributes *)layoutAttributesForItemAtIndexPath:(NSIndexPath *)path {
+    UICollectionViewLayoutAttributes *a = %orig;
+    if (sg_reordering || sg_pageLayout != (UICollectionViewLayout *)self || !a) return a;
+    NSValue *moved = swappedFrames((UICollectionViewLayout *)self)[path];
+    if (!moved) return a;
+    a = [a copy];
+    a.frame = moved.CGRectValue;
+    if ([path isEqual:sg_headingPath]) { a.hidden = YES; a.alpha = 0; }
+    return a;
+}
+%end
+
 %hook _TtC12Element_List18CollectionViewCell
+- (void)layoutSubviews {
+    %orig;
+    UICollectionViewCell *cell = (UICollectionViewCell *)self;
+    UICollectionView *page = sg_pageLayout.collectionView;
+    if (page && cell.superview == page && objc_getAssociatedObject(page, &kAuraKey)) stripBase(cell, 3);
+}
+
 - (UICollectionViewLayoutAttributes *)preferredLayoutAttributesFittingAttributes:(UICollectionViewLayoutAttributes *)attributes {
     UICollectionViewLayoutAttributes *result = %orig;
     static Class shelf;
@@ -93,6 +206,22 @@ static CGFloat growth(CGFloat width) {
     // Home's sections only, as HomeSections.x tells them: a shelf on another page is not Home's top.
     if (![NSStringFromClass(object_getClass(content)) containsString:@"Home_EvoPageImpl13HomeStructure"]) return result;
     UIView *root = content.subviews.firstObject;
+    UICollectionView *pageList = nil;
+    for (UIView *v = ((UIView *)self).superview; v; v = v.superview) {
+        if ([v isKindOfClass:UICollectionView.class]) { pageList = (UICollectionView *)v; break; }
+    }
+    if (pageList && pageList.collectionViewLayout != sg_pageLayout) {
+        sg_pageLayout = pageList.collectionViewLayout;
+        sg_shortcutsPath = sg_topPath = nil;
+    }
+    if (root && ![root isKindOfClass:shelf ?: NSObject.class] && [root isKindOfClass:UICollectionView.class]) {
+        UIView *first = ((UICollectionView *)root).visibleCells.firstObject;
+        if ([NSStringFromClass(object_getClass(first.subviews.firstObject)) containsString:@"Home_AnchorsAndShortcutsKit"]
+            && ![attributes.indexPath isEqual:sg_shortcutsPath]) {
+            sg_shortcutsPath = attributes.indexPath;
+            [sg_pageLayout invalidateLayout];
+        }
+    }
     NSInteger index = attributes.indexPath.section * 10000 + attributes.indexPath.item;
     if (!shelf || ![root isKindOfClass:shelf] || result.size.height <= kHeading) {
         // The top's place holds something else now (the feed came again): the next shelf measured takes it.
@@ -101,7 +230,12 @@ static CGFloat growth(CGFloat width) {
     }
     UICollectionViewLayout *layout = ((UICollectionView *)root).collectionViewLayout;
     if (index < sg_topIndex) sg_topIndex = index;
-    BOOL large = index == sg_topIndex, was = objc_getAssociatedObject(layout, &kLargeKey) != nil;
+    if (index == sg_topIndex && ![attributes.indexPath isEqual:sg_topPath]) {
+        sg_topPath = attributes.indexPath;
+        [sg_pageLayout invalidateLayout];
+    }
+    BOOL large = SGFlag(SGRKeyHomeTopPicks, NO) && index == sg_topIndex;
+    BOOL was = objc_getAssociatedObject(layout, &kLargeKey) != nil;
     // The shelf's height as Spotify sizes it, from a measuring before it was large.
     if (!was) objc_setAssociatedObject(layout, &kNaturalKey, @(result.size.height), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (large != was) {
@@ -132,8 +266,143 @@ static CGFloat growth(CGFloat width) {
 }
 %end
 
+
+BOOL SGRHomeShelfIsLarge(UIView *view) {
+    static Class shelf;
+    if (!shelf) shelf = NSClassFromString(@"_TtC16Home_CarouselKit29TouchCancellingCollectionView");
+    for (UIView *v = view.superview; v; v = v.superview) {
+        if (shelf && [v isKindOfClass:shelf]) return objc_getAssociatedObject(((UICollectionView *)v).collectionViewLayout, &kLargeKey) != nil;
+    }
+    return NO;
+}
+
+SGModRow *SGRHomeTopPicksRow(void) {
+    return SGWithSymbol(SGSwitchRow(@"Top picks", @"Draw Home's first shelf large", SGRKeyHomeTopPicks), @"rectangle.stack");
+}
+
+// The cards style themselves as they lay out, which can be before the shelf is large: ask each once more.
+static void pokeCards(UICollectionView *shelf) {
+    static char kPokedKey;
+    NSHashTable *poked = objc_getAssociatedObject(shelf, &kPokedKey);
+    if (!poked) {
+        poked = [NSHashTable weakObjectsHashTable];
+        objc_setAssociatedObject(shelf, &kPokedKey, poked, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    for (UICollectionViewCell *cell in shelf.visibleCells) {
+        if ([poked containsObject:cell]) continue;
+        [poked addObject:cell];
+        void (^poke)(void) = ^{
+            SGForEachView(cell, ^(UIView *v) {
+                if ([v.accessibilityIdentifier isEqualToString:@"Components.UI.HomeCard"]) [v setNeedsLayout];
+            });
+        };
+        poke();
+        __weak UICollectionViewCell *weak = cell;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ if (weak) poke(); });
+    }
+}
+
+// The page's gradient: behind the list, in the colour of the cover at the shelf's leading edge, so it changes as the
+// large shelf is scrolled. Cells lose their base-surface backgrounds so it shows through.
+static UICollectionView *pageListOf(UIView *shelf) {
+    for (UIView *v = shelf.superview; v; v = v.superview) {
+        if ([v isKindOfClass:UICollectionView.class] && v != shelf) return (UICollectionView *)v;
+    }
+    return nil;
+}
+
+static UIImage *coverOf(UIView *card) {
+    UIView *holder = SGRFindByIdentifier(card, @"Encore.ImageView", &kAuraImageKey);
+    for (UIView *sub in holder.subviews) {
+        if ([sub isKindOfClass:UIImageView.class] && ((UIImageView *)sub).image) return ((UIImageView *)sub).image;
+    }
+    return nil;
+}
+
+// Cells made or reused after the gradient came carry Spotify's black again: cleared as they lay out.
+static void stripBase(UIView *cell, NSUInteger depth) {
+    if (SGIsBaseSurface(cell.layer.backgroundColor)) cell.layer.backgroundColor = NULL;
+    if (depth == 0) return;
+    for (UIView *sub in cell.subviews) stripBase(sub, depth - 1);
+}
+
+static void paintAura(UICollectionView *list, UIColor *color) {
+    CAGradientLayer *gradient = objc_getAssociatedObject(list, &kAuraKey);
+    if (!gradient) {
+        gradient = [CAGradientLayer layer];
+        gradient.zPosition = -1;
+        gradient.locations = @[@0, @0.35, @1];
+        objc_setAssociatedObject(list, &kAuraKey, gradient, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [list.layer insertSublayer:gradient atIndex:0];
+        for (UIView *cell in list.subviews) {
+            SGForEachView(cell, ^(UIView *v) {
+                if (SGIsBaseSurface(v.layer.backgroundColor)) v.layer.backgroundColor = NULL;
+            });
+        }
+    }
+    CGFloat over = 600, span = 620;
+    CGRect frame = CGRectMake(0, -over - list.adjustedContentInset.top, list.bounds.size.width, over + span);
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    if (!CGRectEqualToRect(gradient.frame, frame)) gradient.frame = frame;
+    [CATransaction commit];
+    NSArray *to = @[(id)color.CGColor, (id)color.CGColor, (id)[color colorWithAlphaComponent:0].CGColor];
+    CABasicAnimation *fade = [CABasicAnimation animationWithKeyPath:@"colors"];
+    fade.fromValue = gradient.presentationLayer.colors ?: gradient.colors;
+    fade.toValue = to;
+    fade.duration = SGRCrossfade;
+    [gradient addAnimation:fade forKey:@"colors"];
+    gradient.colors = to;
+}
+
+static void followAlbum(UICollectionView *shelf) {
+    if (SGFlag(SGRKeyHomeTopPicks, NO)) pokeCards(shelf);
+    if (!SGRHomeGlassStyle()) return;
+    UICollectionView *list = pageListOf(shelf);
+    if (!list) return;
+    UIView *lead = nil;
+    CGFloat best = CGFLOAT_MAX, edge = shelf.contentOffset.x + SGRSideMargin;
+    for (UICollectionViewCell *cell in shelf.visibleCells) {
+        CGFloat d = fabs(CGRectGetMinX(cell.frame) - edge);
+        if (d < best) { best = d; lead = cell; }
+    }
+    UIImage *image = lead ? coverOf(lead) : nil;
+    if (!image) {
+        // The covers arrive after the first layout: look again until one has.
+        NSNumber *tries = objc_getAssociatedObject(shelf, &kAuraTriesKey);
+        if (tries.integerValue < 20) {
+            objc_setAssociatedObject(shelf, &kAuraTriesKey, @(tries.integerValue + 1), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            __weak UICollectionView *again = shelf;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [again setNeedsLayout];
+            });
+        }
+        return;
+    }
+    if (objc_getAssociatedObject(shelf, &kAuraShownKey) == image) return;
+    objc_setAssociatedObject(shelf, &kAuraShownKey, image, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    __weak UICollectionView *weakShelf = shelf;
+    SGRPaletteRequest request = {0};
+    [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
+        UICollectionView *s = weakShelf;
+        if (!s || !palette || objc_getAssociatedObject(s, &kAuraShownKey) != image) return;
+        UICollectionView *page = pageListOf(s);
+        // The field colour is dark by design: lift it so the gradient reads like the cover's colour.
+        CGFloat h, sat, b, a;
+        UIColor *c = palette.fieldColor;
+        if ([c getHue:&h saturation:&sat brightness:&b alpha:&a]) c = [UIColor colorWithHue:h saturation:MIN(1, sat * 1.1) brightness:MIN(0.6, MAX(b, 0.1) * 1.9) alpha:1];
+        if (page) paintAura(page, c);
+    }];
+}
+
 // The large shelf's cards sized themselves after its cell was measured and no longer fit: measure the cell again.
 %hook _TtC16Home_CarouselKit29TouchCancellingCollectionView
+- (void)layoutSubviews {
+    %orig;
+    if (SGRHomeGlassStyle() || objc_getAssociatedObject(((UICollectionView *)self).collectionViewLayout, &kLargeKey))
+        followAlbum((UICollectionView *)self);
+}
+
 - (void)setContentSize:(CGSize)size {
     %orig;
     UICollectionView *shelf = (UICollectionView *)self;
@@ -148,11 +417,7 @@ static CGFloat growth(CGFloat width) {
 }
 %end
 
-SGModRow *SGRHomeTopPicksRow(void) {
-    return SGWithSymbol(SGSwitchRow(@"Top picks", @"Home's first shelf drawn large", SGRKeyHomeTopPicks), @"rectangle.stack");
-}
-
 %ctor {
-    if (!SGRedesignedUI() || !SGFlag(SGRKeyHomeTopPicks, NO)) return;
+    if (!SGRedesignedUI() || (!SGRHomeGlassStyle() && !SGFlag(SGRKeyHomeTopPicks, NO))) return;
     %init;
 }

@@ -30,4 +30,7 @@ extern NSNotificationName const SGRFieldColorDidChangeNotification;
 - (void)setArtwork:(UIImage *)image identity:(NSString *)identity animated:(BOOL)animated;
 - (void)refreshStyleAnimated:(BOOL)animated;
 - (void)whenColored:(void (^)(void))colored;
+// A light blur over the Fill artwork while the lyrics are open, so their text and the header read over a sharp
+// cover. Only the Fill background takes it; the other backgrounds are already soft.
+- (void)setLyricsBlurred:(BOOL)blurred animated:(BOOL)animated;
 @end

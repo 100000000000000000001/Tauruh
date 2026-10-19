@@ -657,6 +657,8 @@ static void show(NSString *track, NSURL *file) {
 
 void SGRPlayerMotionLyricsChanged(void) {
     [sg_motion setBlurred:SGRPlayerLyricsOpen() animated:sg_motion.window != nil];
+    SGRArtworkField *field = SGRPlayerField();
+    [field setLyricsBlurred:SGRPlayerLyricsOpen() animated:field.window != nil];
 }
 
 static void videoSurface(id unit, BOOL attached) {

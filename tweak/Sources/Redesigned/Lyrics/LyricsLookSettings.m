@@ -7,9 +7,11 @@
 #import "Settings/SGPageStyle.h"
 #import "Redesigned/Kit/SGRTokens.h"
 #import "LyricsLook.h"
+#import "Shared/Fonts/Fonts.h"
 #import "SGRKaraokeView.h"
 
 static const CGFloat kPreviewHeight = 230, kCardRadius = 26;
+static const CGFloat kPillHeight = 48;
 static const CGFloat kChipHeight = 36, kChipGap = 8, kStripGap = 12, kStripPad = 6, kNoteGap = 14;
 
 #pragma mark - the sliders
@@ -94,10 +96,29 @@ static void presentStyleSheet(UIViewController *owner) {
         lookSlider(@"Wave", 0, 2, 0.1, ^CGFloat(SGRLyricsLook l) { return l.wave; },
                    ^(SGRLyricsLook *l, double v) { l->wave = v; }, ^NSString *(double v) { return share(v); }, &sheetPage),
     ];
+    NSArray<NSString *> *fonts = SGRLyricsFontChoices();
+    SGModRow *font = SGMenuRow(@"Font", fonts, ^NSString *{ return SGRLyricsFontChoice(); }, ^(NSInteger index) {
+        SGRSetLyricsFontChoice(fonts[(NSUInteger)index], sheetPage);
+    });
+    SGModRow *import = SGActionRow(@"Import a font", @"A .ttf or .otf from Files, only for the lyrics", ^{
+        SGPickFontForLyrics(^{
+            NSString *family = [NSUserDefaults.standardUserDefaults stringForKey:SGKeyAppFontName];
+            if (family.length && [SGRLyricsFontChoices() containsObject:family]) SGRSetLyricsFontChoice(family, nil);
+        });
+    });
+    NSArray<NSString *> *motions = SGRLyricsAnimationNames();
+    SGModRow *animation = SGMenuRow(@"Animation", motions, ^NSString *{ return motions[(NSUInteger)SGRLyricsAnimationIndex()]; }, ^(NSInteger index) {
+        SGRSetLyricsAnimationIndex(index, sheetPage);
+    });
+    rows = [rows arrayByAddingObjectsFromArray:@[font, import, animation]];
+    SGModRow *reset = SGActionRow(@"Reset to default", @"Apple Music's look, the system font and its animation", ^{
+        SGRResetLyricsLook(nil);   // the sheet and the page both read the look again
+    });
     NSString *footer = @"Blur is how much the lines away from the one sung soften. Glow and Wave are how strongly a held "
-                       @"word glows and its letters rise. 100% is Apple Music's.";
+                       @"word glows and its letters rise. 100% is Apple Music's. Font and Animation are for the lyrics only. Wave, Glow, Bounce and Ripple move each letter as it is sung (Glow and Wave above set how much); Float lifts the whole word.";
     SGRLyricsStyleSheet *page = [[SGRLyricsStyleSheet alloc] initWithTitle:@"Lyrics Style" intro:nil
-                                                                 sections:@[SGNotedSection(nil, rows, footer)] footer:nil];
+                                                                 sections:@[SGNotedSection(nil, rows, footer),
+                                                                           SGSection(nil, @[reset])] footer:nil];
     sheetPage = page;
     page.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemClose
                                                                                           target:page action:@selector(close)];
@@ -112,11 +133,11 @@ static void presentStyleSheet(UIViewController *owner) {
     __weak SGRLyricsStyleSheet *weakPage = page;
     sheet.detents = @[[UISheetPresentationControllerDetent customDetentWithIdentifier:fit resolver:^CGFloat(id<UISheetPresentationControllerDetentResolutionContext> context) {
         CGFloat measured = weakPage.fittedHeight;
-        return measured > 0 ? MIN(measured + 56, context.maximumDetentValue * 0.6) : context.maximumDetentValue * 0.5;
-    }]];
+        return measured > 0 ? MIN(measured + 56, context.maximumDetentValue * 0.55) : context.maximumDetentValue * 0.5;
+    }], UISheetPresentationControllerDetent.largeDetent];   // pull it up to reach Font, Animation and Reset
     sheet.largestUndimmedDetentIdentifier = fit;
     sheet.prefersGrabberVisible = YES;
-    sheet.prefersScrollingExpandsWhenScrolledToEdge = NO;   // a slider dragged near the top does not grow it
+    sheet.prefersScrollingExpandsWhenScrolledToEdge = YES;
     [owner presentViewController:nav animated:YES completion:nil];
 }
 
@@ -160,6 +181,8 @@ static UIButtonConfiguration *chipConfiguration(NSString *title, NSString *symbo
     UIScrollView *_strip;          // the presets, scrolled sideways when they do not all fit
     NSArray<UIButton *> *_chips;
     UIButton *_adjust;             // the sliders' button, after the last preset
+    UIButton *_reset;              // Default: the look, font and animation back to Apple Music's
+    SGRLyricsSongPill *_pill;      // the glass player above the card, to search a song to try the look on
     UILabel *_note;
     UISelectionFeedbackGenerator *_feedback;
     BOOL _stripPlaced, _showChosen;
@@ -189,6 +212,14 @@ static UIButtonConfiguration *chipConfiguration(NSString *title, NSString *symbo
     _preview.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [_card addSubview:_preview];
     [_header addSubview:_card];
+    _pill = [SGRLyricsSongPill new];
+    _pill.resultsHost = _card;
+    __weak SGRKaraokeView *weakPreview = _preview;
+    _pill.picked = ^(NSArray<SGKaraokeLine *> *lines, NSTimeInterval length, NSString *title, NSString *artist) {
+        [weakPreview setSampleLines:lines length:length];
+    };
+    _pill.togglePlay = ^(BOOL playing) { weakPreview.samplePaused = !playing; };
+    [_header addSubview:_pill];
 
     _strip = [UIScrollView new];
     _strip.showsHorizontalScrollIndicator = NO;
@@ -205,6 +236,9 @@ static UIButtonConfiguration *chipConfiguration(NSString *title, NSString *symbo
     _adjust = [UIButton buttonWithType:UIButtonTypeSystem];
     [_adjust addTarget:self action:@selector(adjustTapped) forControlEvents:UIControlEventPrimaryActionTriggered];
     [_strip addSubview:_adjust];
+    _reset = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_reset addTarget:self action:@selector(resetTapped) forControlEvents:UIControlEventPrimaryActionTriggered];
+    [_strip addSubview:_reset];
     [_header addSubview:_strip];
     [_header addSubview:_note];
     _feedback = [UISelectionFeedbackGenerator new];
@@ -230,6 +264,8 @@ static UIButtonConfiguration *chipConfiguration(NSString *title, NSString *symbo
     _adjust.accessibilityValue = chosen < 0 ? @"Custom" : names[(NSUInteger)chosen];
     _adjust.accessibilityHint = @"Opens the sliders";
     _adjust.accessibilityTraits = UIAccessibilityTraitButton | (chosen < 0 ? UIAccessibilityTraitSelected : 0);
+    _reset.configuration = chipConfiguration(@"Default", @"arrow.counterclockwise", NO);
+    _reset.accessibilityLabel = @"Reset the lyrics to default";
     _showChosen = YES;
     [self.view setNeedsLayout];
 }
@@ -239,6 +275,11 @@ static UIButtonConfiguration *chipConfiguration(NSString *title, NSString *symbo
     if (SGRLyricsLookPresetIndex(SGRLyricsLookNow()) == (NSInteger)i) return;
     [_feedback selectionChanged];
     SGRSetLyricsLook(SGRLyricsLookPreset(i), self);
+}
+
+- (void)resetTapped {
+    [_feedback selectionChanged];
+    SGRResetLyricsLook(self);
 }
 
 - (void)adjustTapped {
@@ -253,7 +294,8 @@ static UIButtonConfiguration *chipConfiguration(NSString *title, NSString *symbo
     UITableView *table = self.tableView;
     CGFloat width = table.bounds.size.width, inset = table.layoutMargins.left, inner = width - 2 * inset;
     if (inner <= 0) return;
-    _card.frame = CGRectMake(inset, SGRGrid, inner, kPreviewHeight);
+    _pill.frame = CGRectMake(inset, SGRGrid, inner, kPillHeight);
+    _card.frame = CGRectMake(inset, CGRectGetMaxY(_pill.frame) + kStripGap, inner, kPreviewHeight);
     CGFloat x = 0, top = CGRectGetMaxY(_card.frame) + kStripGap;
     for (UIButton *chip in _chips) {
         CGFloat wide = ceil([chip sizeThatFits:CGSizeMake(CGFLOAT_MAX, kChipHeight)].width);
@@ -262,6 +304,9 @@ static UIButtonConfiguration *chipConfiguration(NSString *title, NSString *symbo
     }
     _adjust.frame = CGRectMake(x, kStripPad, kChipHeight, kChipHeight);
     x += kChipHeight + kChipGap;
+    CGFloat resetWide = ceil([_reset sizeThatFits:CGSizeMake(CGFLOAT_MAX, kChipHeight)].width);
+    _reset.frame = CGRectMake(x, kStripPad, resetWide, kChipHeight);
+    x += resetWide + kChipGap;
     // Padded above and below so the glass's shadow is not cut off where the strip clips its sides.
     _strip.frame = CGRectMake(0, top, width, kChipHeight + 2 * kStripPad);
     _strip.contentInset = UIEdgeInsetsMake(0, inset, 0, inset);

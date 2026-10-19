@@ -1,4 +1,4 @@
-// The lock screen's favorite star toggles lyrics over the moving artwork.
+// The lock screen's favorite star cycles the configured artwork views.
 #import <MediaPlayer/MediaPlayer.h>
 #import "Core/SGCore.h"
 #import "AnimatedArtwork.h"
@@ -8,22 +8,28 @@ static NSString *const kLikeDislikeFlag = @"ios-feature-lockscreen.like_dislike_
 static MPFeedbackCommand *sg_like;
 static id sg_target;
 
+static NSString *currentStarView(void) {
+    SGLockArtwork artwork = SGLockScreenArtwork();
+    if (artwork == SGLockArtworkFill) return @"fill";
+    if (SGLockArtworkHasMotion(artwork)) return SGLockScreenCanvasLyricsEnabled() ? @"canvasLyrics" : @"canvas";
+    return nil;
+}
+
 static BOOL starOn(void) {
-    return SGHidden(SGKeyLockScreenStar) && SGLockArtworkHasMotion(SGLockScreenArtwork());
+    return SGHidden(SGKeyLockScreenStar) && SGLockScreenStarViewOrder().count > 1;
 }
 
 static MPRemoteCommandHandlerStatus tapped(void) {
     if (!starOn()) return MPRemoteCommandHandlerStatusCommandFailed;
     dispatch_async(dispatch_get_main_queue(), ^{
-        SGLockScreenCanvasLyricsSetEnabled(!SGLockScreenCanvasLyricsEnabled());
-        SGLog(@"lock star: Canvas lyrics %@", SGLockScreenCanvasLyricsEnabled() ? @"on" : @"off");
+        SGLockScreenStarAdvanceView();
     });
     return MPRemoteCommandHandlerStatusSuccess;
 }
 
 static void arm(void) {
     static BOOL lastOn, lastActive;
-    BOOL on = starOn(), active = on && SGLockScreenCanvasLyricsEnabled();
+    BOOL on = starOn(), active = on && [currentStarView() isEqualToString:@"canvasLyrics"];
     if (sg_like && !sg_like.enabled) sg_like.enabled = YES;
     if (on == lastOn && active == lastActive && on == (sg_like != nil)) return;
     lastOn = on;
@@ -42,7 +48,7 @@ static void arm(void) {
     if (!sg_like) {
         [like removeTarget:nil];
         sg_target = [like addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *event) { return tapped(); }];
-        like.localizedTitle = @"Canvas lyrics";
+        like.localizedTitle = @"Cycle lock-screen artwork";
         sg_like = like;
     }
     like.enabled = YES;
