@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the spotifyglass tweak and injects it (plus FLEX) into a decrypted Spotify IPA.
 #
-#   scripts/pipeline.sh <decrypted.ipa> [-o out.ipa] [--no-flex] [--install] [--name N] [--icon P.png]   (or: make build / make install)
+#   scripts/pipeline.sh <decrypted.ipa> [-o out.ipa] [--no-flex] [--no-safari] [--install] [--name N] [--icon P.png]   (or: make build / make install)
 #
 # --install hands the result to install.sh (sign with your certificate, push to the plugged-in iPhone).
 #
@@ -24,13 +24,14 @@ FLEX_DEB="$ROOT/vendor/com.hopeless.autoflex_0.0.1_iphoneos-arm.deb"
 BUNDLE_ID="${BUNDLE_ID:-}"
 mkdir -p "$ROOT/out"
 
-IN="" OUT="" WITH_FLEX=1 INSTALL=0 NAME="" ICON=""
+IN="" OUT="" WITH_FLEX=1 WITH_SAFARI=1 INSTALL=0 NAME="" ICON=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) OUT="$2"; shift 2 ;;
     --name) NAME="$2"; shift 2 ;;
     --icon) ICON="$2"; shift 2 ;;
     --no-flex) WITH_FLEX=0; shift ;;
+    --no-safari) WITH_SAFARI=0; shift ;;
     --install) INSTALL=1; shift ;;
     -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
     *) IN="$1"; shift ;;
@@ -97,6 +98,17 @@ if xcrun --sdk iphoneos --find swiftc >/dev/null 2>&1; then
   FILES+=("$EXT_DIR/SpotifyGlassLiveActivity.appex")
 else
   echo "==> no Xcode selected: building without the Live Activity extension"
+fi
+
+# Package the Safari link opener beside the Live Activity; it uses Spotify's normal URI scheme.
+if [ "$WITH_SAFARI" = 1 ]; then
+  echo "==> building the Safari link extension"
+  SAFARI_DIR="$ROOT/out/safari-extension"
+  unzip -p "$IN" "${APP_DIR}Info.plist" > "$ROOT/out/.safari-host.plist"
+  export BUNDLE_ID
+  bash "$ROOT/scripts/build-safari-extension.sh" "$ROOT/out/.safari-host.plist" "$SAFARI_DIR"
+  rm -f "$ROOT/out/.safari-host.plist"
+  FILES+=("$SAFARI_DIR/TaurusOpenSpotify.appex")
 fi
 
 # Spotify's widget reads what the app writes through App Group suites the re-signed IPA is not entitled
