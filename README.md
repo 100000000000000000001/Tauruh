@@ -106,3 +106,7 @@ the view trees are read through.
 
 All modified and distributed code from chroma.pw is licensed under GPL-3.0, no code under PolyForm Strict License 1.0.0 is distributed. 
 Not affiliated with Spotify.
+
+## Safari link opener
+
+IPA builds include the Open in Spotify Safari extension. See [setup, coverage and verification](docs/safari-extension.md). Run `make test-safari` for regression checks; use `SAFARI=0` to build without it.
