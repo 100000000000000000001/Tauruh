@@ -2,8 +2,7 @@
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
 #import "SGRAccent.h"
-#import "Redesigned/Home/Home.h" 
-#import "Redesigned/Navbar/Navbar.h"
+#import "Redesigned/Home/Home.h"
 
 static void chooseAccent(void) {
     if (!SGRAccentColor()) {
