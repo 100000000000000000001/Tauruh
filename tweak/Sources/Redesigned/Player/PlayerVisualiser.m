@@ -434,8 +434,12 @@ BOOL SGRPlayerVisualiserShowing(void) {
             && SGRPlayerAnimatedFallback() == SGRPlayerBackgroundVisualiser);
 }
 
+// One preview view, reused: the Player page tears its old one down on every tap of the background control,
+// and each of those teardowns races the display link and the palette read it had just started.
 UIView *SGRPlayerVisualiserPreview(void) {
-    return [[SGRVisualiserView alloc] initWithFrame:CGRectZero];
+    static SGRVisualiserView *view;
+    if (!view) view = [[SGRVisualiserView alloc] initWithFrame:CGRectZero];
+    return view;
 }
 
 // The hills from the top of the field to the foot of its bleed, standing on the screen's foot.
