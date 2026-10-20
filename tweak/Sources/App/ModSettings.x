@@ -105,7 +105,12 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    _mastheadByline.text = arc4random_uniform(2) ? @"by natsha and samj." : @"by samj and natsha.";
+    NSArray<NSString *> *bylines = @[
+        @"by natsha, samj, and arnaupq.", @"by natsha, arnaupq, and samj.",
+        @"by samj, natsha, and arnaupq.", @"by samj, arnaupq, and natsha.",
+        @"by arnaupq, natsha, and samj.", @"by arnaupq, samj, and natsha.",
+    ];
+    _mastheadByline.text = bylines[arc4random_uniform((uint32_t)bylines.count)];
     [self startRainbow];
 }
 

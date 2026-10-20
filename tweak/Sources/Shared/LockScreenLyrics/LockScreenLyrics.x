@@ -9,6 +9,7 @@
 #import "LockScreenLyrics.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/Lyrics/Lyrics.h"
+#import "Shared/Player/NowPlayingExtras.h"
 #import "Headers/SPTPlayer.h"
 
 static const NSTimeInterval kTick = 0.25;
@@ -69,7 +70,7 @@ static double elapsedAt(NSDictionary *info, CFAbsoluteTime reportedAt, CFAbsolut
 static NSString *lineFor(NSDictionary *info, double elapsed) {
     SPTPlayerState *state = [(id<SPTPlayer>)SGKaraokePlayer() state];
     // The player's track can lag behind the now playing info; its lyrics would then be another song's.
-    if (![state.track.trackTitle isEqualToString:info[MPMediaItemPropertyTitle]]) return nil;
+    if (!SGNowPlayingTitlesMatch(state.track.trackTitle, info[MPMediaItemPropertyTitle])) return nil;
     NSString *trackID = SGKaraokePlayingTrack();
     NSArray<SGKaraokeLine *> *lines = SGKaraokeLinesForTrack(trackID);
     if (!lines) {

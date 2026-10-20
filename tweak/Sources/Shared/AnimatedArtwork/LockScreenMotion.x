@@ -111,7 +111,8 @@ static void withCover(NSString *title, void (^then)(CGImageRef cover)) {
     dispatch_async(dispatch_get_main_queue(), ^{
         NSDictionary *info = MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo;
         MPMediaItemArtwork *artwork = info[MPMediaItemPropertyArtwork];
-        UIImage *cover = [info[MPMediaItemPropertyTitle] isEqual:title] && [artwork isKindOfClass:MPMediaItemArtwork.class]
+        UIImage *cover = SGNowPlayingTitlesMatch(info[MPMediaItemPropertyTitle], title)
+            && [artwork isKindOfClass:MPMediaItemArtwork.class]
             ? [artwork imageWithSize:CGSizeMake(600, 600)] : nil;
         dispatch_async(sg_queue, ^{ then(cover.CGImage); });
     });
@@ -162,7 +163,7 @@ static void showFill(NSString *picture) {
     if (![MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys containsObject:MPNowPlayingInfoProperty3x4AnimatedArtwork]) return;
     NSString *title = sg_title;
     CGSize size = SGLyricsClipSize(SGMotionPixels());
-    NSURL *file = SGMotionMadeFile([NSString stringWithFormat:@"fill\nv5\n%@\n%.0fx%.0f", picture, size.width, size.height]);
+    NSURL *file = SGMotionMadeFile([NSString stringWithFormat:@"fill\nv9\n%@\n%.0fx%.0f", picture, size.width, size.height]);
     __block UIImage *renderedFrame;
     MPMediaItemAnimatedArtwork *artwork = [[MPMediaItemAnimatedArtwork alloc] initWithArtworkID:file.lastPathComponent
         previewImageRequestHandler:^(CGSize wanted, void (^completion)(UIImage *)) {
