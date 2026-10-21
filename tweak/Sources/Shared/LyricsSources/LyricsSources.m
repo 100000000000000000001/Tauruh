@@ -97,6 +97,13 @@ static id jsonIn(NSData *body) {
     return body.length ? [NSJSONSerialization JSONObjectWithData:body options:0 error:nil] : nil;
 }
 
+// A source may answer JSON null where a number should be; NSNull is not nil and does not answer
+// doubleValue, and reading one straight off killed whole launches. Every unguarded number in a
+// source's JSON goes through this.
+NSInteger SGLyricsNumber(id value) {
+    return [value respondsToSelector:@selector(doubleValue)] ? (NSInteger)[value doubleValue] : 0;
+}
+
 void SGLyricsGetJSON(NSURL *url, NSDictionary<NSString *, NSString *> *headers, void (^done)(id root)) {
     send(requestFor(url, headers), ^(NSData *body) {
         done(jsonIn(body));

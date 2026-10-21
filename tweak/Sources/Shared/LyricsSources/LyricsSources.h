@@ -129,6 +129,8 @@ void SGLyricsPostJSON(NSURL *url, NSDictionary<NSString *, NSString *> *headers,
 void SGLyricsNoteReply(NSURLResponse *response, NSError *error);
 // What it counts as lost: the network failed, or the server answered 429 or 5xx.
 BOOL SGLyricsReplyFailed(NSURLResponse *response, NSError *error);
+// A number read off a source's JSON: 0 for NSNull, nil and anything that cannot answer doubleValue.
+NSInteger SGLyricsNumber(id value);
 
 // SGTTML.m. Apple Music's TTML as timed lines, the voices already turned into alignments and each
 // line's translation and pronunciation added where the head has them; nil when the document holds no

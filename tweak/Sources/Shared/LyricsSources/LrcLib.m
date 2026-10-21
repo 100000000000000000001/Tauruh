@@ -109,8 +109,8 @@ static BOOL betterRecord(NSDictionary *record, NSDictionary *best, NSInteger sec
     BOOL wasSynced = [best[@"syncedLyrics"] isKindOfClass:NSString.class] && [best[@"syncedLyrics"] length];
     if (synced != wasSynced) return synced;
     if (seconds > 0) {
-        NSInteger off = labs((NSInteger)[record[@"duration"] doubleValue] - seconds);
-        NSInteger wasOff = labs((NSInteger)[best[@"duration"] doubleValue] - seconds);
+        NSInteger off = labs(SGLyricsNumber(record[@"duration"]) - seconds);
+        NSInteger wasOff = labs(SGLyricsNumber(best[@"duration"]) - seconds);
         return off < wasOff;
     }
     NSString *text = record[@"syncedLyrics"] ?: record[@"plainLyrics"] ?: @"";
@@ -122,7 +122,7 @@ static NSDictionary *bestOf(id found, NSInteger seconds) {
     NSDictionary *best = nil;
     for (NSDictionary *record in [found isKindOfClass:NSArray.class] ? found : @[]) {
         if (![record isKindOfClass:NSDictionary.class]) continue;
-        NSInteger length = (NSInteger)[record[@"duration"] doubleValue];
+        NSInteger length = SGLyricsNumber(record[@"duration"]);
         if (seconds > 0 && length > 0 && labs(length - seconds) > kLengthSlack) continue;
         if (betterRecord(record, best, seconds)) best = record;
     }
