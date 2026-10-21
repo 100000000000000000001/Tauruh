@@ -269,7 +269,7 @@ static SGLyricsResult *withTrack(SGLyricsResult *lyrics, id track) {
     if ([title isKindOfClass:NSString.class]) result.title = title;
     if ([artist isKindOfClass:NSString.class]) result.artist = artist;
     if ([album isKindOfClass:NSString.class]) result.album = album;
-    result.seconds = [track[@"track_length"] integerValue];
+    result.seconds = SGLyricsNumber(track[@"track_length"]);
     result.instrumental = truthy(track[@"instrumental"]);
     return result;
 }
