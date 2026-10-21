@@ -240,6 +240,9 @@ static UIViewPropertyAnimator *setBlurIntensity(UIVisualEffectView *view, UIView
 
 - (void)dealloc {
     [NSNotificationCenter.defaultCenter removeObserver:self];
+    // AVFoundation tears a looping player down while it plays: pause, then stop the looper, before both go.
+    [_player pause];
+    [_looper disableLooping];
 }
 
 - (void)setScreenHeight:(CGFloat)height {
@@ -524,11 +527,22 @@ BOOL SGRPlayerMotionShowing(void) {
     return sg_motion != nil;
 }
 
+// One preview view per file, kept across taps: the Player page tears its background down on every tap, and
+// rebuilding an AVPlayerLooper inside a second is what took the app down (the player's own clip keeps
+// kHandOver between swaps). A file change rebuilds; the old view is paused and unlooped in its dealloc.
 static UIView *previewOf(NSURL *file, UIImage *poster) {
-    SGRPlayerMotionView *preview = [[SGRPlayerMotionView alloc] initWithFrame:CGRectZero];
-    [preview playFile:file poster:poster];
-    [preview appear:NO then:^{}];
-    return preview;
+    static SGRPlayerMotionView *view;
+    static NSURL *shownFile;
+    if (view && [file isEqual:shownFile]) {
+        [view appear:NO then:^{}];
+        return view;
+    }
+    [view removeFromSuperview];
+    view = [[SGRPlayerMotionView alloc] initWithFrame:CGRectZero];
+    [view playFile:file poster:poster];
+    [view appear:NO then:^{}];
+    shownFile = file;
+    return view;
 }
 
 // The playing track's clip the Player page looked up itself while the player had none, and its poster; the
