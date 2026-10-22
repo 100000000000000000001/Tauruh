@@ -28,6 +28,7 @@ static NSString *trackOf(SPTPlayerState *state) { return SGURIString(state.track
 static BOOL isSong(NSString *uri) { return [uri hasPrefix:@"spotify:track:"]; }
 static BOOL notPlaying(SPTPlayerState *state) { return state.isPaused || !state.isPlaying; }
 static BOOL overheated(void) { return NSProcessInfo.processInfo.thermalState >= NSProcessInfoThermalStateSerious; }
+static BOOL ignoresResourceWarnings(void) { return SGFlag(SGKeySingIgnoreResourceWarnings, NO); }
 // Everything between the source and the ear, in source seconds: the output route, and speed and pitch's unit.
 static double downstreamLatency(void) {
     return (AVAudioSession.sharedInstance.outputLatency + SGPlayerAudioLatency()) * SGPlayerSpeed();
@@ -66,6 +67,7 @@ static double downstreamLatency(void) {
 @property (nonatomic) NSTimer *timer;
 @property (nonatomic) CFTimeInterval lastClockPublication;
 - (void)workerStatus:(int32_t)status session:(SGSingSession *)session;
+- (void)publish:(SGSingState)state explanation:(NSString *)explanation;
 - (void)reconcile;
 - (void)updateSpatial;
 - (void)applySpatial;
@@ -109,7 +111,12 @@ uint64_t SGSingTrackIdentifier(id uri) {
 BOOL SGSingPosition(SPTPlayerState *state, double *position) {
     if (!state) return NO;
     uint64_t track = SGSingTrackIdentifier(state.track.URI);
-    if (SGSingAudioClock(track, position)) return YES;
+    if (SGSingAudioClock(track, position)) {
+        // Spotify uses this clock for track-end decisions; never let Sing report past its source clock.
+        double source = SGSingSourcePosition(state);
+        if (isfinite(source)) *position = MIN(*position, MAX(0, source));
+        return YES;
+    }
     if (SGSingAudioAwaitingTrack(sg_controller.session.audio, track)) { *position = 0; return YES; }
     return NO;
 }
@@ -164,7 +171,7 @@ static void workerStatus(void *context, int32_t status) {
 }
 - (NSString *)restriction {
     if (_interrupted) return @"Sing will be ready when the audio interruption ends.";
-    if (overheated()) return @"Let your iPhone cool down before using Sing again.";
+    if (overheated() && !ignoresResourceWarnings()) return @"Let your iPhone cool down before using Sing again.";
     for (AVAudioSessionPortDescription *port in AVAudioSession.sharedInstance.currentRoute.outputs)
         if ([port.portType isEqualToString:AVAudioSessionPortAirPlay]) return @"Sing is unavailable over AirPlay.";
     if (!isSong(trackOf(SGPlayerState()))) return @"Play a song on this iPhone to use Sing.";
@@ -417,11 +424,22 @@ static void workerStatus(void *context, int32_t status) {
     [self reconcile];
 }
 - (void)memory:(NSNotification *)note {
+    if (ignoresResourceWarnings()) {
+        SGLog(@"Sing: continuing after a memory warning because resource warnings are ignored");
+        return;
+    }
     _blockedTrack = trackOf(SGPlayerState()); [self stop:NO unload:YES];
     if (_state != SGSingUnavailable) [self publish:SGSingFailed explanation:@"Sing stopped to free memory. The original audio will continue."];
 }
 - (void)thermal:(NSNotification *)note {
     dispatch_async(dispatch_get_main_queue(), ^{
+        if (ignoresResourceWarnings()) {
+            BOOL wasCooling = self.cooling;
+            self.cooling = NO;
+            if (wasCooling && self.state == SGSingFailed && !self.session) [self publish:SGSingIdle explanation:nil];
+            [self reconcile];
+            return;
+        }
         if (!overheated()) {
             if (self.cooling) {
                 self.cooling = NO;
@@ -520,6 +538,25 @@ BOOL SGSingCanRetry(void) {
 BOOL SGSingEnabled(void) { return sg_configured && sg_controller.wanted; }
 float SGSingVocalLevel(void) { return sg_controller.level; }
 float SGSingReducedLevel(void) { return sg_controller.reduced; }
+void SGSingResourceWarningsChanged(void) {
+    SGSingController *controller = sg_controller;
+    if (!controller) return;
+    if (ignoresResourceWarnings()) {
+        BOOL wasCooling = controller.cooling;
+        controller.cooling = NO;
+        if (wasCooling && controller.state == SGSingFailed && !controller.session)
+            [controller publish:SGSingIdle explanation:nil];
+        [controller reconcile];
+        return;
+    }
+    if (overheated() && (controller.session || controller.wanted)) {
+        controller.cooling = YES;
+        [controller stop:NO unload:YES];
+        if (controller.state != SGSingUnavailable)
+            [controller publish:SGSingFailed explanation:@"Sing stopped so your iPhone can cool down."];
+    }
+    [controller reconcile];
+}
 void SGSingSetVocalLevel(float level) {
     if (!sg_configured) return;
     sg_controller.level = SGSingClampLevel(level);

@@ -268,9 +268,9 @@ static SGRSingLook lookOf(SGSingState state) {
     _holding = held;
 }
 
-// With the controls away the microphone stays only while Sing is on.
+// With the controls away, hide the microphone even while Sing is active.
 - (void)updateVisibility {
-    BOOL visible = !_immersive || SGSingStateIsOn(SGSingCurrentState());
+    BOOL visible = !_immersive;
     self.alpha = visible ? 1 : 0;
     self.accessibilityElementsHidden = !visible;
 }

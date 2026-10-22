@@ -28,6 +28,8 @@ float SGSingVocalLevel(void);
 float SGSingReducedLevel(void); // the last balance below vocals-only, which turning Sing on goes back to
 void SGSingSetVocalLevel(float level);
 void SGSingSetEnabled(BOOL enabled);
+#define SGKeySingIgnoreResourceWarnings @"spotifyglass.sing.ignoreResourceWarnings"
+void SGSingResourceWarningsChanged(void);
 #if SG_DRIVER
 void SGDriverSingSetEnabled(BOOL enabled);
 #endif

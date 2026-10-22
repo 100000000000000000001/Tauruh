@@ -216,9 +216,10 @@ void SGRPlayerSetCoverAccent(UIColor *cover) {
         [bright getRed:&r green:&g blue:&b alpha:&a];
         rgb = ((NSInteger)lround(r * 255) << 16) | ((NSInteger)lround(g * 255) << 8) | (NSInteger)lround(b * 255);
     }
-    if (rgb == sg_cover) return;
-    sg_cover = rgb;
-    SGLog(@"redesign player: follow the cover %@", rgb < 0 ? @"gives the accent back (a gray cover)" : [NSString stringWithFormat:@"paints #%06lX", (long)rgb]);
+    if (rgb != sg_cover) {
+        sg_cover = rgb;
+        SGLog(@"redesign player: follow the cover %@", rgb < 0 ? @"gives the accent back (a gray cover)" : [NSString stringWithFormat:@"paints #%06lX", (long)rgb]);
+    }
     SGRPlayerPaintCover(sg_stack);
 }
 
@@ -230,6 +231,12 @@ void SGRPlayerSetCoverAccent(UIColor *cover) {
     if (stack && (sg_cover >= 0 || objc_getAssociatedObject(self, &kTintedKey)) && [(UIView *)self isDescendantOfView:stack]) {
         SGRPlayerPaintCover((UIView *)self);
     }
+}
+
+- (void)setImage:(UIImage *)image forState:(UIControlState)state {
+    %orig;
+    UIView *stack = sg_stack;
+    if (stack && [(UIView *)self isDescendantOfView:stack]) SGRPlayerPaintCover((UIView *)self);
 }
 %end
 

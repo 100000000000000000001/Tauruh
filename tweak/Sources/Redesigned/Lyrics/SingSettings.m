@@ -111,6 +111,10 @@ static SGModSection *karaokeSection(void) {
     if (!SGSingSupported()) return SGNotedSection(@"Karaoke", @[unavailableRow()], footer());
     SGModRow *sing = SGOptionRow(@"Sing", @"The microphone in the lyrics", SGRKeySing);
     sing.changed = ^(BOOL on) { SGRSingApplySwitch(); };
+    SGModRow *ignoreResourceWarnings = SGSwitchRow(@"Ignore heat and memory warnings",
+        @"Keep Sing running during thermal or memory pressure. This can make your iPhone unstable or cause apps to close.",
+        SGKeySingIgnoreResourceWarnings);
+    ignoreResourceWarnings.changed = ^(BOOL on) { SGSingResourceWarningsChanged(); };
 
     NSArray<NSString *> *modelChoices = @[
         [NSString stringWithFormat:@"Best quality · %@", SGSingModelSizeTextOf(SGSingModelFull)],
@@ -144,7 +148,8 @@ static SGModSection *karaokeSection(void) {
     SGModRow *spatial = SGPageRow(@"Spatial voice", ^UIViewController *{ return SGSpatialVoiceSettingsPage(); });
     spatial.value = ^NSString *{ return SGSingSpatial() ? @"On" : @"Off"; };
     spatial.visible = ^BOOL { return SGSingSpatialAvailable(); };
-    return SGNotedSection(@"Karaoke", @[sing, modelChoice, model, download, cancel, remove, spatial], footer());
+    return SGNotedSection(@"Karaoke",
+        @[sing, ignoreResourceWarnings, modelChoice, model, download, cancel, remove, spatial], footer());
 }
 
 @interface SGSpatialVoicePage : SGModPage

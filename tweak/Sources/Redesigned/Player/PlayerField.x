@@ -36,6 +36,8 @@ static __weak UIImage *sg_lastCover;
 static NSString *sg_lastCoverURI;
 // Spotify's color for the player, which can arrive before the plane has laid out once.
 static UIColor *sg_spotifyColor;
+static NSString *sg_followedCover;
+static NSUInteger sg_coverRequest;
 
 SGRArtworkField *SGRPlayerField(void) {
     return sg_field;
@@ -92,10 +94,18 @@ void SGRPlayerHoldField(void) {
 // Follow the cover: the most colorful of the cover's five colors (its quarters and the whole), once per artwork. A
 // white wall behind a pink subject has the wall as the whole's color, too gray to give an accent.
 static void followCover(UIImage *image, NSString *identity) {
-    static NSString *followed;
-    if (!SGRPlayerFollowsCover() || !image || (identity && [identity isEqualToString:followed])) return;
-    followed = identity;
+    if (!SGRPlayerFollowsCover()) return;
+    if (!image) {
+        sg_coverRequest++;
+        sg_followedCover = nil;
+        return;
+    }
+    NSString *cover = identity.length ? identity : [NSString stringWithFormat:@"%p", image];
+    if ([cover isEqualToString:sg_followedCover]) return;
+    sg_followedCover = cover;
+    NSUInteger request = ++sg_coverRequest;
     [SGRPalette paletteForImage:image request:(SGRPaletteRequest){.flow = YES} completion:^(SGRPalette *palette) {
+        if (request != sg_coverRequest || !SGRPlayerFollowsCover()) return;
         UIColor *best = nil;
         CGFloat bestSaturation = -1;
         for (UIColor *color in palette.flowColors) {
@@ -105,7 +115,7 @@ static void followCover(UIImage *image, NSString *identity) {
                 bestSaturation = saturation;
             }
         }
-        SGRPlayerSetCoverAccent(best);
+        if (best) SGRPlayerSetCoverAccent(best);
     }];
 }
 

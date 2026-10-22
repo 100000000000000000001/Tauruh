@@ -10,6 +10,8 @@ static id sg_target;
 
 static NSString *currentStarView(void) {
     SGLockArtwork artwork = SGLockScreenArtwork();
+    if (artwork == SGLockArtworkOff) return @"default";
+    if (artwork == SGLockArtworkEverySong) return @"colorful";
     if (artwork == SGLockArtworkFill) return @"fill";
     if (SGLockArtworkHasMotion(artwork)) return SGLockScreenCanvasLyricsEnabled() ? @"canvasLyrics" : @"canvas";
     return nil;

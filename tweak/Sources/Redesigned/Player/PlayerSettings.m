@@ -434,6 +434,10 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         SGNotedSection(@"Background opacity", blur, @"Lower opacity makes each background layer more transparent. "
                     @"Canvas and lyrics sliders reduce blur strength directly; at 0% the blur is fully transparent."),
         SGNotedSection(@"Controls", @[
+                       SGSwitchRow(@"Auto-hide portrait controls", @"Bring them back with a tap after a few seconds",
+                                   SGRKeyLyricsAutoHide),
+                       SGSwitchRow(@"Auto-hide landscape controls", @"Bring them back with a tap after a few seconds",
+                                   SGRKeyLyricsLandscapeAutoHide),
                        SGOptionRow(@"Show Sing button", @"Karaoke control in the player lyrics", SGRKeyPlayerKaraokeButton),
                        SGOptionRow(@"Show Translate button", @"Pronunciation and translation in the player lyrics", SGRKeyPlayerTranslateButton),
                        SGOptionRow(@"Show volume slider", @"Off by default", SGRKeyPlayerVolume),

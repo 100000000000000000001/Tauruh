@@ -36,9 +36,7 @@ SGModSection *SGLyricsSourcesSection(BOOL namingSource) {
 
 SGModRow *SGLockScreenLyricsRow(void) {
     SGModRow *row = SGSwitchRow(@"Lock screen lyrics", @"Current line in place of the artist", SGKeyLockScreenLyrics);
-    row.changed = ^(BOOL on) {
-        if (on && SGEnabled(SGKeyLockScreenExclusiveLyrics)) SGLockScreenCanvasLyricsSetEnabled(NO);
-    };
+    row.changed = ^(BOOL on) { SGLockScreenArtistLyricsChanged(on); };
     return row;
 }
 

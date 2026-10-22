@@ -143,14 +143,16 @@ Shared:
                   or graph change when attachment fails. Boundary tests are in harness/audio/ and harness/sing/
     Sing/         the local Core ML separator, source-domain audio adapter, worker and player lifecycle, from iOS 18. Core ML
                   uses Vitrine's Neural Engine model in the foreground and its warm CPU model in the background. The audible
-                  clock follows emitted source samples while delayed audio drains. Model loading overlaps source capture;
+                  clock follows emitted source samples while delayed audio drains and never reports ahead of Spotify's
+                  source clock. Model loading overlaps source capture;
                   verified continuous next-track PCM keeps its worker and reserve across a natural transition.
                   Redesigned/Lyrics owns the Now Playing microphone control and Mod Settings' Karaoke page. The voice
                   model (about 201 MiB) is not in the IPA: SGSingModel.m downloads My-Name-Is-Jeff/vitrine-sing's
                   separator-ane.mlmodelc in a
                   background URL session, checks each against a size and a SHA-256 pinned in the code, and moves
                   them into Application Support/spoti.pw/Sing only when all are right (SingModel.x reconnects at
-                  launch). Tested against harness/sing/ (the download against a local server, model_test.py)
+                  launch). Karaoke can optionally ignore thermal and memory warnings; the default retains both
+                  safeguards. Tested against harness/sing/ (the download against a local server, model_test.py)
                   Spatial voice can place the vocals relative to head motion, with distance, room, and instrument
                   width controls under Karaoke; it stays off until enabled and yields to spatial audio on the route.
     Player/       the player's open and close announced (PlayerEvents.x), what the player is doing read through
@@ -356,11 +358,13 @@ Lyrics: the ordered list of lyrics sources, lyrics for every track,
 naming the source in the redesign, artist-name replacement on the lock screen (independent of Canvas lyrics),
 and glass lyrics in the native look; in the redesign also
 which of the lyrics, their pronunciation and their translation is set largest, Genius meaning marks (which can
-be hidden without losing the hold-on-a-line meaning sheet), the translation's language, and whether portrait
-or landscape lyrics controls auto-hide (both under Lyrics > Display). Lock Screen: its controls and, under Artwork,
+be hidden without losing the hold-on-a-line meaning sheet), and the translation's language. Player controls
+include independent portrait and landscape auto-hide switches for the lyrics screen. Lock Screen: its controls and, under Artwork,
 Animated lock screen, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls,
 with optional Canvas lyrics toggled from the redesigned player's ⋯ menu or the lock-screen star, a Sources page for
-their order, Fill artwork, and configurable lock-screen star cycling, and a "Needs iOS 26" row below that;
+their order, Fill artwork, and configurable lock-screen star cycling across Canvas, Canvas with lyrics, Fill,
+Colourful (Every Song's moving-cover fallback) and Default (iOS's full album artwork); a missing animation
+advances to the next ordered view. A "Needs iOS 26" row appears below that;
 Canvas lyrics and artist-name replacement remain independent.
 Audio effects follows Lock Screen, which appears between Lyrics and Audio effects on the root page.
 In the native look also Now playing bar (its device button and its flags), Queue & devices, and

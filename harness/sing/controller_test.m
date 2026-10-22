@@ -109,8 +109,20 @@ int main(void) { @autoreleasepool {
     [sg_controller thermal:nil]; flush();
     assert(SGSingCurrentState() == SGSingIdle && starts == 0 && SGSingCanRetry());
 
+    SGSetEnabled(SGKeySingIgnoreResourceWarnings, YES);
+    heat = NSProcessInfoThermalStateSerious;
+    [sg_controller thermal:nil]; flush();
+    assert(SGSingCurrentState() == SGSingIdle && starts == 0);
     SGSingSetEnabled(YES); report(0, SGStemReady);
     assert(starts == 1 && sg_controller.session.attached);
+    unsigned warningsPurged = purges, warningsCancelled = cancels;
+    [sg_controller memory:nil];
+    assert(sg_controller.session.attached && purges == warningsPurged && cancels == warningsCancelled);
+    heat = NSProcessInfoThermalStateFair;
+    [sg_controller thermal:nil]; flush();
+    SGSetEnabled(SGKeySingIgnoreResourceWarnings, NO);
+    SGSingResourceWarningsChanged();
+
     SGSingStream *s = stream(sg_controller.session);
     float pcm[882] = {0};
     // No inference result: fill the bounded input queue, then finish the worker BEFORE polling.
@@ -362,6 +374,11 @@ int main(void) { @autoreleasepool {
             transitioned = YES;
         }
         [sg_controller reconcile];
+        if (!transitioned && sourceFrames < naturalBoundary) {
+            double position;
+            assert(SGSingPosition(player, &position));
+            assert(position <= SGSingSourcePosition(player));
+        }
         if (transitioned && sourceFrames > repeatBoundary) {
             // Repeat-one does not announce a new URI. Reconcile must still retain the
             // same worker and reset the clock when the repeated PCM becomes audible.

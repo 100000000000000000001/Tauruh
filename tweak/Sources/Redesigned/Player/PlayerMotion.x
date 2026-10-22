@@ -59,7 +59,7 @@ static const NSTimeInterval kGiveUp = 5;
 // Seconds the last track's clip stays on a skip for the next one's to come in over it.
 static const NSTimeInterval kHandOver = 0.4;
 // The dim's floor and ceiling, and what the lyrics add to it.
-static const CGFloat kDimLeast = 0.10, kDimMost = 0.80, kDimLyrics = 0.15;
+static const CGFloat kDimLeast = 0.04, kDimMost = 0.45, kDimLyrics = 0.10;
 // The frames measured for the dim besides the poster, in seconds into the clip (one past its end is skipped).
 static const double kMeasuredAt[] = {1, 2};
 
@@ -78,7 +78,7 @@ static CGImageRef blurredFoot(CGImageRef image) {
 
 CGFloat SGRPlayerClipDim(CGFloat luminance, BOOL contrast, BOOL lyrics) {
     // White is 1, so (1 + 0.05) / (L + 0.05) >= ratio puts the clip's luminance at `most` or under.
-    CGFloat ratio = contrast ? 7 : 4.5, most = 1.05 / ratio - 0.05;
+    CGFloat ratio = contrast ? 4.5 : 3.0, most = 1.05 / ratio - 0.05;
     // A black layer scales the clip's encoded values, which Core Animation blends, so its linear luminance
     // goes down by about the 2.2nd power of what the layer leaves.
     CGFloat dim = luminance > most ? 1 - pow(most / luminance, 1 / 2.2) : 0;

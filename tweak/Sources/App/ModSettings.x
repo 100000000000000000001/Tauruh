@@ -398,6 +398,8 @@ static UIColor *planBadgeColor(void) {
                             blue:(rgb & 0xFF) / 255.0 alpha:1];
 }
 
+static __weak UIView *sg_drawerRoot;
+
 static void updatePlanBadge(UIView *root) {
     UIColor *color = planBadgeColor();
     CGFloat red = 0, green = 0, blue = 0, alpha = 0;
@@ -409,18 +411,38 @@ static void updatePlanBadge(UIView *root) {
         if (![label.text isEqualToString:@"Spotify Free"] && ![label.text isEqualToString:@"Taurine"]) return;
         label.text = @"Taurine";
         label.textColor = textColor;
+        label.backgroundColor = color;
         UIView *badge = label.superview;
         badge.backgroundColor = color;
-        badge.layer.cornerRadius = CGRectGetHeight(badge.bounds) / 2;
-        badge.clipsToBounds = YES;
+        badge.layer.cornerRadius = 0;
+        badge.clipsToBounds = NO;
     });
 }
+
+%hook UILabel
+- (void)setText:(NSString *)text {
+    %orig;
+    if (![text isEqualToString:@"Spotify Free"] && ![text isEqualToString:@"Taurine"]) return;
+    UIView *root = sg_drawerRoot;
+    if (!root || ![self isDescendantOfView:root]) return;
+    UIColor *color = planBadgeColor();
+    CGFloat red = 0, green = 0, blue = 0, alpha = 0;
+    [color getRed:&red green:&green blue:&blue alpha:&alpha];
+    if ([text isEqualToString:@"Spotify Free"]) %orig(@"Taurine");
+    self.textColor = (0.2126 * red + 0.7152 * green + 0.0722 * blue) > 0.55 ? UIColor.blackColor : UIColor.whiteColor;
+    self.backgroundColor = color;
+    self.superview.backgroundColor = color;
+    self.superview.layer.cornerRadius = 0;
+    self.superview.clipsToBounds = NO;
+}
+%end
 
 // This hook carries the drawer's "Taurine" plan badge; the mod settings row is gone from the drawer.
 %hook _TtC23SideDrawer_ListPageImpl18ListViewController
 - (void)viewDidLayoutSubviews {
     %orig;
-    updatePlanBadge(((UIViewController *)self).view);
+    sg_drawerRoot = ((UIViewController *)self).view;
+    updatePlanBadge(sg_drawerRoot);
 }
 %end
 

@@ -126,7 +126,9 @@ static UIScrollView *pageList(UIView *view) {
 %hook _TtC19Home_FunkisPageImpl20FunkisViewController
 - (void)viewDidLayoutSubviews {
     %orig;
-    for (UIView *wrapper in ((UIViewController *)self).viewIfLoaded.subviews) {
+    UIView *page = ((UIViewController *)self).viewIfLoaded;
+    if (!page || !sg_homeRoot || ![sg_homeRoot isDescendantOfView:page]) return;
+    for (UIView *wrapper in page.subviews) {
         for (UIView *view in wrapper.subviews) {
             if ([NSStringFromClass(view.class) containsString:@"GradientView"]) view.hidden = YES;
         }

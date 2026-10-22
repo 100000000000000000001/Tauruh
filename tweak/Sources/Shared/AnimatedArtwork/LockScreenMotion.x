@@ -35,9 +35,25 @@ static dispatch_queue_t sg_queue;   // cuts clips and makes the cover's, one at 
 static SGMotionFollower *sg_follower;
 static NSURL *sg_lyricsFile;
 static BOOL sg_plain, sg_plainShown;
+static NSString *sg_fallbackTrack;
+static NSUInteger sg_fallbackAttempts;
 
 static BOOL motionOn(SGLockArtwork choice) {
     return SGLockArtworkHasMotion(choice);
+}
+
+static void advanceAfterMissingMotion(NSString *uri) {
+    if (![sg_fallbackTrack isEqualToString:uri]) {
+        sg_fallbackTrack = uri;
+        sg_fallbackAttempts = 0;
+    }
+    NSArray<NSString *> *order = SGLockScreenStarViewOrder();
+    if (!order.count || ++sg_fallbackAttempts >= order.count) {
+        SGSetInt(SGKeyFullScreenArtwork, SGLockArtworkOff);
+        SGLockScreenCanvasLyricsSetEnabled(NO);
+        return;
+    }
+    SGLockScreenStarAdvanceView();
 }
 
 // The key a clip shown at `shown` goes under, and the shape it is cut to (width over height): 1:1 for a
@@ -216,6 +232,10 @@ void SGLockMotionShowPlain(BOOL plain) {
         // Each walk takes the last one's clip off first, so the lock screen falls back to the still cover.
         sg_follower = [[SGMotionFollower alloc] initWithBegin:^BOOL(NSString *uri, SPTPlayerState *state) {
             sg_walk++;
+            if (![sg_fallbackTrack isEqualToString:uri]) {
+                sg_fallbackTrack = uri;
+                sg_fallbackAttempts = 0;
+            }
             SGNowPlayingSetExtras(@"motion", nil, nil);
             sg_lyricsFile = nil;
             sg_plainShown = NO;
@@ -233,8 +253,15 @@ void SGLockMotionShowPlain(BOOL plain) {
                 sg_lyricsFile = file;
                 SGLyricsArtworkSetMotion(uri, file);
                 SGLockMotionShowPlain(sg_plain);
-            } else if (file) show(file);
-            else if (sg_choice == SGLockArtworkEverySong) showCover(sg_picture);
+                if (!file) advanceAfterMissingMotion(uri);
+            } else if (file) {
+                show(file);
+                sg_fallbackAttempts = 0;
+            } else if (sg_choice == SGLockArtworkEverySong) {
+                showCover(sg_picture);
+            } else if (motionOn(sg_choice)) {
+                advanceAfterMissingMotion(uri);
+            }
         }];
         // Heard on the writing thread and handed to main without waiting: a main-queue observer makes every
         // background defaults write wait for main, which deadlocks launch while main waits on Spotify's CoreThread.

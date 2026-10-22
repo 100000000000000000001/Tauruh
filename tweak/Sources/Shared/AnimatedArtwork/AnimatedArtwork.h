@@ -29,6 +29,8 @@ void SGLockScreenStarAdvanceView(void);
 CGFloat SGLockScreenCoverArtworkScale(void);
 BOOL SGLockScreenCanvasLyricsEnabled(void);
 void SGLockScreenCanvasLyricsSetEnabled(BOOL enabled);
+void SGLockScreenLyricsExclusivityChanged(BOOL enabled);
+void SGLockScreenArtistLyricsChanged(BOOL enabled);
 void SGLockMotionShowPlain(BOOL plain);
 static inline BOOL SGLockArtworkHasMotion(SGLockArtwork artwork) {
     return artwork == SGLockArtworkMotion || artwork == SGLockArtworkEverySong;

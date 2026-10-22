@@ -180,10 +180,7 @@ static void refreshArtistLyrics(void) {
 
 static BOOL artistLyricsOn(void) {
     BOOL enabled = SGFlag(SGKeyLockScreenLyrics, NO);
-    if (enabled && SGLockScreenCanvasLyricsEnabled() && SGEnabled(SGKeyLockScreenExclusiveLyrics)) {
-        SGSetEnabled(SGKeyLockScreenLyrics, NO);
-        return NO;
-    }
+    if (enabled && SGLockScreenCanvasLyricsEnabled() && SGEnabled(SGKeyLockScreenExclusiveLyrics)) return NO;
     return enabled;
 }
 
