@@ -41,6 +41,10 @@ UIViewController *SGRNavbarEditorPage(void);     // the tab editor alone, for th
 BOOL SGRTabBarMinimized(void);
 void SGRSetTabBarMinimized(BOOL minimized, BOOL animated);
 
+// TabBar.x: shows the given custom tab (an SGRTabItemView on the row) as the bar's selected one, and keeps
+// it selected until a stock tab is tapped; Spotify never paints one of the mod's tabs white itself.
+void SGRTabBarMarkCustomSelected(UIView *customItem);
+
 // TabBar.x: passes a tap on to the Spotify view a mod view stands in for, so the mini player's pill opens the player.
 // SGRFireTapRecognizers fires the tap recognizers on that one view alone; it answers whether it had any.
 BOOL SGRFireTapRecognizers(UIView *view);

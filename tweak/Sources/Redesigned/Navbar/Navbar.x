@@ -103,7 +103,12 @@ static UIView *iconView(NSDictionary *entry) {
     SGLinkRoute route = SGSpotifyURIRoute(url, &via);
     SGLog(@"navbar: open %@ -> %@", url.absoluteString ?: self.uri,
           route == SGLinkRouteOpens ? via : route == SGLinkRouteNone ? @"no handler" : @"unknown");
-    if (!SGOpenSpotifyURI(url)) SGLog(@"navbar: cannot open %@, dispatcher %@", self.uri, SGLinkDispatcher());
+    if (!SGOpenSpotifyURI(url)) {
+        SGLog(@"navbar: cannot open %@, dispatcher %@", self.uri, SGLinkDispatcher());
+    } else {
+        // The page opened in process; light the tab up as the one the user is in now.
+        SGRTabBarMarkCustomSelected(self);
+    }
 }
 
 @end
