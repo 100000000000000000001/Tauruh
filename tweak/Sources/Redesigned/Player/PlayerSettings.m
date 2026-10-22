@@ -437,11 +437,9 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
                        SGOptionRow(@"Show Sing button", @"Karaoke control in the player lyrics", SGRKeyPlayerKaraokeButton),
                        SGOptionRow(@"Show Translate button", @"Pronunciation and translation in the player lyrics", SGRKeyPlayerTranslateButton),
                        SGOptionRow(@"Show volume slider", @"Off by default", SGRKeyPlayerVolume),
-                       SGSwitchRow(@"Hide volume slider thumb", @"Keep the slider usable without the white dot", SGRKeyHidePlayerVolumeThumb),
                        SGOptionRow(@"Match time slider", @"Align its width and track with song progress", SGRKeyPlayerVolumeMatchSlider),
                        SGOptionRow(@"Follow the cover", nil, SGRKeyPlayerFollowsCover)],
                        @"The volume slider controls this iPhone, or the speaker while Spotify plays on another device. "
-                       @"Hiding its thumb leaves the slider interactive. "
                        @"Follow the cover paints the like, shuffle and repeat in the color of the song playing."),
         SGNotedSection(@"Mini player", SGRNowPlayingBarRows(),
                        @"Apple Music style moves the now playing bar in between two tabs as you scroll down. "
