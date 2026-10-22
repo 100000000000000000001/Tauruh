@@ -35,6 +35,17 @@ The redesign is `UIGlassEffect`, which only exists from iOS 26. Below that the R
 is greyed out and the mod runs Spotify's own screens with everything else it adds on top. Both live
 in Settings → Mod Settings.
 
+## Downloads
+
+Mod Settings → **Downloads** drives Spotify's own offline downloads: download the current track or its
+album, check whether it is saved, cancel, check your offline quotas and device slots, and see the download
+status. Spotify's own download buttons (playlists, albums, ⋯ menus, Your Library) work too. Songs stay in
+Spotify's offline storage and play inside Spotify.
+
+It needs **Spotify 9.1.90**: the build edits that exact executable in three guarded places and skips the
+edit on any other version (`--no-downloads` skips it by choice). The engine is
+[Pixie](https://github.com/Glongq/Vitrine-Pixie) by Glongq, see `extension/Downloads/`.
+
 ## Install it
 
 Each

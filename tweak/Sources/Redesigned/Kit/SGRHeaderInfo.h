@@ -18,6 +18,10 @@ extern const CGFloat SGRHeaderInfoTitleRise;  // 56, of the content over the pic
 - (void)trailingStateChanged;
 - (void)showShuffle:(UIView *)shuffle play:(UIView *)play trailing:(UIView *)trailing
    trailingFallback:(UIImage *)trailingFallback playColor:(UIColor *)playColor;
+// Album and playlist row: Play at the trailing edge, the independent shuffle, download and add controls at the
+// leading edge. Narrow widths scroll only that group. Each button forwards to Spotify's own control.
+- (void)showAlbumShuffle:(UIView *)shuffle play:(UIView *)play download:(UIView *)download
+                    add:(UIView *)add playColor:(UIColor *)playColor;
 // The height the content wants at `width`, from the top of the title to the bottom of the description.
 - (CGFloat)contentHeightForWidth:(CGFloat)width;
 @end
