@@ -311,6 +311,13 @@ static UICollectionView *pageListOf(UIView *shelf) {
     return nil;
 }
 
+static BOOL isHomeShelf(UICollectionView *shelf) {
+    for (UIView *view = shelf; view; view = view.superview) {
+        if ([NSStringFromClass(object_getClass(view)) containsString:@"Home_EvoPageImpl13HomeStructure"]) return YES;
+    }
+    return NO;
+}
+
 static UIImage *coverOf(UIView *card) {
     UIView *holder = SGRFindByIdentifier(card, @"Encore.ImageView", &kAuraImageKey);
     for (UIView *sub in holder.subviews) {
@@ -356,6 +363,7 @@ static void paintAura(UICollectionView *list, UIColor *color) {
 }
 
 static void followAlbum(UICollectionView *shelf) {
+    if (!isHomeShelf(shelf)) return;
     if (SGFlag(SGRKeyHomeTopPicks, NO)) pokeCards(shelf);
     if (!SGRHomeGlassStyle()) return;
     UICollectionView *list = pageListOf(shelf);
