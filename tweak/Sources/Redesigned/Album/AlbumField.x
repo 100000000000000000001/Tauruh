@@ -94,7 +94,7 @@ static SGRArtworkField *fieldIn(UIView *page) {
 %ctor {
     // Registered whatever the switch says: the flag rows elsewhere lock to these while it is on.
     SGRedesignForceFlags(@"album", @{
-        @"ios-album-albumfeatureproperties-impl.context_menu_in_navigation_bar_enabled": @NO,
+        @"ios-album-albumfeatureproperties-impl.context_menu_in_navigation_bar_enabled": @YES,
         @"ios-album-albumfeatureproperties-impl.share_in_action_row_enabled": @NO,
         // A row is a title and its artists. The video badge is neither.
         @"ios-creativeworkcommons-retrievalrow-impl.track_video_indicator_enabled": @NO,
