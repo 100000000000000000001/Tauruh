@@ -299,7 +299,7 @@ Redesigned:
 
 App:
 
-    ModSettings.x  the root page and the rows that open it from Spotify's settings and the side drawer
+    ModSettings.x  the root page and the row that opens it from Spotify's settings
     Pages.m        the Appearance card with Redesigned UI, the Player and Lyrics pages, which Navbar page opens
     About/         the silent check against Taurus's GitHub Releases and the update alert at the top of Mod Settings;
                    backup, the signing warning and the Mod page with the reset
@@ -333,7 +333,7 @@ logs are not shared unless the user explicitly chooses Copy or Share.
 
 ## Mod Settings
 
-Mod Settings, opened by holding Home on the tab bar or from the first row of the side drawer and the
+Mod Settings, opened by holding Home on the tab bar or from the
 last row of Spotify's Settings, sorts every
 setting by the part of Spotify it changes, so a part's glass, its hide switches and its flags sit on
 one page, the mod's own rows first and Spotify's flags below them or on a sub page named after what
