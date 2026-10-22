@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the spotifyglass tweak and injects it (plus FLEX) into a decrypted Spotify IPA.
 #
-#   scripts/pipeline.sh <decrypted.ipa> [-o out.ipa] [--no-flex] [--no-safari] [--install] [--name N] [--icon P.png]   (or: make build / make install)
+#   scripts/pipeline.sh <decrypted.ipa> [-o out.ipa] [--no-flex] [--no-safari] [--no-downloads] [--install] [--name N] [--icon P.png]   (or: make build / make install)
 #
 # --install hands the result to install.sh (sign with your certificate, push to the plugged-in iPhone).
 #
@@ -24,7 +24,7 @@ FLEX_DEB="$ROOT/vendor/com.hopeless.autoflex_0.0.1_iphoneos-arm.deb"
 BUNDLE_ID="${BUNDLE_ID:-}"
 mkdir -p "$ROOT/out"
 
-IN="" OUT="" WITH_FLEX=1 WITH_SAFARI=1 INSTALL=0 NAME="" ICON=""
+IN="" OUT="" WITH_FLEX=1 WITH_SAFARI=1 WITH_DOWNLOADS=1 INSTALL=0 NAME="" ICON=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) OUT="$2"; shift 2 ;;
@@ -32,6 +32,7 @@ while [ $# -gt 0 ]; do
     --icon) ICON="$2"; shift 2 ;;
     --no-flex) WITH_FLEX=0; shift ;;
     --no-safari) WITH_SAFARI=0; shift ;;
+    --no-downloads) WITH_DOWNLOADS=0; shift ;;
     --install) INSTALL=1; shift ;;
     -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
     *) IN="$1"; shift ;;
@@ -73,6 +74,21 @@ if [ ! -f "$ROOT/tweak/Sources/Shared/Flags/SGFlagList.m" ]; then
   python3 "$ROOT/scripts/extract-flags.py" "$IN"
 fi
 
+# Downloads are patched only for the Spotify build whose byte patterns were verified.
+DOWNLOADS_DYLIB=""
+SPOTIFY_IN="$IN"
+if [ "$WITH_DOWNLOADS" = 1 ]; then
+  echo "==> patching Spotify for Downloads"
+  DL_RC=0
+  python3 "$ROOT/extension/Downloads/tools/build_downloads.py" "$IN" \
+    --out-ipa "$ROOT/out/.downloads-base.ipa" --out-dylib "$ROOT/out/SpotifyAudioProbe.dylib" >"$ROOT/out/.downloads.json" || DL_RC=$?
+  case "$DL_RC" in
+    0) IN="$ROOT/out/.downloads-base.ipa"; DOWNLOADS_DYLIB="$ROOT/out/SpotifyAudioProbe.dylib"; echo "    patched" ;;
+    3) echo "    skipped: Downloads needs Spotify 9.1.90" ;;
+    *) echo "downloads patch failed (exit $DL_RC); rerun with --no-downloads to build without it" >&2; exit "$DL_RC" ;;
+  esac
+fi
+
 echo "==> building tweak"
 export THEOS
 # Theos resolves its toolchain through `xcrun -sdk iphoneos`, which needs full Xcode. With only the
@@ -87,6 +103,7 @@ TWEAK_DEB="$(ls -t "$ROOT"/tweak/packages/*.deb | head -1)"
 echo "    $TWEAK_DEB"
 
 FILES=("$TWEAK_DEB")
+[ -n "$DOWNLOADS_DYLIB" ] && FILES+=("$DOWNLOADS_DYLIB")
 [ "$WITH_FLEX" = 1 ] && FILES+=("$FLEX_DEB")
 
 # The Live Activity (Shared/LiveActivity) draws in a widget extension of its own.
@@ -152,6 +169,8 @@ if [ -n "${EXT_DIR:-}" ]; then
   echo "==> adding the Live Activity intents to Spotify's App Intents metadata"
   python3 "$ROOT/scripts/merge-appintents.py" "$OUT" "$APP_DIR" "$EXT_DIR/app/Metadata.appintents"
 fi
+
+[ "$IN" != "$SPOTIFY_IN" ] && rm -f "$IN" "$ROOT/out/.downloads.json"
 
 echo "==> done: $OUT"
 [ "$INSTALL" = 1 ] && exec bash "$ROOT/scripts/install.sh" "$OUT"

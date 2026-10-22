@@ -17,6 +17,8 @@
                                 backup and signing, the welcome tour
     tweak/Sources/Diagnostics/  screen dumps, the tree server and the main thread hang sampler of FLEX builds
     extension/LiveActivity/     the Live Activity widget, a WidgetKit extension of its own
+    extension/Downloads/        the Pixie download engine: a companion dylib and guarded patches to Spotify 9.1.90
+                                that enable its offline-download implementation (see its README)
     extension/AppGroups/        a dylib loaded by Spotify and its home screen widget that moves Spotify's App Groups
                                 into a group the re-signed IPA has; without it the widget stays a placeholder
     scripts/                    pipeline.sh (build + inject), build-extension.sh (the widget extension, without an
@@ -76,6 +78,9 @@ Shared:
                   rewritten on the way in (AdNetwork.x, Premium.m over the protobuf walker in Protobuf.m), with crossfade
                   and automix switched on in the player core and crossfade's switch kept in step with its slider (Crossfade.x)
     Privacy/      telemetry blocking and its counters
+    Downloads/    Mod Settings > Downloads and its runtime companion bridge. Spotify's own download controls use
+                  the companion dylib and guarded executable patches; without the companion, the page reports
+                  Downloads as unavailable
     ArtistBlock/  tracks by blocked artists skipped as they start (ArtistSkip.x), the list and the Blocked artists page under Player
     Flags/        Spotify's remote-config flags: the provider hook, the generated table, the All flags page and the Labs page
     Gestures/     the double tap zones on the player: the grid, what each cell does, the recognizer (each look hooks it on)

@@ -7,6 +7,7 @@ static const CGFloat kDissolve = 0.46, kTopScrim = 140, kTopScrimAlpha = 0.28;
 static const CGFloat kMinHero = 120, kMinCover = 80;
 
 static char kCoverKey, kMetaKey, kPlayKey, kLayoutKey, kToolbarKey, kScrimKey, kBarScrimKey;
+static char kIndependentActionsKey;
 static char kShuffleKey, kAddKey, kDownloadKey, kInfoKey, kBlockHeightKey, kBlockWatchedKey;
 static char kHeroKey, kHeroHeightKey, kRestPlaneKey, kRowKey, kRowWatchedKey, kMoreKey, kCreatorKey, kPinnedMoreKey, kSortKey;
 
@@ -245,9 +246,18 @@ static void showPlaylist(SGRHeaderInfo *info, UIView *block, UIView *root, id mo
     UIView *shuffle = SGRFindByIdentifier(block, @"Components.UI.ShuffleButton", &kShuffleKey);
     UIView *play = SGRFindByIdentifier(root, @"header-play-button", &kPlayKey);
     UIView *save = own ? nil : SGRFindByIdentifier(block, @"Components.UI.AddToButton", &kAddKey);
-    UIView *download = save ? nil : SGRFindByIdentifier(block, @"DownloadButton.Granular*", &kDownloadKey);
-    [info showShuffle:shuffle play:play trailing:save ?: download
-     trailingFallback:[UIImage systemImageNamed:save ? @"plus" : @"arrow.down"] playColor:SGRPlaylistFieldColor(info)];
+    UIView *download = SGRFindByIdentifier(block, @"DownloadButton.Granular*", &kDownloadKey);
+    BOOL independent = [objc_getAssociatedObject(info, &kIndependentActionsKey) boolValue];
+    if (!independent && save && download) {
+        independent = YES;
+        objc_setAssociatedObject(info, &kIndependentActionsKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (independent) {
+        [info showAlbumShuffle:shuffle play:play download:download add:save playColor:SGRPlaylistFieldColor(info)];
+    } else {
+        [info showShuffle:shuffle play:play trailing:save ?: download
+         trailingFallback:[UIImage systemImageNamed:save ? @"plus" : @"arrow.down"] playColor:SGRPlaylistFieldColor(info)];
+    }
     // Only what the button draws goes: a concealed layer still sends the actions the capsule fires.
     conceal(play);
 
