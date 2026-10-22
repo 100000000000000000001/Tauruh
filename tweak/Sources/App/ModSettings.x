@@ -274,6 +274,7 @@ static UIViewController *modSettingsPage(void) {
 #pragma mark - row in the settings list
 
 @interface SGModSettingsRow : UIControl
+@property (nonatomic) BOOL drawer;
 @end
 
 @implementation SGModSettingsRow {
@@ -297,10 +298,11 @@ static UIViewController *modSettingsPage(void) {
 - (void)layoutSubviews {
     [super layoutSubviews];
     _title.font = SGTitleFont();
-    CGFloat width = self.bounds.size.width, height = self.bounds.size.height;
-    _icon.frame = CGRectMake(12, (height - 24) / 2, 24, 24);
-    _title.frame = CGRectMake(48, 0, width - 96, height);
+    CGFloat width = self.bounds.size.width, height = self.bounds.size.height, lead = self.drawer ? 4 : 0;
+    _icon.frame = CGRectMake(12 + lead, (height - 24) / 2, 24, 24);
+    _title.frame = CGRectMake(48 + lead, 0, width - 96, height);
     _chevron.frame = CGRectMake(width - 24, (height - 12) / 2, 12, 12);
+    _chevron.hidden = self.drawer;
 }
 
 - (void)setHighlighted:(BOOL)highlighted {
@@ -322,6 +324,13 @@ static UINavigationController *navigationIn(UIViewController *page) {
     for (UIResponder *r = self; r && !owner; r = r.nextResponder) {
         if ([r isKindOfClass:UIViewController.class]) owner = (UIViewController *)r;
     }
+    UIViewController *presenting = self.drawer ? owner.presentingViewController : nil;
+    if (presenting) {
+        [presenting dismissViewControllerAnimated:YES completion:^{
+            SGShowPage(navigationIn(presenting).topViewController ?: presenting, modSettingsPage());
+        }];
+        return;
+    }
     SGShowPage(owner, modSettingsPage());
 }
 
@@ -341,15 +350,27 @@ void SGOpenModSettings(UIView *source) {
 static void placeRow(UICollectionView *list, SGModSettingsRow *row) {
     SGAdoptFonts(list, row);
     CGFloat bottom = list.contentSize.height;
-    row.hidden = bottom <= 0;
-    row.frame = CGRectMake(0, bottom, list.bounds.size.width, kRowHeight);
+    row.hidden = !row.drawer && bottom <= 0;
+    row.frame = CGRectMake(0, row.drawer ? -kRowHeight : bottom, list.bounds.size.width, kRowHeight);
 
     UIEdgeInsets inset = list.contentInset;
     NSValue *applied = objc_getAssociatedObject(list, &kInsetKey);
     if (applied && UIEdgeInsetsEqualToEdgeInsets(inset, applied.UIEdgeInsetsValue)) return;
-    inset.bottom += kRowHeight;
+    if (row.drawer) inset.top += kRowHeight;
+    else inset.bottom += kRowHeight;
     objc_setAssociatedObject(list, &kInsetKey, [NSValue valueWithUIEdgeInsets:inset], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     list.contentInset = inset;
+}
+
+static SGModSettingsRow *ensureDrawerRow(UICollectionView *list) {
+    SGModSettingsRow *row = objc_getAssociatedObject(list, &kRowKey);
+    if (!row) {
+        row = [[SGModSettingsRow alloc] initWithFrame:CGRectZero];
+        row.drawer = YES;
+        objc_setAssociatedObject(list, &kRowKey, row, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (row.superview != list) [list addSubview:row];
+    return row;
 }
 
 static UIViewController *settingsListIn(UIViewController *page, Class kind) {
@@ -400,6 +421,14 @@ static UIColor *planBadgeColor(void) {
 
 static __weak UIView *sg_drawerRoot;
 
+static BOOL isDrawerBadgeLabel(UILabel *label) {
+    for (UIView *view = label; view; view = view.superview) {
+        if (view == sg_drawerRoot ||
+            [NSStringFromClass(view.class) containsString:@"SideDrawerListCollectionView"]) return YES;
+    }
+    return NO;
+}
+
 static void updatePlanBadge(UIView *root) {
     UIColor *color = planBadgeColor();
     CGFloat red = 0, green = 0, blue = 0, alpha = 0;
@@ -408,8 +437,9 @@ static void updatePlanBadge(UIView *root) {
     SGForEachView(root, ^(UIView *view) {
         if (![view isKindOfClass:UILabel.class]) return;
         UILabel *label = (UILabel *)view;
-        if (![label.text isEqualToString:@"Spotify Free"] && ![label.text isEqualToString:@"Taurine"]) return;
-        label.text = @"Taurine";
+        if (![label.text isEqualToString:@"Spotify Free"] && ![label.text isEqualToString:@"Taurine"] &&
+            ![label.text isEqualToString:@"Taurus"]) return;
+        if (![label.text isEqualToString:@"Taurus"]) label.text = @"Taurus";
         label.textColor = textColor;
         label.backgroundColor = color;
         UIView *badge = label.superview;
@@ -422,13 +452,13 @@ static void updatePlanBadge(UIView *root) {
 %hook UILabel
 - (void)setText:(NSString *)text {
     %orig;
-    if (![text isEqualToString:@"Spotify Free"] && ![text isEqualToString:@"Taurine"]) return;
-    UIView *root = sg_drawerRoot;
-    if (!root || ![self isDescendantOfView:root]) return;
+    if (![text isEqualToString:@"Spotify Free"] && ![text isEqualToString:@"Taurine"] &&
+        ![text isEqualToString:@"Taurus"]) return;
+    if (!isDrawerBadgeLabel(self)) return;
     UIColor *color = planBadgeColor();
     CGFloat red = 0, green = 0, blue = 0, alpha = 0;
     [color getRed:&red green:&green blue:&blue alpha:&alpha];
-    if ([text isEqualToString:@"Spotify Free"]) %orig(@"Taurine");
+    if (![text isEqualToString:@"Taurus"]) %orig(@"Taurus");
     self.textColor = (0.2126 * red + 0.7152 * green + 0.0722 * blue) > 0.55 ? UIColor.blackColor : UIColor.whiteColor;
     self.backgroundColor = color;
     self.superview.backgroundColor = color;
@@ -437,12 +467,17 @@ static void updatePlanBadge(UIView *root) {
 }
 %end
 
-// This hook carries the drawer's "Taurine" plan badge; the mod settings row is gone from the drawer.
+// Keep the drawer's plan badge and the Taurus settings row current as Spotify rebuilds its view.
 %hook _TtC23SideDrawer_ListPageImpl18ListViewController
 - (void)viewDidLayoutSubviews {
     %orig;
     sg_drawerRoot = ((UIViewController *)self).view;
     updatePlanBadge(sg_drawerRoot);
+    SGForEachView(sg_drawerRoot, ^(UIView *view) {
+        if (![view isKindOfClass:UICollectionView.class] ||
+            ![NSStringFromClass(view.class) containsString:@"SideDrawerListCollectionView"]) return;
+        ensureDrawerRow((UICollectionView *)view);
+    });
 }
 %end
 
@@ -451,6 +486,10 @@ static void updatePlanBadge(UIView *root) {
 - (void)layoutSubviews {
     %orig;
     SGModSettingsRow *row = objc_getAssociatedObject(self, &kRowKey);
+    BOOL drawerList = [NSStringFromClass(self.class) containsString:@"SideDrawerListCollectionView"];
+    if (drawerList) updatePlanBadge(self);
+    if (!row && drawerList)
+        row = ensureDrawerRow(self);
     if (row && row.superview != self) [self addSubview:row];
     if (row) placeRow(self, row);
 }

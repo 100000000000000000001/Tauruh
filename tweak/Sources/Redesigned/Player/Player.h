@@ -61,6 +61,7 @@ void SGRPlayerToggleLyrics(void);
 void SGRPlayerLyricsChanged(void);
 #define SGRKeyLyricsAutoHide @"spotifyglass.redesign.lyrics.autoHide"
 #define SGRKeyLyricsLandscapeAutoHide @"spotifyglass.redesign.lyrics.landscapeAutoHide"
+#define SGRKeyPlayerAllowAutoLock @"spotifyglass.redesign.player.allowAutoLock"
 #define SGRKeyPlayerVolumeMatchSlider @"spotifyglass.redesign.player.volume.matchSlider"
 #define SGRKeyPlayerKaraokeButton @"spotifyglass.redesign.player.karaokeButton"
 #define SGRKeyPlayerTranslateButton @"spotifyglass.redesign.player.translateButton"

@@ -1,9 +1,10 @@
 #import <UIKit/UIKit.h>
+#import "Shared/Player/PlayerState.h"
 
 extern const CGFloat SGRHeaderInfoBottom;     // 14, under the content
 extern const CGFloat SGRHeaderInfoTitleRise;  // 56, of the content over the picture
 
-@interface SGRHeaderInfo : UIView
+@interface SGRHeaderInfo : UIView <SGPlayerStateObserver>
 // YES when anything shown changed. nil or empty hides that line.
 - (BOOL)showTitle:(NSString *)title creator:(NSString *)creator length:(NSString *)length about:(NSString *)about;
 // A title image such as an artist's logo; nil restores the spoken title.

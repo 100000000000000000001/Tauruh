@@ -1,5 +1,5 @@
-// The lock screen's artwork moves: the track's Canvas, else Apple Music's animated album cover, and with
-// Every song chosen, failing both, the cover over a moving blur of itself (SGFluidClip.h). iOS 26 takes a
+// The lock screen can show the track's Canvas or Apple Music's animated album cover, or Every song's cover
+// over a moving blur of itself (SGFluidClip.h). iOS 26 takes a
 // local video through MPMediaItemAnimatedArtwork under one of two now playing keys, 1:1 or 3:4, of those
 // the system lists. It rides on Spotify's now playing info as an extra (Shared/Player/NowPlayingExtras.h).
 //
@@ -39,7 +39,7 @@ static NSString *sg_fallbackTrack;
 static NSUInteger sg_fallbackAttempts;
 
 static BOOL motionOn(SGLockArtwork choice) {
-    return SGLockArtworkHasMotion(choice);
+    return choice == SGLockArtworkMotion;
 }
 
 static void advanceAfterMissingMotion(NSString *uri) {
@@ -247,6 +247,10 @@ void SGLockMotionShowPlain(BOOL plain) {
                 showFill(sg_picture);
                 return NO;
             }
+            if (sg_choice == SGLockArtworkEverySong) {
+                showCover(sg_picture);
+                return NO;
+            }
             return motionOn(sg_choice);
         } found:^(NSString *uri, NSURL *file) {
             if (SGLockScreenCanvasLyricsEnabled() && motionOn(sg_choice)) {
@@ -257,8 +261,6 @@ void SGLockMotionShowPlain(BOOL plain) {
             } else if (file) {
                 show(file);
                 sg_fallbackAttempts = 0;
-            } else if (sg_choice == SGLockArtworkEverySong) {
-                showCover(sg_picture);
             } else if (motionOn(sg_choice)) {
                 advanceAfterMissingMotion(uri);
             }
@@ -290,7 +292,7 @@ void SGLockMotionShowPlain(BOOL plain) {
                 }
             });
         }];
-        SGLog(@"lock motion: %@, the lock screen takes %@", motionOn(sg_choice) ? (sg_choice == SGLockArtworkEverySong ? @"on for every song" : @"on") : @"off",
+        SGLog(@"lock motion: %@, the lock screen takes %@", motionOn(sg_choice) ? @"on" : @"off",
               MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys);
     }
 }

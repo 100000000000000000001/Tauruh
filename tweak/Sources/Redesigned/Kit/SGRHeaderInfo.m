@@ -65,7 +65,14 @@ static BOOL setText(UILabel *label, NSString *text) {
         button.hidden = YES;
         [self addSubview:button];
     }
+    SGAddPlayerStateObserver(self);
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(applicationDidBecomeActive:)
+                                               name:UIApplicationDidBecomeActiveNotification object:nil];
     return self;
+}
+
+- (void)dealloc {
+    [NSNotificationCenter.defaultCenter removeObserver:self];
 }
 
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
@@ -190,6 +197,30 @@ static BOOL setText(UILabel *label, NSString *text) {
 
 - (void)trailingStateChanged {
     if (_trailing.source) [_trailing feedFrom:_trailing.source];
+}
+
+- (void)refreshButtons {
+    if (_shuffle.source) [_shuffle feedFrom:_shuffle.source];
+    if (_play.source) [_play feedFrom:_play.source];
+    if (_trailing.source) [_trailing feedFrom:_trailing.source];
+}
+
+- (void)playerStateDidChange:(SPTPlayerState *)state {
+    __weak SGRHeaderInfo *weakSelf = self;
+    for (NSNumber *delay in @[@0, @0.25, @0.8]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            [weakSelf refreshButtons];
+        });
+    }
+}
+
+- (void)applicationDidBecomeActive:(NSNotification *)note {
+    [self refreshButtons];
+    __weak SGRHeaderInfo *weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [weakSelf refreshButtons];
+    });
 }
 
 - (void)showCard:(UIView *)card {

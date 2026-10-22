@@ -23,6 +23,7 @@
 #import <substrate.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Shared/Player/PlayerState.h"
 #import "Player.h"
 
 static const CGFloat kLyricsGlyphSize = 20;
@@ -47,6 +48,52 @@ static const CGFloat kVolumeLift = 10;
 
 static char kConnectKey, kShareKey, kTrimmerKey, kSharedByKey, kQueueKey, kLyricsGlyphKey, kReachKey;
 static __weak SGRGlyphButton *sg_lyricsGlyph;
+static __weak UIView *sg_footerHost;
+
+static void refreshFooter(void) {
+    UIView *host = sg_footerHost;
+    if (!host.window) return;
+    [host.superview setNeedsLayout];
+    [host setNeedsLayout];
+    [host.superview layoutIfNeeded];
+    [host layoutIfNeeded];
+    UIView *connect = SGRFindByIdentifier(host, @"Components.ConnectButtonOutputSwitcher", &kConnectKey);
+    [connect setNeedsLayout];
+    [connect layoutIfNeeded];
+}
+
+@interface SGRFooterStateWatcher : NSObject <SGPlayerStateObserver>
+@end
+
+@implementation SGRFooterStateWatcher
+- (void)playerStateDidChange:(SPTPlayerState *)state {
+    refreshFooter();
+    for (NSNumber *delay in @[@0.2, @0.7]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ refreshFooter(); });
+    }
+}
+@end
+
+static SGRFooterStateWatcher *sg_footerStateWatcher;
+
+static BOOL sg_playerIsVisible;
+static BOOL sg_idleTimerOwned;
+static BOOL sg_idleTimerWasDisabled;
+
+static void updatePlayerIdleTimer(void) {
+    UIApplication *application = UIApplication.sharedApplication;
+    if (sg_playerIsVisible) {
+        if (!sg_idleTimerOwned) {
+            sg_idleTimerWasDisabled = application.idleTimerDisabled;
+            sg_idleTimerOwned = YES;
+        }
+        application.idleTimerDisabled = !SGEnabled(SGRKeyPlayerAllowAutoLock);
+    } else if (sg_idleTimerOwned) {
+        application.idleTimerDisabled = sg_idleTimerWasDisabled;
+        sg_idleTimerOwned = NO;
+    }
+}
 
 // The view the footer's stack view arranges around `view`.
 static UIView *arrangedAround(UIView *view, UIView *host) {
@@ -237,6 +284,7 @@ static void lowerRow(UIView *row) {
     %orig;
     UIView *host = ((UIViewController *)self).viewIfLoaded;
     if (!host) return;
+    sg_footerHost = host;
     // The unit lays out before its row does, and the moves are measured from where the row put things.
     [SGRowIn(host) layoutIfNeeded];
     CGFloat width = host.bounds.size.width, middleY = CGRectGetMidY(host.bounds);
@@ -295,8 +343,42 @@ static void lowerRow(UIView *row) {
 }
 %end
 
+%hook _TtC21NowPlaying_ScrollImpl27NPVBackgroundViewController
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    sg_playerIsVisible = YES;
+    updatePlayerIdleTimer();
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    sg_playerIsVisible = YES;
+    updatePlayerIdleTimer();
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    %orig;
+    sg_playerIsVisible = NO;
+    updatePlayerIdleTimer();
+}
+%end
+
 %ctor {
     if (!SGRedesignedUI()) return;
     %init;
-    SGRequireClasses(@[@"_TtC20NowPlaying_ModesImpl18FooterElementsUnit"]);
+    SGRequireClasses(@[@"_TtC20NowPlaying_ModesImpl18FooterElementsUnit",
+                       @"_TtC21NowPlaying_ScrollImpl27NPVBackgroundViewController"]);
+    sg_footerStateWatcher = [SGRFooterStateWatcher new];
+    SGAddPlayerStateObserver(sg_footerStateWatcher);
+    NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
+    for (NSNotificationName name in @[UIApplicationDidBecomeActiveNotification, NSUserDefaultsDidChangeNotification]) {
+        [center addObserverForName:name object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+            updatePlayerIdleTimer();
+            if (name == UIApplicationDidBecomeActiveNotification) {
+                refreshFooter();
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
+                               dispatch_get_main_queue(), ^{ refreshFooter(); });
+            }
+        }];
+    }
 }

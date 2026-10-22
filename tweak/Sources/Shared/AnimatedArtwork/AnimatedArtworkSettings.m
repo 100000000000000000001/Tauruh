@@ -141,6 +141,7 @@ NSArray *SGLockScreenMotionRows(void) {
         SGModRow *canvasLyrics = SGOptionRow(@"Canvas lyrics", @"Show synced lines over the moving artwork",
                                              SGKeyLockScreenCanvasLyrics);
         canvasLyrics.changed = ^(BOOL on) { SGLockScreenCanvasLyricsSetEnabled(on); };
+        canvasLyrics.visible = ^BOOL { return SGLockScreenArtwork() == SGLockArtworkMotion; };
         SGModRow *exclusiveLyrics = SGSwitchRow(@"Automatically switch lyric styles",
             @"Turn off artist-name lyrics when Canvas lyrics turn on, and vice versa", SGKeyLockScreenExclusiveLyrics);
         exclusiveLyrics.changed = ^(BOOL on) { SGLockScreenLyricsExclusivityChanged(on); };
@@ -149,9 +150,9 @@ NSArray *SGLockScreenMotionRows(void) {
         SGModRow *starViews = SGLockScreenStarViewsRow();
         starViews.visible = ^BOOL { return SGHidden(SGKeyLockScreenStar); };
         SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Moving artwork, up to about 7 MB a song", SGKeyMotionLowData);
-        lowData.visible = ^BOOL { return SGLockArtworkHasMotion(SGLockScreenArtwork()); };
+        lowData.visible = ^BOOL { return SGLockScreenArtwork() == SGLockArtworkMotion; };
         SGModRow *coverSize = SGSliderRow(@"Fallback album art size",
-            @"Every song's blurred fallback when no moving artwork or lyrics clip is available",
+            @"Every song's colourful cover-and-blur treatment, even when Canvas or animated covers are available",
             0.25, 0.85, 0.05,
             ^double { return SGLockScreenCoverArtworkScale(); },
             ^(double value) { SGSetInt(SGKeyLockScreenCoverArtworkScale, (NSInteger)lround(value * 100)); },
@@ -160,8 +161,8 @@ NSArray *SGLockScreenMotionRows(void) {
         SGModRow *sources = SGMotionSourcesRow();
         sources.visible = lowData.visible;
         return @[
-            SGChoiceRow(@"Full-screen artwork", @"The Canvas or Apple Music's animated cover, or the lyrics a line at a time. "
-                                                 @"Every song puts the cover over a moving blur of it where a song has neither. "
+            SGChoiceRow(@"Full-screen artwork", @"Moving artwork uses Canvas or Apple Music's animated cover; Lyrics shows synced lines. "
+                                                 @"Every song always uses the colourful cover-and-blur look. "
                                                  @"Fill uses a sharp cover fading into progressively blurred artwork.",
                         SGKeyFullScreenArtwork, @[@"Off", @"Moving artwork", @"Lyrics", @"Every song", @"Fill"], SGLockArtworkOff),
             style,
@@ -183,7 +184,7 @@ SGModRow *SGLockScreenStarViewsRow(void) {
             [SGSource sourceWithKey:kStarCanvas name:@"Canvas" detail:@"The track's Canvas or its Apple Music animated cover"],
             [SGSource sourceWithKey:kStarCanvasLyrics name:@"Canvas with lyrics" detail:@"Synced lyrics over the moving artwork"],
             [SGSource sourceWithKey:kStarFill name:@"Fill" detail:@"The cover fading into progressively blurred artwork"],
-            [SGSource sourceWithKey:kStarColorful name:@"Colourful" detail:@"Every Song: animated artwork or the custom moving-cover fallback"],
+            [SGSource sourceWithKey:kStarColorful name:@"Colourful" detail:@"Every Song: the custom moving-cover look, without source animations"],
             [SGSource sourceWithKey:kStarDefault name:@"Default" detail:@"iOS's full album artwork without an animated layer"],
         ];
         return SGSourcesPageMake(@"Lock-screen star views",

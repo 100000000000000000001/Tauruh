@@ -19,7 +19,7 @@ typedef NS_ENUM(NSInteger, SGLockArtwork) {
     SGLockArtworkOff = 0,
     SGLockArtworkMotion,   // the Canvas, else Apple Music's animated cover (LockScreenMotion.x)
     SGLockArtworkLyrics,   // a clip per line of lyrics (Shared/LockScreenLyrics/LyricsArtwork.x)
-    SGLockArtworkEverySong,   // Moving artwork, else the cover over a moving blur of it (LockScreenMotion.x)
+    SGLockArtworkEverySong,   // The cover over its moving blur; never a source animation (LockScreenMotion.x)
     SGLockArtworkFill,   // a sharp cover fading into progressively blurred artwork
 };
 // Off below iOS 26, which has no animated artwork on the lock screen.

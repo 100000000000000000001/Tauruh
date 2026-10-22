@@ -434,6 +434,8 @@ UIViewController *SGRPlayerSettingsPage(NSArray *more) {
         SGNotedSection(@"Background opacity", blur, @"Lower opacity makes each background layer more transparent. "
                     @"Canvas and lyrics sliders reduce blur strength directly; at 0% the blur is fully transparent."),
         SGNotedSection(@"Controls", @[
+                       SGSwitchRow(@"Allow auto-lock while player is open", @"When off, keep the screen awake while the player is open",
+                                   SGRKeyPlayerAllowAutoLock),
                        SGSwitchRow(@"Auto-hide portrait controls", @"Bring them back with a tap after a few seconds",
                                    SGRKeyLyricsAutoHide),
                        SGSwitchRow(@"Auto-hide landscape controls", @"Bring them back with a tap after a few seconds",
