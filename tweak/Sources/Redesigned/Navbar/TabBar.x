@@ -21,6 +21,16 @@ static CGFloat sg_room, sg_glassHeight;   // see "room for the glass bar"
 static void syncBar(UIView *stockBar);
 static void applyMinimized(UIView *stockBar, BOOL animated);
 
+// The mod's own tab the user last opened a page with; it overrides Spotify's label whites until a stock
+// tab is tapped, because Spotify has no idea one of the mod's tabs is showing a page.
+static __weak UIView *sg_customSource;
+
+void SGRTabBarMarkCustomSelected(UIView *customItem) {
+    sg_customSource = customItem;
+    UIView *stockBar = sg_stockBar;
+    if (customItem && stockBar) syncBar(stockBar);
+}
+
 #pragma mark - minimizing the glass bar
 
 // TabBarMinimize.x decides this from a page's scroll. Minimized, the bar gives way to its first and last tab as two
@@ -471,6 +481,8 @@ static void applyMinimized(UIView *stockBar, BOOL animated) {
 - (void)tabBar:(UITabBar *)tabBar didSelectItem:(UITabBarItem *)item {
     NSUInteger index = [self.items indexOfObject:item];
     if (index == NSNotFound || index >= self.sources.count) return;
+    // A stock tab chosen for real takes the highlight back from the mod's own tab.
+    if (sg_customSource) sg_customSource = nil;
     // Home tapped while on Home pops Spotify's stack, which would take Mod Settings straight off it.
     if (!self.holding) forwardTap(self.sources[index]);
     // Spotify repaints its labels a moment later; a tap it did not take snaps the selection back.
@@ -686,10 +698,17 @@ static void syncBar(UIView *stockBar) {
     }
 
     UITabBarItem *selected = nil;
+    // The mod's own tab wins while it is last known as the open one; once the custom item is gone from
+    // the row, Spotify's own state takes the lead again.
+    if (sg_customSource) {
+        for (NSUInteger i = 0; i < sources.count; i++)
+            if (sources[i] == sg_customSource) { selected = bar.items[i]; break; }
+        if (!selected) sg_customSource = nil;
+    }
     BOOL missing = NO;
     for (NSUInteger i = 0; i < sources.count; i++) {
         UITabBarItem *item = bar.items[i];
-        UIImage *image = glyphOf(sources[i], NO);
+        UIImage *image = glyphOf(sources[i], sources[i] == sg_customSource);
         UIImage *selectedImage = glyphOf(sources[i], YES);
         if (image) item.image = image;
         if (selectedImage) item.selectedImage = selectedImage;
