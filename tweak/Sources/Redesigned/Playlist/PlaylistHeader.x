@@ -1,6 +1,7 @@
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Playlist.h"
+#import "Headers/SGPostShield.h"
 #import <objc/message.h>
 
 static const CGFloat kDissolve = 0.46, kTopScrim = 140, kTopScrimAlpha = 0.28;
@@ -450,31 +451,42 @@ static UIView *layoutIn(UIView *root) {
 
 %hook _TtC28EncoreConsumerMobile_BaseKit19HeaderContentLayout
 - (void)layoutSubviews {
+    SGMainSuspensionArmed = YES;
     %orig;
     if (SGRPlaylistHeaderOf((UIView *)self)) applyHeader((UIView *)self);
+    SGMainSuspensionArmed = NO;
 }
 %end
 
 %hook _TtC28EncoreConsumerMobile_BaseKit14PlayButtonView
 - (void)layoutSubviews {
+    SGMainSuspensionArmed = YES;
     %orig;
     UIView *button = (UIView *)self;
-    if (button.layer.hidden || ![button.accessibilityIdentifier isEqualToString:@"header-play-button"]) return;
+    if (button.layer.hidden || ![button.accessibilityIdentifier isEqualToString:@"header-play-button"]) {
+        SGMainSuspensionArmed = NO;
+        return;
+    }
     if (SGRPlaylistHeaderOf(button)) conceal(button);
+    SGMainSuspensionArmed = NO;
 }
 %end
 
 %hook SPTFreeTierPlaylistEncoreHeaderViewController
 - (void)viewDidLayoutSubviews {
+    SGMainSuspensionArmed = YES;
     %orig;
     UIView *layout = layoutIn(((UIViewController *)self).viewIfLoaded);
     if (layout) applyHeader(layout);
+    SGMainSuspensionArmed = NO;
 }
 
 - (void)update {
+    SGMainSuspensionArmed = YES;
     %orig;
     UIView *layout = layoutIn(((UIViewController *)self).viewIfLoaded);
     if (layout) applyHeader(layout);
+    SGMainSuspensionArmed = NO;
 }
 
 %end

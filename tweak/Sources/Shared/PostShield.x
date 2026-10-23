@@ -10,6 +10,9 @@
 // first post through this hook (a %ctor without %init would never install the hooks).
 #import <os/log.h>
 #import <Foundation/Foundation.h>
+#import "Headers/SGPostShield.h"
+
+volatile BOOL SGMainSuspensionArmed = NO;
 
 static volatile int32_t sgMainTick;   // incremented on main each landing
 static volatile int32_t sgSeenTick;   // how far the servo has confirmed
@@ -43,7 +46,7 @@ static void sgShieldStart(void) {
 - (void)postNotificationName:(NSString *)name object:(id)object userInfo:(NSDictionary *)userInfo {
   static dispatch_once_t once;
   dispatch_once(&once, ^{ sgShieldStart(); });
-  if (![NSThread isMainThread] && sgMainStalled) {
+  if (![NSThread isMainThread] && (SGMainSuspensionArmed || sgMainStalled)) {
     if (shieldLog == NULL) shieldLog = os_log_create("spotifyglass", "wedge");
     os_log(shieldLog, "shield: deferring post %{public}@ from %{public}@", name,
            [NSThread currentThread].description);
