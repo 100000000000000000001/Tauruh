@@ -1,12 +1,12 @@
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRRepaint.h"
 #import "Redesigned/Kit/SGRTokens.h"
+#import "Redesigned/Kit/SGRBridges.h"
 #import "Redesigned/Navbar/Navbar.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/Player/NowPlayingExtras.h"
 #import "Shared/Player/PlayerState.h"
 #import "NowPlayingBar.h"
-#import <MediaPlayer/MediaPlayer.h>
 #import <objc/message.h>
 
 static const CGFloat kCardRadius = 24;
@@ -18,9 +18,6 @@ static __weak UIViewController *sg_container;
 static BOOL sg_docked;
 static CGRect sg_dockRow;   // window coordinates
 static __weak UIView *sg_dockHost;
-static MPMediaItemArtwork *sg_cachedArtwork;
-static NSString *sg_cachedArtworkTitle;
-static UIImage *sg_cachedCover;
 
 CGRect SGRNowPlayingCardFrameIn(UIView *host, CGFloat *radius) {
     UIVisualEffectView *glass = sg_cardGlass;
@@ -282,18 +279,9 @@ static UIImage *cardCover(void) {
 
 static UIImage *currentCover(void) {
     SPTPlayerState *state = SGPlayerState();
-    NSDictionary *info = MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo;
-    MPMediaItemArtwork *artwork = info[MPMediaItemPropertyArtwork];
-    NSString *title = info[MPMediaItemPropertyTitle];
-    if (SGNowPlayingTitlesMatch(title, state.track.trackTitle)
-        && [artwork isKindOfClass:MPMediaItemArtwork.class]) {
-        if (artwork != sg_cachedArtwork || ![title isEqualToString:sg_cachedArtworkTitle]) {
-            sg_cachedCover = [artwork imageWithSize:CGSizeMake(120, 120)];
-            sg_cachedArtwork = artwork;
-            sg_cachedArtworkTitle = [title copy];
-        }
-        if (sg_cachedCover) return sg_cachedCover;
-    }
+    NSString *artworkTrack = nil;
+    UIImage *artwork = SGRNowPlayingArtwork(&artworkTrack, NULL);
+    if (artwork && [artworkTrack isEqualToString:SGURIString(state.track.URI)]) return artwork;
     return cardCover();
 }
 
@@ -355,6 +343,7 @@ static void openPlayer(void) {
 @end
 
 static SGRMiniPlayerWatcher *sg_miniWatcher;
+static id sg_artworkObserver;
 
 static void applyDock(BOOL animated) {
     UIView *view = sg_container.viewIfLoaded;
@@ -470,6 +459,13 @@ static void styleNowPlayingBar(UIViewController *container) {
     %init;
     sg_miniWatcher = [SGRMiniPlayerWatcher new];
     SGAddPlayerStateObserver(sg_miniWatcher);
+    sg_artworkObserver = [NSNotificationCenter.defaultCenter addObserverForName:SGRNowPlayingArtworkDidChangeNotification
+                                                                          object:nil
+                                                                           queue:NSOperationQueue.mainQueue
+                                                                      usingBlock:^(NSNotification *note) {
+        NSString *trackURI = SGURIString(SGPlayerState().track.URI);
+        if ([note.userInfo[@"trackURI"] isEqualToString:trackURI]) refreshMini();
+    }];
     SGRequireClasses(@[
         @"_TtC18NowPlaying_BarImpl36NowPlayingBarContainerViewController",
         @"_TtC18NowPlaying_BarImpl27NowPlayingBarViewController",
