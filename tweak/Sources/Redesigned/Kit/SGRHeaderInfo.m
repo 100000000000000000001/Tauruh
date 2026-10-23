@@ -42,6 +42,7 @@ static BOOL setText(UILabel *label, NSString *text) {
     UIScrollView *_albumControls;
     SGRMirrorButton *_albumDownload;
     __weak UIView *_creatorLink;
+    NSUInteger _playerRefreshGeneration;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -208,20 +209,24 @@ static BOOL setText(UILabel *label, NSString *text) {
 }
 
 - (void)playerStateDidChange:(SPTPlayerState *)state {
+    NSUInteger generation = ++_playerRefreshGeneration;
     __weak SGRHeaderInfo *weakSelf = self;
     for (NSNumber *delay in @[@0, @0.25, @0.8]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
-            [weakSelf refreshButtons];
+            SGRHeaderInfo *strongSelf = weakSelf;
+            if (strongSelf && generation == strongSelf->_playerRefreshGeneration) [strongSelf refreshButtons];
         });
     }
 }
 
 - (void)applicationDidBecomeActive:(NSNotification *)note {
+    NSUInteger generation = ++_playerRefreshGeneration;
     [self refreshButtons];
     __weak SGRHeaderInfo *weakSelf = self;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [weakSelf refreshButtons];
+        SGRHeaderInfo *strongSelf = weakSelf;
+        if (strongSelf && generation == strongSelf->_playerRefreshGeneration) [strongSelf refreshButtons];
     });
 }
 

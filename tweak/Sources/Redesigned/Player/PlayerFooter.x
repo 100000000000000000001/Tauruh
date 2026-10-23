@@ -49,10 +49,11 @@ static const CGFloat kVolumeLift = 10;
 static char kConnectKey, kShareKey, kTrimmerKey, kSharedByKey, kQueueKey, kLyricsGlyphKey, kReachKey;
 static __weak SGRGlyphButton *sg_lyricsGlyph;
 static __weak UIView *sg_footerHost;
+static BOOL sg_playerIsVisible;
 
 static void refreshFooter(void) {
     UIView *host = sg_footerHost;
-    if (!host.window) return;
+    if (!sg_playerIsVisible || !host.window) return;
     [host.superview setNeedsLayout];
     [host setNeedsLayout];
     [host.superview layoutIfNeeded];
@@ -66,18 +67,23 @@ static void refreshFooter(void) {
 @end
 
 @implementation SGRFooterStateWatcher
+{
+    NSUInteger _refreshGeneration;
+}
+
 - (void)playerStateDidChange:(SPTPlayerState *)state {
-    refreshFooter();
-    for (NSNumber *delay in @[@0.2, @0.7]) {
+    NSUInteger generation = ++_refreshGeneration;
+    for (NSNumber *delay in @[@0, @0.2, @0.7]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{ refreshFooter(); });
+                       dispatch_get_main_queue(), ^{
+            if (generation == self->_refreshGeneration) refreshFooter();
+        });
     }
 }
 @end
 
 static SGRFooterStateWatcher *sg_footerStateWatcher;
 
-static BOOL sg_playerIsVisible;
 static BOOL sg_idleTimerOwned;
 static BOOL sg_idleTimerWasDisabled;
 

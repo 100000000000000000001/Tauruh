@@ -328,17 +328,32 @@ static void openPlayer(void) {
 @interface SGRMiniPlayerWatcher : NSObject <SGPlayerStateObserver>
 @end
 
+static NSUInteger sg_miniRefreshGeneration, sg_miniTrackGeneration;
+static NSString *sg_miniTrackURI;
+
 @implementation SGRMiniPlayerWatcher
 - (void)playerStateDidChange:(SPTPlayerState *)state {
+    NSUInteger refreshGeneration = ++sg_miniRefreshGeneration;
+    NSString *trackURI = SGURIString(state.track.URI);
+    BOOL trackChanged = ![trackURI isEqualToString:sg_miniTrackURI];
+    if (trackChanged) {
+        sg_miniTrackURI = [trackURI copy];
+        sg_miniTrackGeneration++;
+    }
+    NSUInteger generation = sg_miniTrackGeneration;
     dispatch_async(dispatch_get_main_queue(), ^{
+        if (refreshGeneration != sg_miniRefreshGeneration) return;
         // The queue ended with the bar minimized: the pill has nothing left to show, so the whole bar comes back.
         if (!hasTrack() && SGRTabBarMinimized()) SGRSetTabBarMinimized(NO, YES);
         refreshMini();
-        // A new track's cover reaches the card a little after the state does.
-        for (NSNumber *delay in @[@0.3, @1, @2.5]) {
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ refreshMini(); });
-        }
     });
+    if (!trackChanged) return;
+    // A new track's cover reaches the card a little after the state does.
+    for (NSNumber *delay in @[@0.3, @1, @2.5]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (generation == sg_miniTrackGeneration) refreshMini();
+        });
+    }
 }
 @end
 

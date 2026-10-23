@@ -71,7 +71,7 @@ static UIColor *SGRainbowTextColor(CGFloat width, CGFloat height, double phase) 
 }
 
 - (instancetype)initWithSections:(NSArray<SGModSection *> *)sections {
-    return [super initWithTitle:@"taurus" intro:nil sections:sections footer:@"Contributor: @Pulse-Ice (EeveeImmersive)"];
+    return [super initWithTitle:@"taurus" intro:nil sections:sections footer:@"Contributor: @Pulse-Ice (EeveeImmersive)\nBug fixes: @darkit"];
 }
 
 - (void)viewDidLoad {
@@ -434,23 +434,36 @@ static BOOL isDrawerBadgeLabel(UILabel *label) {
     return NO;
 }
 
-static void updatePlanBadge(UIView *root) {
+static void stylePlanBadgeLabel(UILabel *label) {
     UIColor *color = planBadgeColor();
     CGFloat red = 0, green = 0, blue = 0, alpha = 0;
     [color getRed:&red green:&green blue:&blue alpha:&alpha];
-    UIColor *textColor = (0.2126 * red + 0.7152 * green + 0.0722 * blue) > 0.55 ? UIColor.blackColor : UIColor.whiteColor;
+    if (![label.text isEqualToString:@"Taurus"]) label.text = @"Taurus";
+    label.textColor = (0.2126 * red + 0.7152 * green + 0.0722 * blue) > 0.55 ? UIColor.blackColor : UIColor.whiteColor;
+    label.backgroundColor = color;
+    label.layer.backgroundColor = color.CGColor;
+    label.layer.cornerRadius = 0;
+    label.clipsToBounds = NO;
+
+    CGRect labelBounds = label.bounds;
+    for (UIView *badge = label.superview; badge && badge != sg_drawerRoot; badge = badge.superview) {
+        CGRect labelFrame = [label convertRect:labelBounds toView:badge];
+        if (badge.bounds.size.width > CGRectGetWidth(labelFrame) + 80 ||
+            badge.bounds.size.height > CGRectGetHeight(labelFrame) + 32) break;
+        badge.backgroundColor = color;
+        badge.layer.backgroundColor = color.CGColor;
+        badge.layer.cornerRadius = 0;
+        badge.layer.masksToBounds = NO;
+    }
+}
+
+static void updatePlanBadge(UIView *root) {
     SGForEachView(root, ^(UIView *view) {
         if (![view isKindOfClass:UILabel.class]) return;
         UILabel *label = (UILabel *)view;
         if (![label.text isEqualToString:@"Spotify Free"] && ![label.text isEqualToString:@"Taurine"] &&
             ![label.text isEqualToString:@"Taurus"]) return;
-        if (![label.text isEqualToString:@"Taurus"]) label.text = @"Taurus";
-        label.textColor = textColor;
-        label.backgroundColor = color;
-        UIView *badge = label.superview;
-        badge.backgroundColor = color;
-        badge.layer.cornerRadius = 0;
-        badge.clipsToBounds = NO;
+        stylePlanBadgeLabel(label);
     });
 }
 
@@ -460,15 +473,8 @@ static void updatePlanBadge(UIView *root) {
     if (![text isEqualToString:@"Spotify Free"] && ![text isEqualToString:@"Taurine"] &&
         ![text isEqualToString:@"Taurus"]) return;
     if (!isDrawerBadgeLabel(self)) return;
-    UIColor *color = planBadgeColor();
-    CGFloat red = 0, green = 0, blue = 0, alpha = 0;
-    [color getRed:&red green:&green blue:&blue alpha:&alpha];
     if (![text isEqualToString:@"Taurus"]) %orig(@"Taurus");
-    self.textColor = (0.2126 * red + 0.7152 * green + 0.0722 * blue) > 0.55 ? UIColor.blackColor : UIColor.whiteColor;
-    self.backgroundColor = color;
-    self.superview.backgroundColor = color;
-    self.superview.layer.cornerRadius = 0;
-    self.superview.clipsToBounds = NO;
+    stylePlanBadgeLabel(self);
 }
 %end
 
