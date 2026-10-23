@@ -17,7 +17,6 @@
 #import <Foundation/Foundation.h>
 
 static os_log_t wedgeLog;
-static int32_t wedgeMeter = 0;
 
 static os_log_t sgWedgeLog(void) {
   if (wedgeLog == NULL) wedgeLog = os_log_create("spotifyglass", "wedge");
