@@ -18,6 +18,9 @@ static __weak UIViewController *sg_container;
 static BOOL sg_docked;
 static CGRect sg_dockRow;   // window coordinates
 static __weak UIView *sg_dockHost;
+static MPMediaItemArtwork *sg_cachedArtwork;
+static NSString *sg_cachedArtworkTitle;
+static UIImage *sg_cachedCover;
 
 CGRect SGRNowPlayingCardFrameIn(UIView *host, CGFloat *radius) {
     UIVisualEffectView *glass = sg_cardGlass;
@@ -281,10 +284,15 @@ static UIImage *currentCover(void) {
     SPTPlayerState *state = SGPlayerState();
     NSDictionary *info = MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo;
     MPMediaItemArtwork *artwork = info[MPMediaItemPropertyArtwork];
-    if (SGNowPlayingTitlesMatch(info[MPMediaItemPropertyTitle], state.track.trackTitle)
+    NSString *title = info[MPMediaItemPropertyTitle];
+    if (SGNowPlayingTitlesMatch(title, state.track.trackTitle)
         && [artwork isKindOfClass:MPMediaItemArtwork.class]) {
-        UIImage *image = [artwork imageWithSize:CGSizeMake(600, 600)];
-        if (image) return image;
+        if (artwork != sg_cachedArtwork || ![title isEqualToString:sg_cachedArtworkTitle]) {
+            sg_cachedCover = [artwork imageWithSize:CGSizeMake(120, 120)];
+            sg_cachedArtwork = artwork;
+            sg_cachedArtworkTitle = [title copy];
+        }
+        if (sg_cachedCover) return sg_cachedCover;
     }
     return cardCover();
 }
