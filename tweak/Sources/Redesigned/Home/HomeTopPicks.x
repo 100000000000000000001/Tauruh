@@ -184,14 +184,15 @@ static NSDictionary<NSIndexPath *, NSValue *> *swappedFrames(UICollectionViewLay
 
     // Add only moved cells that entered the requested rect; avoid enumerating the entire Home feed.
     for (NSIndexPath *path in frames) {
-        if ([included containsObject:path] || !CGRectIntersectsRect(frames[path].CGRectValue, rect)) continue;
+        NSValue *frameValue = [frames objectForKey:path];
+        if ([included containsObject:path] || !CGRectIntersectsRect(frameValue.CGRectValue, rect)) continue;
         sg_reordering = YES;
         UICollectionViewLayoutAttributes *item = [self layoutAttributesForItemAtIndexPath:path];
         sg_reordering = NO;
         if (!item) continue;
         [included addObject:path];
         UICollectionViewLayoutAttributes *a = [item copy];
-        a.frame = frames[path].CGRectValue;
+        a.frame = frameValue.CGRectValue;
         if ([path isEqual:sg_headingPath]) { a.hidden = YES; a.alpha = 0; }
         [out addObject:a];
     }
