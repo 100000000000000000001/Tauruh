@@ -36,7 +36,7 @@ static void wedgeRemember(NSString *name) {
 %hook NSOperation
 - (void)waitUntilFinished {
   int32_t old = __sync_fetch_and_add(&wedgeMeter, 1);
-  if (old < 30) {
+  if (old < 1000) {
     if (wedgeLog == NULL) wedgeLog = os_log_create("spotifyglass", "wedge");
     NSMutableArray *ring = wedgeRing();
     os_log(wedgeLog, "wtf thread=%{public}@ lane=%{public}@ lastposts=[%{public}@ | %{public}@ | %{public}@] op=%{public}@",
