@@ -37,6 +37,14 @@ static UIImageView *glyph(NSString *symbol) {
     return view;
 }
 
+// What the volume view's slider is drawn with: nothing.
+static UIImage *clearImage(void) {
+    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+    format.opaque = NO;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(1, 1) format:format];
+    return [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {}];
+}
+
 @interface SGRVolumeRow : UIControl
 @property (nonatomic) BOOL matchTimeSlider;
 @end
@@ -55,15 +63,21 @@ static UIImageView *glyph(NSString *symbol) {
 
 - (instancetype)initWithFrame:(CGRect)frame {
     if (!(self = [super initWithFrame:frame])) return nil;
-    // Only plumbing: the slider inside moves the system's volume, nobody sees or touches the view.
+    // Only plumbing: the slider inside moves the system's volume, nobody touches the view. iOS keeps its own volume HUD
+    // off only while a volume view is visible, so this one is drawn in full (alpha 1, on screen, in the window) and
+    // draws nothing: every part of its slider is a clear image. It lives in the window, not in this row: the lyrics fade
+    // the row to alpha 0, and a volume view under it no longer counts, so the HUD came up on the next track change.
     _system = [MPVolumeView new];
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     _system.showsRouteButton = NO;
 #pragma clang diagnostic pop
-    _system.alpha = 0.01;
+    UIImage *clear = clearImage();
+    [_system setMinimumVolumeSliderImage:clear forState:UIControlStateNormal];
+    [_system setMaximumVolumeSliderImage:clear forState:UIControlStateNormal];
+    [_system setVolumeThumbImage:clear forState:UIControlStateNormal];
+    [_system setVolumeThumbImage:clear forState:UIControlStateHighlighted];
     _system.userInteractionEnabled = NO;
-    [self addSubview:_system];
 
     _track = [UIView new];
     _track.clipsToBounds = YES;
@@ -85,6 +99,13 @@ static UIImageView *glyph(NSString *symbol) {
                                        context:&kSessionContext];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refreshFromSystem)
                                                name:UIApplicationDidBecomeActiveNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(routeDidChange)
+                                               name:AVAudioSessionRouteChangeNotification object:nil];
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(routeDidChange)
+                                               name:MPVolumeViewWirelessRouteActiveDidChangeNotification object:nil];
+#pragma clang diagnostic pop
 
     self.isAccessibilityElement = YES;
     self.accessibilityLabel = @"Volume";
@@ -93,6 +114,8 @@ static UIImageView *glyph(NSString *symbol) {
 }
 
 - (void)dealloc {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self];
+    [_system removeFromSuperview];
     [_poll invalidate];
     [self restoreAncestorGestures];
     [NSNotificationCenter.defaultCenter removeObserver:self];
@@ -106,26 +129,43 @@ static UIImageView *glyph(NSString *symbol) {
     [self setNeedsLayout];
 }
 
-// The volume view builds its slider itself, so it is looked for until it is there.
+// The volume view builds its slider itself, so it is looked for until it is there, and again if it builds another.
 - (UISlider *)systemSlider {
-    if (!_systemSlider) {
-        for (UIView *view in _system.subviews) {
-            if (![view isKindOfClass:UISlider.class]) continue;
-            _systemSlider = (UISlider *)view;
-            [_systemSlider addObserver:self
-                            forKeyPath:@"value"
-                               options:NSKeyValueObservingOptionNew
-                               context:&kSliderContext];
-            break;
-        }
+    if (_systemSlider && ![_systemSlider isDescendantOfView:_system]) {
+        [_systemSlider removeObserver:self forKeyPath:@"value" context:&kSliderContext];
+        _systemSlider = nil;
     }
-
-    // Hide the system slider's visible artwork.
-    _systemSlider.thumbTintColor = UIColor.clearColor;
-    _systemSlider.minimumTrackTintColor = UIColor.clearColor;
-    _systemSlider.maximumTrackTintColor = UIColor.clearColor;
-
+    if (_systemSlider) return _systemSlider;
+    for (UIView *view in _system.subviews) {
+        if (![view isKindOfClass:UISlider.class]) continue;
+        _systemSlider = (UISlider *)view;
+        [_systemSlider addObserver:self forKeyPath:@"value" options:NSKeyValueObservingOptionNew context:&kSliderContext];
+        break;
+    }
     return _systemSlider;
+}
+
+// Whether the volume is this phone's or a Connect device's changes what iOS counts as the volume view's: after a switch
+// it is taken out and put back, which has iOS look at it again.
+- (void)routeDidChange {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(reattachSystem) object:nil];
+    [self performSelector:@selector(reattachSystem) withObject:nil afterDelay:0.3];
+}
+
+- (void)reattachSystem {
+    if (!self.window) return;
+    [_system removeFromSuperview];
+    [self hostSystem];
+}
+
+// Behind everything in the window, blank, on screen: for as long as the row is in the window the HUD stays off, whatever
+// the lyrics do to the row's alpha.
+- (void)hostSystem {
+    UIWindow *window = self.window;
+    if (!window || _system.superview == window) return;
+    _system.frame = CGRectMake(0, 0, 160, kRowHeight);
+    [window insertSubview:_system atIndex:0];
+    [_system layoutIfNeeded];
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
@@ -192,8 +232,6 @@ static UIImageView *glyph(NSString *symbol) {
     CGRect bounds = self.bounds;
     CGFloat side = kRowHeight, middle = CGRectGetMidY(bounds), glyphWidth = side / 2 + kGlyphSize / 2;
     BOOL match = self.matchTimeSlider;
-    _system.frame = CGRectMake(0, 0, MAX(140, bounds.size.width), side);
-    [_system layoutIfNeeded];
     [self systemSlider];
     _quiet.hidden = _loud.hidden = match;
     CGFloat loudMin = CGRectGetMaxX(bounds) - side / 2 - kGlyphSize;
@@ -210,11 +248,13 @@ static UIImageView *glyph(NSString *symbol) {
 - (void)didMoveToWindow {
     [super didMoveToWindow];
     if (!self.window) {
+        [_system removeFromSuperview];
         [_poll invalidate];
         _poll = nil;
         [self restoreAncestorGestures];
         return;
     }
+    [self hostSystem];
     [self systemSlider];
     [self refreshFromSystem];
     if (_poll) return;
