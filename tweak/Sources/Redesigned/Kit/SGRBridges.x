@@ -86,32 +86,50 @@ static NSURLSession *artworkSession(void) {
     return session;
 }
 
+static void fetchPicture(NSString *key, NSURL *url, NSUInteger attempt);
+
+static void finishPicture(NSString *key, NSURL *url, NSUInteger attempt, NSInteger status, NSError *error,
+                          UIImage *image, CFTimeInterval started) {
+    if (![key isEqualToString:sg_wantedKey]) {
+        artworkLog(@"%@ came after the track moved on to %@, dropped", key, sg_wantedKey);
+        return;
+    }
+    if (!image) {
+        artworkLog(@"%@ not fetched (%ld, %@), attempt %lu", key, (long)status, error.localizedDescription, (unsigned long)attempt + 1);
+        if (attempt + 1 >= kFetchAttempts) return;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kFetchRetry * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if ([key isEqualToString:sg_wantedKey] && !([sg_artworkKey isEqualToString:key] && sg_artworkQuality == SGRArtworkQualityExact)) {
+                fetchPicture(key, url, attempt + 1);
+            }
+        });
+        return;
+    }
+    artworkLog(@"%@ fetched %.0fx%.0f in %.0f ms", key, image.size.width, image.size.height, (CACurrentMediaTime() - started) * 1000);
+    publish(image, key, SGRArtworkQualityExact);
+}
+
 static void fetchPicture(NSString *key, NSURL *url, NSUInteger attempt) {
     CFTimeInterval started = CACurrentMediaTime();
     sg_fetch = [artworkSession() dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        if (error.code == NSURLErrorCancelled) return;
         NSInteger status = [response isKindOfClass:NSHTTPURLResponse.class] ? ((NSHTTPURLResponse *)response).statusCode : 0;
-        UIImage *image = data.length && status == 200 ? [UIImage imageWithData:data] : nil;
-        // Decoded here, off the main thread, rather than on the first frame that draws it.
-        image = image.imageByPreparingForDisplay ?: image;
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (error.code == NSURLErrorCancelled) return;
-            // A newer track asked for another picture meanwhile: this one would put the old one back.
             if (![key isEqualToString:sg_wantedKey]) {
                 artworkLog(@"%@ came after the track moved on to %@, dropped", key, sg_wantedKey);
                 return;
             }
-            if (!image) {
-                artworkLog(@"%@ not fetched (%ld, %@), attempt %lu", key, (long)status, error.localizedDescription, (unsigned long)attempt + 1);
-                if (attempt + 1 >= kFetchAttempts) return;
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kFetchRetry * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                    if ([key isEqualToString:sg_wantedKey] && !([sg_artworkKey isEqualToString:key] && sg_artworkQuality == SGRArtworkQualityExact)) {
-                        fetchPicture(key, url, attempt + 1);
-                    }
-                });
+            if (!data.length || status != 200) {
+                finishPicture(key, url, attempt, status, error, nil, started);
                 return;
             }
-            artworkLog(@"%@ fetched %.0fx%.0f in %.0f ms", key, image.size.width, image.size.height, (CACurrentMediaTime() - started) * 1000);
-            publish(image, key, SGRArtworkQualityExact);
+            dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+                UIImage *image = [UIImage imageWithData:data];
+                // Skip decoding stale downloads before they consume memory and CPU.
+                image = image.imageByPreparingForDisplay ?: image;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    finishPicture(key, url, attempt, status, error, image, started);
+                });
+            });
         });
     }];
     [sg_fetch resume];
@@ -176,7 +194,9 @@ static SGRArtworkFollower *sg_follower;
 static char kBarCardKey, kBarImageKey;
 static __weak UIView *sg_barView;
 
-static void publishBarArtwork(void) {
+static void publishBarArtwork(NSString *expectedURI) {
+    NSString *uri = SGURIString(SGPlayerState().track.URI);
+    if (!uri || (expectedURI && ![expectedURI isEqualToString:uri])) return;
     UIView *card = SGRFindByIdentifier(sg_barView, @"SPTNowPlayingBar", &kBarCardKey);
     UIView *holder = SGRFindByIdentifier(card, @"Encore.ImageView", &kBarImageKey);
     UIImageView *cover = nil;
@@ -184,8 +204,7 @@ static void publishBarArtwork(void) {
         if ([sub isKindOfClass:UIImageView.class]) cover = (UIImageView *)sub;
     }
     UIImage *image = cover.image;
-    NSString *uri = SGURIString(SGPlayerState().track.URI);
-    if (!image || !uri) return;
+    if (!image) return;
     SGRSetNowPlayingArtwork(image, uri, SGRArtworkQualityLow);
 }
 
@@ -194,14 +213,18 @@ static void publishBarArtwork(void) {
 
 @implementation SGRBarArtworkWatcher {
     NSString *_track;
+    NSUInteger _generation;
 }
 
 - (void)playerStateDidChange:(SPTPlayerState *)state {
     NSString *track = SGURIString(state.track.URI);
     if (!track || [track isEqualToString:_track]) return;
     _track = track;
+    NSUInteger generation = ++_generation;
     for (NSNumber *delay in @[@0, @0.3, @1, @2.5]) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ publishBarArtwork(); });
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (generation == self->_generation) publishBarArtwork(track);
+        });
     }
 }
 
@@ -214,7 +237,7 @@ static SGRBarArtworkWatcher *sg_barWatcher;
 - (void)viewDidLayoutSubviews {
     %orig;
     sg_barView = ((UIViewController *)self).viewIfLoaded;
-    publishBarArtwork();
+    publishBarArtwork(nil);
 }
 %end
 %end

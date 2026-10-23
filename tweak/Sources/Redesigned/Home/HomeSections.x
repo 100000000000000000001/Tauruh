@@ -1,12 +1,9 @@
-// Home redesign: of the sections the feed sends, only the music ones stay: the grid of shortcuts, the
+// Home redesign: the sections the feed sends are filtered to the music ones: the grid of shortcuts, the
 // DJ and the shelves of cards (Recents, Jump back in, Your playlists, New releases, the mixes, For fans
-// of...). Every other section reports no height, so the list closes up around it: the medium density
-// previews (a video or an episode playing muted under Unmute and Watch full episode, or a playlist to
-// Preview), a heading over one of those (Fitness for you, Videos from your top artists), the episode
-// cards, and any kind the server adds later.
+// of...). Known video and episode previews are collapsed; unknown section types stay visible so a Spotify
+// feed change cannot leave the whole page empty.
 //
-// An allow list, as for the cards under the player (Redesigned/Player/PlayerCards.x): the feed is the
-// server's, and a new kind should not turn up on a redesigned Home.
+// Known unsupported types include medium density preview cards and the episode carousel.
 //
 // Tree (trees/clean/home/10.txt): a section is an Element_List.CollectionViewCell of the page's list whose
 // first subview is an ElementContentView over Home_EvoPageImpl.HomeStructure, then an
@@ -66,13 +63,14 @@ static void logOnce(NSString *what) {
     SGLog(@"redesign home: %@", what);
 }
 
-// The shortcuts grid names no identifier; episode cards and whatever else comes as a bare list do.
+// Unknown feed variants stay visible; only the episode carousel is a known grid to drop.
 static SGRHomeKind gridKind(UICollectionView *grid) {
-    if (grid.accessibilityIdentifier.length) return SGRHomeKindDrop;
+    if ([grid.accessibilityIdentifier isEqualToString:@"ActionCardCarouselElement"]) return SGRHomeKindDrop;
+    if (grid.accessibilityIdentifier.length) return SGRHomeKindPending;
     UIView *cell = grid.visibleCells.firstObject;
     // A grid the list sized before it laid its own cells out: nothing but the shortcuts has come as one.
     if (!cell) return SGRHomeKindKeep;
-    return contentNames(cell.subviews.firstObject, @"Home_AnchorsAndShortcutsKit") ? SGRHomeKindKeep : SGRHomeKindDrop;
+    return contentNames(cell.subviews.firstObject, @"Home_AnchorsAndShortcutsKit") ? SGRHomeKindKeep : SGRHomeKindPending;
 }
 
 // A LazyElementView names the element it will hold before it holds it.
@@ -80,7 +78,7 @@ static SGRHomeKind stackKind(UIStackView *stack) {
     for (UIView *part in stack.arrangedSubviews) {
         if ([NSStringFromClass(part.class) containsString:@"Discovery_DJElementKit"]) return SGRHomeKindKeep;
     }
-    return stack.arrangedSubviews.count >= 2 ? SGRHomeKindDrop : SGRHomeKindPending;
+    return SGRHomeKindPending;
 }
 
 // Before the cell is measured, so the height it reports is without the heading.
@@ -103,7 +101,8 @@ static SGRHomeKind kindOf(UIView *content, NSString **rootName) {
     if (shelf && [root isKindOfClass:shelf]) return SGRHomeKindKeep;
     if ([root isKindOfClass:UICollectionView.class]) return gridKind((UICollectionView *)root);
     if ([root isKindOfClass:UIStackView.class]) return stackKind((UIStackView *)root);
-    return SGRHomeKindDrop;
+    if ([NSStringFromClass(root.class) containsString:@"MediumCardAnimatingLayout"]) return SGRHomeKindDrop;
+    return SGRHomeKindPending;
 }
 
 // A dropped section's cell is 0 tall, but what it holds keeps the height it measured at, hidden and cut off

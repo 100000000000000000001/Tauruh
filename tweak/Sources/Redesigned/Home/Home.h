@@ -1,9 +1,9 @@
 // The Home redesign: Spotify's Home page kept, with its controllers, lists and cards, decluttered to a
 // music app on black and restyled from the Kit. No settings of its own.
 //
-//     HomeSections.x   an allow list of the feed's sections: the shortcuts grid, the DJ and the shelves of
-//                      cards stay; video and episode previews, episode cards and any new kind collapse. The
-//                      DJ loses its heading, and the flags the redesign forces on Home
+//     HomeSections.x   known video and episode sections collapse; the shortcuts grid, DJ and shelves of
+//                      cards stay, and unknown feed sections remain visible. The DJ loses its heading, and
+//                      the flags the redesign forces on Home
 //     HomeHeader.x     a large title where the filter pills were, the avatar at the trailing edge, no scrim
 //     HomeHeadings.x   the shelves' headings in the Music app's size, drawn over Spotify's
 //     HomeCards.x      the Encore button every card is: shortcut tiles (HomeTiles.m), continuous corners on the
