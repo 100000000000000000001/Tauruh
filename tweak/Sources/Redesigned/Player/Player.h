@@ -72,6 +72,9 @@ void SGRPlayerLyricsChanged(void);
 #define SGRKeyHidePlayerVolumeThumb @"spotifyglass.redesign.player.hideVolumeThumb"
 BOOL SGRPlayerVolumeOn(void);
 BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat margin);
+// PlayerLyrics.x: whether the lyrics fade holds the given bottom-stack view; while it does,
+// the lyrics own that view's alpha and the player's own layout passes leave it be.
+BOOL SGRLyricsFadedView(UIView *view);
 
 // The cover's color may tint the player's controls.
 #define SGRKeyPlayerFollowsCover @"spotifyglass.redesign.player.followsCover"
