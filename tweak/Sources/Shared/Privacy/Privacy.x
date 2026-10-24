@@ -22,6 +22,7 @@ static const size_t kRuleCount = sizeof(kRules) / sizeof(kRules[0]);
 
 static NSString *const kCounts = @"spotifyglass.privacy.counts";
 static NSMutableDictionary<NSString *, NSNumber *> *sg_counts;
+static BOOL sg_unsaved;   // counts counted since the counts were last written
 
 @interface SGBlockProtocol : NSURLProtocol
 @end
@@ -41,8 +42,24 @@ static void countOne(NSString *label) {
     @synchronized (SGBlockProtocol.class) {
         NSMutableDictionary<NSString *, NSNumber *> *counts = countsLocked();
         counts[label] = @(counts[label].unsignedIntegerValue + 1);
-        [NSUserDefaults.standardUserDefaults setObject:counts forKey:kCounts];
+        // Counting runs on the CFNetwork protocol thread: writing here synchronously deadlocks the app
+        // (a defaults write posts its observer relays on this thread while the main thread waits on it;
+        // hang 2026-10-23 15:24). The counts keep in memory and the leaving observer writes them once.
+        sg_unsaved = YES;
     }
+}
+
+// Persists the protocol-hook counts as the app leaves the screen, so they write on the main thread once
+// instead of synchronously from every blocked request (see countOne).
+__attribute__((constructor)) static void saveBlockedOnLeaving(void) {
+    [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:nil
+                                                usingBlock:^(NSNotification *note) {
+        @synchronized (SGBlockProtocol.class) {
+            if (!sg_unsaved) return;
+            [NSUserDefaults.standardUserDefaults setObject:countsLocked() forKey:kCounts];
+            sg_unsaved = NO;
+        }
+    }];
 }
 
 static NSString *labelFor(NSURL *url) {
