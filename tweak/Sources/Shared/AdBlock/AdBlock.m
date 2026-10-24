@@ -149,8 +149,10 @@ void SGAdBlockCountOne(NSString *label) {
     @synchronized (kCounts) {
         NSMutableDictionary<NSString *, NSNumber *> *counts = countsLocked();
         counts[label] = @(counts[label].unsignedIntegerValue + 1);
-        [NSUserDefaults.standardUserDefaults setObject:counts forKey:kCounts];
-        sg_unsaved = NO;
+        // Counting runs on whichever thread a request finishes on: writing here synchronously deadlocks
+        // the app (a defaults write posts its observer relays on this queue while the main thread waits
+        // on it; hang 2026-10-23). The counts keep in memory and the leaving observer writes them once.
+        sg_unsaved = YES;
     }
 }
 
