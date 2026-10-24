@@ -377,6 +377,10 @@ static void fadeControls(BOOL faded) {
     }
 }
 
+BOOL SGRLyricsFadedView(UIView *view) {
+    return view && sg_faded && [sg_faded containsObject:view];
+}
+
 // Where the lines go on their own: from where they start under the title row down to the bottom of the
 // safe area, over the controls that faded.
 static CGRect aloneStage(UIView *host, SGRLyricsLayout l) {
