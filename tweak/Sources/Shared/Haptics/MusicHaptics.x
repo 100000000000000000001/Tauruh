@@ -259,6 +259,9 @@ static float strength(void) {
     return (float)loadDouble(&sg_strengthBits);
 }
 
+// Every player-thread state change races nothing: the stopped/reset handlers may run on any
+// thread, so they only set the atomic flag, and the loop itself breaks down the state through
+// it. A stop call on a dead engine raises - stop sites check and ring before calling.
 static BOOL startEngine(void) {
     static BOOL supported, checked;
     static double retryAt;
@@ -306,7 +309,15 @@ static BOOL startEngine(void) {
 }
 
 static void stopEngine(void) {
-    [sg_rumble stopAtTime:CHHapticTimeImmediate error:nil];
+    if (sg_rumble && sg_engineRunning) {
+        @try {
+            [sg_rumble stopAtTime:CHHapticTimeImmediate error:nil];
+        } @catch (NSException *e) {
+            SGLog(@"music haptics: the rumble stop threw %@", e.reason);
+            atomic_store(&sg_engineStopped, true);
+            sg_engineRunning = NO;
+        }
+    }
     sg_rumble = nil;
     sg_rumbling = NO;
     if (sg_engineRunning) [sg_engine stopWithCompletionHandler:nil];
@@ -379,8 +390,13 @@ static void playPreview(BOOL rumbles) {
 }
 
 static void stopRumble(NSTimeInterval at) {
-    if (!sg_rumbling) return;
-    [sg_rumble stopAtTime:at error:nil];
+    if (!sg_rumbling || !sg_engineRunning || !sg_rumble) return;
+    @try {
+        [sg_rumble stopAtTime:at error:nil];
+    } @catch (NSException *e) {
+        SGLog(@"music haptics: the rumble stop threw %@", e.reason);
+        atomic_store(&sg_engineStopped, true);
+    }
     sg_rumbling = NO;
 }
 
